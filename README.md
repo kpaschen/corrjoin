@@ -1,1 +1,3 @@
 # corrjoin
+
+Correlating Prometheus timeseries
