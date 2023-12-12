@@ -106,5 +106,22 @@ func TestSVD(t *testing.T) {
    if math.Abs(svd.data.At(0,0) - svd.data.At(1,0)) > 0.001 {
       t.Errorf("expected values in first vector to be the same")
    }
-   fmt.Printf("svd returned %+v\n", svd.data)
+}
+
+func TestCorrelationPairs(t *testing.T) {
+   initialTsData := []float64{
+      0.1, 0.2, 0.3, 0.4,
+      1.1, 1.2, 1.3, 1.4,
+      1.1, 1.2, 1.3, 1.4,
+      2.1, 2.2, 2.3, 2.4,
+   }
+   initial := mat.NewDense(4, 4, initialTsData)
+   tswindow := &TimeseriesWindow{
+       data: initial,
+   }
+   pairs, err := tswindow.CorrelationPairs(initial, 4, 3, 0.9)
+   if err != nil {
+      t.Errorf("unexpected error in correlationpairs: %v", err)
+   }
+   fmt.Printf("pairs: %+v\n", pairs)
 }

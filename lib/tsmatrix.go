@@ -8,15 +8,12 @@ import (
    "corrjoin/lib/svd"
 )
 
+// A TimeseriesWindow is a sliding window over a list of timeseries.
+// TODO: make this keep track of the number of shifts that have happend, or 
+// some kind of absolute timestamp.
 type TimeseriesWindow struct {
    data *mat.Dense
 }
-
-type CorrelationResult struct {
-   timeSeriesOne int
-   timeSeriesTwo int
-   pearson float32
-}  
 
 // shift _buffer_ into _w_ from the right, displacing the first buffer.width columns
 // of w.
@@ -44,20 +41,23 @@ func (w *TimeseriesWindow) shiftBuffer(buffer TimeseriesWindow) error {
    return nil
 }
 
-func (w *TimeseriesWindow) normalizeWindow() {
-   rowCount, _ := w.data.Dims()
+// This copies the original matrix instead of modifying it in place because
+// we will need a part of the original matrix when computing the normalizations
+// for the subsequent shifts.
+func (w *TimeseriesWindow) normalizeWindow() *TimeseriesWindow {
+   newMatrix := mat.DenseCopyOf(w.data)
+   rowCount, _ := newMatrix.Dims()
    for i := 0; i < rowCount; i++ {
-      paa.NormalizeSlice(w.data.RawRowView(i))
+      paa.NormalizeSlice(newMatrix.RawRowView(i))
    }
+   return &TimeseriesWindow{ data: newMatrix }
 }
 
 func (w *TimeseriesWindow) PAA(targetColumnCount int) *TimeseriesWindow {
    rowCount, _ := w.data.Dims()
    result := mat.NewDense(rowCount, targetColumnCount, nil)
    for i := 0; i < rowCount; i++ {
-      fmt.Printf("raw data in row %d: %+v\n", i, w.data.RawRowView(i))
       row := paa.PAA(w.data.RawRowView(i), targetColumnCount)
-      fmt.Printf("reduced: %+v\n", row)
       result.SetRow(i, row)
    }
    return &TimeseriesWindow{
@@ -65,53 +65,23 @@ func (w *TimeseriesWindow) PAA(targetColumnCount int) *TimeseriesWindow {
    }
 }
 
-func (w *TimeseriesWindow) BucketingFilter(dimensions int, theta float32, windowSize int) (
-   []CorrelationResult, error) {
-   scheme := buckets.NewBucketingScheme(dimensions, theta, windowSize) 
-   rowCount, _ := w.data.Dims()
-   // First fill the bucketing scheme.
-   for i := 0; i < rowCount; i++ {
-      coordinates, err := scheme.Assign(w.data.RawRowView(i))
-      _ = coordinates
-      if err != nil {
-         return nil, err
-      }
+// CorrelationPairs returns a list of pairs of row indices
+// and their pearson correlations.
+func (w *TimeseriesWindow) CorrelationPairs(originalMatrix *mat.Dense,
+      ks int, ke int, correlationThreshold float64) (map[buckets.RowPair]float64, error) {
+   scheme := buckets.NewBucketingScheme(originalMatrix, w.data, ks, ke, correlationThreshold)
+   err := scheme.Initialize()
+   if err != nil {
+      return nil, err
    }
-   // Now retrieve correlation candidates from all the buckets.
-   buckets := scheme.Buckets()
-   for _, b := range buckets {
-      candidates := scheme.CorrelationCandidates(b)
-      fmt.Printf("correlation candidates in bucket %s and its neighbours: %v\n",
-      b, candidates)
+   pairs, err := scheme.CorrelationCandidates()
+   if err != nil {
+      return nil, err
    }
-   return nil, nil
-}
-
-func (w *TimeseriesWindow) FullSVD() *TimeseriesWindow {
-   var svd mat.SVD
-   ok := svd.Factorize(w.data, mat.SVDThinV)
-   if !ok { return nil }
-   var dst mat.Dense // This will hold V in matrix form
-   svd.VTo(&dst)
-   // values := svd.Values(nil)
-
-   // The R code for the paper actually returns V * S where S is the 
-   // diagonal matrix with the singular values, but it also doesn't appear
-   // to sort the singular values by size first.
-
-  // see also: https://stats.stackexchange.com/questions/79043/why-pca-of-data-by-means-of-svd-of-the-data
-   // S := mat.NewDiagDense(len(values), values)
-   // var ret mat.Dense
-   // ret.Product(S, dst.T())
-
-   // Just use v here without additional scaling by the singular values.
-
-   // TODO: call Slice to truncate u and v
-   _, c := dst.Dims()
-   r, _ := w.data.Dims()
-   result := mat.NewDense(c, r, nil)
-   result.Product(w.data, &dst)
-   return &TimeseriesWindow{ data: result }
+   stats := scheme.Stats()
+   fmt.Printf("correlation pair statistics:\npairs compared in r1: %d\npairs rejected by r1: %d\npairs compared in r2: %d\npairs rejected by r2: %d\npairs compared using pearson: %d\npairs rejected by pearson: %d\n",
+      stats[0], stats[1], stats[2], stats[3], stats[4], stats[5])
+   return pairs, nil
 }
 
 func (w *TimeseriesWindow) SVD(k int) (*TimeseriesWindow, error) {
