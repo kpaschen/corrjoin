@@ -36,10 +36,15 @@ func NormalizeSlice(slice []float64) {
       sumOfSquares += diff * diff
    }
    normalizingFactor := math.Sqrt(sumOfSquares)
-
-   for i := 0; i < length; i++ {
-      diff := slice[i] - avg
-      slice[i] = diff / normalizingFactor
+   if normalizingFactor == 0.0 {
+      for i := 0; i < length; i++ {
+         slice[i] = 0.0
+      }
+   } else {
+      for i := 0; i < length; i++ {
+         diff := slice[i] - avg
+         slice[i] = diff / normalizingFactor
+      }
    }
 }
 

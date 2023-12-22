@@ -2,8 +2,10 @@ package lib
 
 import (
    "fmt"
+   "math"
    "gonum.org/v1/gonum/mat"
    "corrjoin/lib/buckets"
+   "corrjoin/lib/correlation"
    "corrjoin/lib/paa"
    "corrjoin/lib/svd"
 )
@@ -13,6 +15,10 @@ import (
 // some kind of absolute timestamp.
 type TimeseriesWindow struct {
    data *mat.Dense
+}
+
+func NewTimeseriesWindow(data *mat.Dense) *TimeseriesWindow {
+    return &TimeseriesWindow{ data: data }
 }
 
 // shift _buffer_ into _w_ from the right, displacing the first buffer.width columns
@@ -65,6 +71,28 @@ func (w *TimeseriesWindow) PAA(targetColumnCount int) *TimeseriesWindow {
    }
 }
 
+func (w *TimeseriesWindow) AllPairs(matrix *mat.Dense, correlationThreshold float64) (
+    map[buckets.RowPair]float64, error) {
+   ret := map[buckets.RowPair]float64{} 
+   pearsonFilter := 0
+
+   rc, _ := matrix.Dims()
+   for i := 0; i < rc; i++ {
+      r1 := matrix.RawRowView(i)
+      for j := i+1; j < rc; j++ {
+         r2 := matrix.RawRowView(j)
+         pearson, err := correlation.PearsonCorrelation(r1, r2)
+         if err != nil { return nil, err }
+         if math.Abs(pearson) >= correlationThreshold {
+            pair := buckets.NewRowPair(i, j)
+            ret[*pair] = pearson
+         } else { pearsonFilter++ }
+      }
+   }
+   fmt.Printf("full pairs: rejected %d pairs using pearson threshold\n", pearsonFilter)
+   return ret, nil
+}
+
 // CorrelationPairs returns a list of pairs of row indices
 // and their pearson correlations.
 func (w *TimeseriesWindow) CorrelationPairs(originalMatrix *mat.Dense,
@@ -81,6 +109,13 @@ func (w *TimeseriesWindow) CorrelationPairs(originalMatrix *mat.Dense,
    stats := scheme.Stats()
    fmt.Printf("correlation pair statistics:\npairs compared in r1: %d\npairs rejected by r1: %d\npairs compared in r2: %d\npairs rejected by r2: %d\npairs compared using pearson: %d\npairs rejected by pearson: %d\n",
       stats[0], stats[1], stats[2], stats[3], stats[4], stats[5])
+
+   r, _ := originalMatrix.Dims()
+   totalRows := float32(r * r / 2) 
+   fmt.Printf("r1 pruning rate: %f\nr2 pruning rate: %f\n", float32(stats[1]) / totalRows,
+      float32(stats[3])/totalRows)
+   fmt.Printf("there were %f total comparisons and after bucketing we did %d or %f\n",
+      totalRows, stats[0], float32(stats[0])/totalRows)
    return pairs, nil
 }
 

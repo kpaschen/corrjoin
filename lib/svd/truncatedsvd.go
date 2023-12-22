@@ -31,6 +31,9 @@ func (t * TruncatedSVD) FitTransform(m mat.Matrix) (*mat.Dense, error) {
    if !ok {
       return nil, fmt.Errorf("Failed to find SVD of input matrix")
    }
+   //singulars := svd.Values(nil)
+   //fmt.Printf("singular values: %v\n", singulars)
+
    var v mat.Dense
    svd.VTo(&v)
 

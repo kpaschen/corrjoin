@@ -23,6 +23,10 @@ type RowPair struct {
    r2 int
 }
 
+func NewRowPair(r1 int, r2 int) *RowPair {
+   return &RowPair{r1: r1, r2: r2}
+}
+
 // k-dimensional items are assigned into a k-dimensional bucketing scheme
 // by finding a bucket at each dimension.
 type BucketingScheme struct {
@@ -77,10 +81,18 @@ func NewBucketingScheme(originalMatrix *mat.Dense,
    _, originalColumnCount := originalMatrix.Dims()
    _, postSvdColumnCount := svdOutputMatrix.Dims()
 
+   fmt.Printf("using n = %d\n", originalColumnCount)
+
    // epsilon1 = sqrt(2 ks (1 - correlationThreshold) / n)
-   epsilon1 := math.Sqrt(float64(2 * ks) * (1.0 - correlationThreshold) / float64(originalColumnCount))
+   // The paper has the ks and ke factors here but the R code doesn't, and 
+   // the buckets get too large with these factors.
+   // epsilon1 := math.Sqrt(float64(2 * ks) * (1.0 - correlationThreshold) / float64(originalColumnCount))
+   epsilon1 := math.Sqrt(float64(2) * (1.0 - correlationThreshold) / float64(originalColumnCount))
    // epsilon2 = sqrt(2 ks (1 - correlationThreshold) / n)
-   epsilon2 := math.Sqrt(float64(2 * ke) * (1.0 - correlationThreshold) / float64(originalColumnCount))
+   // epsilon2 := math.Sqrt(float64(2 * ke) * (1.0 - correlationThreshold) / float64(originalColumnCount))
+   epsilon2 := math.Sqrt(float64(2) * (1.0 - correlationThreshold) / float64(originalColumnCount))
+
+   fmt.Printf("epsilon1 %f epsilon2 %f, T %f\n", epsilon1, epsilon2, correlationThreshold)
 
    return &BucketingScheme{
       originalMatrix: originalMatrix,
@@ -117,9 +129,9 @@ func (s *BucketingScheme) Initialize() error {
       return fmt.Errorf("svd output matrix needs to be length %d but is length %d",
           s.dimensions, columnCount)
    }
-   coordinates := make([]int, columnCount, columnCount) 
    for i := 0; i < rowCount; i++ {
       vec := s.svdOutputMatrix.RawRowView(i)
+      coordinates := make([]int, columnCount, columnCount) 
       for j, v := range vec {
          coordinates[j] = s.BucketIndex(v)
       }
@@ -133,8 +145,8 @@ func (s *BucketingScheme) Initialize() error {
             members: []int{i},
          }
       }
-      for j := 0; j < columnCount; j++ { coordinates[j] = 0 }
    }
+
    return nil
 }
 
@@ -156,8 +168,8 @@ func (s *BucketingScheme) CorrelationCandidates() (map[RowPair]float64, error) {
       for _, c := range candidates {
          s.pearsonProcessedCount++
          pearson, err := correlation.PearsonCorrelation(
-            s.svdOutputMatrix.RawRowView(c.r1),
-            s.svdOutputMatrix.RawRowView(c.r2))
+            s.originalMatrix.RawRowView(c.r1),
+            s.originalMatrix.RawRowView(c.r2))
          if err != nil {
             return nil, err
          }
@@ -174,66 +186,96 @@ func (s *BucketingScheme) CorrelationCandidates() (map[RowPair]float64, error) {
 // candidatesForBucket returns a list of rowPairs for Bucket
 // and its neighbours.
 func (s *BucketingScheme) candidatesForBucket(bucket *Bucket) ([]RowPair, error) {
-   flatList := make([]int, 0)
-   flatList = append(flatList, bucket.members...)
+   ret := make([]RowPair, 0)
+   for i := 0; i < len(bucket.members); i++ {
+      r1 := bucket.members[i]
+      for j := i + 1; j < len(bucket.members); j++ {
+         r2 := bucket.members[j]
+         if r1 == r2 {
+            return nil, fmt.Errorf("duplicate entry %d in bucket %s", r1,
+               BucketName(bucket.coordinates))
+         }
+         if r1 > r2 {
+            r1, r2 = r2, r1 
+         }
+         rp := RowPair{r1: r1, r2: r2}
+         ok, err := s.filterPair(rp)
+         if err != nil { return nil, err }
+         if ok {
+            ret = append(ret, rp)
+         }
+      }
+   }
+
    n := neighbourCoordinates(bucket.coordinates)
    for _, d := range n {
       name := BucketName(d)
       neighbour, exists := s.buckets[name]
       if exists {
-         // name is the name of a neighbouring bucket
-         flatList = append(flatList, neighbour.members...)
-      }
-   }
-   ret := make([]RowPair, 0)
-   for i := 0; i < len(flatList); i++ {
-      firstElement := flatList[i]
-      for j := i+1; j < len(flatList); j++ {
-         secondElement := flatList[j]
-         if firstElement > secondElement {
-            firstElement, secondElement = secondElement, firstElement
+         for _, r1 := range bucket.members {
+            for _, r2 := range neighbour.members {
+               if r1 == r2 {
+                  return nil, fmt.Errorf("element %d is in buckets %s and %s", r1,
+                     BucketName(bucket.coordinates), name)
+               }
+               rp := RowPair{r1: r1, r2: r2}
+               if r1 > r2 {
+                  rp = RowPair{r1: r2, r2: r1}
+               }
+               ok, err := s.filterPair(rp)
+               if err != nil { return nil, err }
+               if ok {
+                  ret = append(ret, rp)
+               }
+            }
          }
-         rp := RowPair{ r1: firstElement, r2: secondElement }
-         _, exists := s.scores[rp]
-         if exists { continue } // already looked at this pair
-         vec1 := s.svdOutputMatrix.RawRowView(firstElement)
-         vec2 := s.svdOutputMatrix.RawRowView(secondElement)
-         s.r1ProcessedCount++
-         distance, err := correlation.EuclideanDistance(vec1, vec2)
-         if err != nil {
-             return nil, err
-         }
-         s.scores[rp] = distance
-         if distance > s.epsilon1 {
-            s.r1FilterCount++
-            continue
-         }
-         // Next filtering step needs to apply PAA (with s.ke target dimensions)
-         // to s.originalMatrix[firstElement] and secondElement and compare
-         // their euclidean distances to s.epsilon2
-         paaVec1, exists := s.paa2[firstElement]
-         if !exists {
-            input := s.originalMatrix.RawRowView(firstElement)
-            paaVec1 = paa.PAA(input, s.ke)
-            s.paa2[firstElement] = paaVec1
-         }
-         paaVec2, exists := s.paa2[secondElement]
-         if !exists {
-            input := s.originalMatrix.RawRowView(secondElement)
-            paaVec2 = paa.PAA(input, s.ke)
-            s.paa2[secondElement] = paaVec2
-         }
-         s.r2ProcessedCount++
-         distance, err = correlation.EuclideanDistance(paaVec1, paaVec2)
-         if err != nil { return nil, err }
-         if distance > s.epsilon2 {
-            s.r2FilterCount++
-            continue
-         }
-         ret = append(ret, rp)
       }
    }
    return ret, nil
+}
+
+func (s *BucketingScheme) filterPair(pair RowPair) (bool, error) {
+   _, exists := s.scores[pair]
+   if exists { 
+      return false, nil
+   }
+
+   // This is unnecessary if the pair came from the same bucket.
+   vec1 := s.svdOutputMatrix.RawRowView(pair.r1)
+   vec2 := s.svdOutputMatrix.RawRowView(pair.r2)
+   s.r1ProcessedCount++
+   distance, err := correlation.EuclideanDistance(vec1, vec2)
+   if err != nil {
+       return false, err
+   }
+   s.scores[pair] = distance
+   if distance > s.epsilon1 {
+      s.r1FilterCount++
+      return false, nil
+   }
+   // Next filtering step needs to apply PAA (with s.ke target dimensions)
+   // to s.originalMatrix[firstElement] and secondElement and compare
+   // their euclidean distances to s.epsilon2
+   paaVec1, exists := s.paa2[pair.r1]
+   if !exists {
+      input := s.originalMatrix.RawRowView(pair.r1)
+      paaVec1 = paa.PAA(input, s.ke)
+      s.paa2[pair.r1] = paaVec1
+   }
+   paaVec2, exists := s.paa2[pair.r2]
+   if !exists {
+      input := s.originalMatrix.RawRowView(pair.r2)
+      paaVec2 = paa.PAA(input, s.ke)
+      s.paa2[pair.r2] = paaVec2
+   }
+   s.r2ProcessedCount++
+   distance, err = correlation.EuclideanDistance(paaVec1, paaVec2)
+   if err != nil { return false, err }
+   if distance > s.epsilon2 {
+      s.r2FilterCount++
+      return false, nil
+   }
+   return true, nil
 }
 
 func neighbourCoordinates(input []int) [][]int {
