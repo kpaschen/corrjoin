@@ -27,6 +27,8 @@ func (w *TimeseriesWindow) FullPearson(processor TimeseriesProcessor,
       }
    }
 
+   r, _ := w.data.Dims()
+
    originalMatrix := w
 
    // Normalize _window_
@@ -36,9 +38,39 @@ func (w *TimeseriesWindow) FullPearson(processor TimeseriesProcessor,
       processor.CorrelationThreshold)
    if err != nil { return err }
 
-   for pair, corr := range pairs {
-      fmt.Printf("row pair %+v is correlated: %f\n", pair, corr)
+   totalPairs := r * r / 2
+
+   fmt.Printf("found %d correlated pairs out of %d possible (%d)\n", len(pairs), totalPairs,
+      100 * len(pairs) / totalPairs)
+
+   return nil
+}
+
+func (w *TimeseriesWindow) PAAOnly(processor TimeseriesProcessor,
+   buffer *TimeseriesWindow) error {
+   if buffer != nil {
+      // Shift _buffer_ into _window_. The stride length is equal to the
+      // width of _buffer_. 
+      err := w.shiftBuffer(*buffer)
+      if err != nil {
+         return err
+      }
    }
+
+   normalizedMatrix := w.normalizeWindow() 
+   // normalizedMatrix := w
+
+   // Reduce dimensions of w to processor.svdDimensions
+   postPAA := normalizedMatrix.PAA(processor.SvdDimensions)
+
+   paaPairs, err := postPAA.PAAPairs(normalizedMatrix.data, processor.CorrelationThreshold)
+   if err != nil { return err }
+
+   r, _ := w.data.Dims()
+   totalPairs := r * r / 2
+
+   fmt.Printf("found %d correlated pairs out of %d possible (%d)\n", len(paaPairs), totalPairs,
+      100 * len(paaPairs) / totalPairs)
    return nil
 }
 
@@ -54,12 +86,8 @@ func (w *TimeseriesWindow) ProcessBuffer(processor TimeseriesProcessor,
       }
    }
 
-   // Need to keep the original matrix intact because
-   // we have to normalize again after the next buffer arrives.
    originalMatrix := w
-
-   // Normalize _window_
-   normalizedMatrix := originalMatrix.normalizeWindow()
+   normalizedMatrix := originalMatrix.normalizeWindow() 
 
    // Reduce dimensions of w to processor.svdDimensions
    windowForSvd := normalizedMatrix.PAA(processor.SvdDimensions)
@@ -75,9 +103,11 @@ func (w *TimeseriesWindow) ProcessBuffer(processor TimeseriesProcessor,
       processor.CorrelationThreshold)
    if err != nil { return err }
 
-   for pair, corr := range pairs {
-      fmt.Printf("row pair %+v is correlated: %f\n", pair, corr)
-   }
+   r, _ := w.data.Dims()
+   totalPairs := r * r / 2
+
+   fmt.Printf("found %d correlated pairs out of %d possible (%d)\n", len(pairs), totalPairs,
+      100 * len(pairs) / totalPairs)
 
    return nil
 }
