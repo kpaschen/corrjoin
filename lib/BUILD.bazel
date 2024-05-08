@@ -1,0 +1,26 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "lib",
+    srcs = [
+        "process_ts_window.go",
+        "tsmatrix.go",
+    ],
+    importpath = "github.com/kpaschen/corrjoin/lib",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//lib/buckets",
+        "//lib/correlation",
+        "//lib/paa",
+        "//lib/svd",
+        "@org_gonum_v1_gonum//mat",
+    ],
+)
+
+go_test(
+    name = "lib_test",
+    size = "small",
+    srcs = ["tsmatrix_test.go"],
+    embed = [":lib"],
+    deps = ["@org_gonum_v1_gonum//mat"],
+)

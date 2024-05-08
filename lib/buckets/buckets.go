@@ -4,8 +4,8 @@ import (
    "fmt"
    "math"
    "gonum.org/v1/gonum/mat"
-   "corrjoin/lib/correlation"
-   "corrjoin/lib/paa"
+   "github.com/kpaschen/corrjoin/lib/correlation"
+   "github.com/kpaschen/corrjoin/lib/paa"
 )
 
 // A Bucket is an n-dimensional epsilon-tree leaf.

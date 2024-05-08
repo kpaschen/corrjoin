@@ -1,4 +1,4 @@
-module corrjoin
+module github.com/kpaschen/corrjoin
 
 go 1.21.1
 
