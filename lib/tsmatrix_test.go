@@ -17,9 +17,9 @@ func TestNormalizeWindow(t *testing.T) {
    tswindow := &TimeseriesWindow{
        data: initial,
    }
-   tswindow.normalizeWindow()
+   normal := tswindow.normalizeWindow()
 
-   fmt.Printf("normalized: %+v\n", tswindow.data)
+   fmt.Printf("normalized: %+v\n", normal.data)
 }
 
 func TestShiftBuffer(t *testing.T) {
@@ -76,6 +76,16 @@ func TestPAA(t *testing.T) {
    rows, columns := reduced.data.Dims()  
    if rows != 3 || columns != 2 {
       t.Errorf("Expected post-PAA matrix to have 3 rows and 2 columns but got (%d, %d)", rows, columns)
+   }
+   expectedData := []float64{
+      0.15, 0.35,
+      1.15, 1.35,
+      2.15, 2.35,
+   }
+   expected := mat.NewDense(3, 2, expectedData)
+
+   if !mat.EqualApprox(reduced.data, expected, 0.0001) {
+      t.Errorf("expected shifted matrix to be %+v but got %v", expected, reduced.data)
    }
 }
 

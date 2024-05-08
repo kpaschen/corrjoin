@@ -81,16 +81,13 @@ func NewBucketingScheme(originalMatrix *mat.Dense,
    _, originalColumnCount := originalMatrix.Dims()
    _, postSvdColumnCount := svdOutputMatrix.Dims()
 
-   fmt.Printf("using n = %d\n", originalColumnCount)
+   fmt.Printf("using n = %d and svd output columns %d\n", originalColumnCount, postSvdColumnCount)
 
    // epsilon1 = sqrt(2 ks (1 - correlationThreshold) / n)
-   // The paper has the ks and ke factors here but the R code doesn't, and 
-   // the buckets get too large with these factors.
-   // epsilon1 := math.Sqrt(float64(2 * ks) * (1.0 - correlationThreshold) / float64(originalColumnCount))
-   epsilon1 := math.Sqrt(float64(2) * (1.0 - correlationThreshold) / float64(originalColumnCount))
-   // epsilon2 = sqrt(2 ks (1 - correlationThreshold) / n)
-   // epsilon2 := math.Sqrt(float64(2 * ke) * (1.0 - correlationThreshold) / float64(originalColumnCount))
-   epsilon2 := math.Sqrt(float64(2) * (1.0 - correlationThreshold) / float64(originalColumnCount))
+   epsilon1 := math.Sqrt(float64(2 * ks) * (1.0 - correlationThreshold) / float64(originalColumnCount))
+
+   // epsilon2 = sqrt(2 ke (1 - correlationThreshold) / n)
+   epsilon2 := math.Sqrt(float64(2 * ke) * (1.0 - correlationThreshold) / float64(originalColumnCount))
 
    fmt.Printf("epsilon1 %f epsilon2 %f, T %f\n", epsilon1, epsilon2, correlationThreshold)
 
@@ -173,7 +170,7 @@ func (s *BucketingScheme) CorrelationCandidates() (map[RowPair]float64, error) {
          if err != nil {
             return nil, err
          }
-         if math.Abs(pearson) >= s.correlationThreshold {
+         if pearson >= s.correlationThreshold {
             ret[c] = pearson
          } else {
             s.pearsonFilterCount++

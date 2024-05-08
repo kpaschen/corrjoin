@@ -83,13 +83,86 @@ func (w *TimeseriesWindow) AllPairs(matrix *mat.Dense, correlationThreshold floa
          r2 := matrix.RawRowView(j)
          pearson, err := correlation.PearsonCorrelation(r1, r2)
          if err != nil { return nil, err }
-         if math.Abs(pearson) >= correlationThreshold {
+         if pearson >= correlationThreshold {
             pair := buckets.NewRowPair(i, j)
             ret[*pair] = pearson
          } else { pearsonFilter++ }
       }
    }
    fmt.Printf("full pairs: rejected %d pairs using pearson threshold\n", pearsonFilter)
+   return ret, nil
+}
+
+func (w *TimeseriesWindow) PAAPairs(originalMatrix *mat.Dense, correlationThreshold float64) (
+   map[buckets.RowPair]float64, error) {
+
+   ret := map[buckets.RowPair]float64{} 
+   paaFilter := 0
+   fp := 0
+   fn := 0
+
+   r, c := w.data.Dims()
+   _, originalN := originalMatrix.Dims()
+
+   fmt.Printf("post-paa matrix has %d columns, original has %d\n", c, originalN)
+
+   epsilon := math.Sqrt(float64(2 * c) * (1.0 - correlationThreshold) / float64(originalN))
+   fmt.Printf("epsilon is %f\n", epsilon)
+
+   // The smallest fp is the one closest to the tp line
+   smallestFp := float64(10.0)
+   // The largest tp is closest to the tp line on the other side
+   largestTp := float64(0.0)
+
+   lineCount := r
+   for i := 0; i < lineCount; i++ {
+      r1 := w.data.RawRowView(i)
+      s1 := originalMatrix.RawRowView(i)
+      for j := i+1; j < lineCount; j++ {
+         r2 := w.data.RawRowView(j)
+         distance, err := correlation.EuclideanDistance(r1, r2) 
+         if err != nil {
+            return nil, err
+         }
+         if distance > epsilon {
+            paaFilter++
+         }
+         s2 := originalMatrix.RawRowView(j)
+         pearson, err := correlation.PearsonCorrelation(s1, s2)
+         if err != nil { return nil, err }
+
+         // pearson > T and distance <= epsilon: true positive
+         // pearson > T and distance > epsilon: false negative
+         // pearson <= T and distance <= epsilon: false positive
+         // pearson <= T and distance > epsilon: true negative
+         if pearson >= correlationThreshold {
+            pair := buckets.NewRowPair(i, j)
+            ret[*pair] = pearson
+
+            if distance > epsilon {  // false negative
+               fmt.Printf("false negative: euclidean distance between rows %d and %d is %f > %f but correlation coefficient is %f\n", i, j, distance, epsilon, pearson)
+               fn++
+            } else {  // true positive
+              if distance > largestTp {
+                 largestTp = distance
+              }
+            }
+         } else {
+            if distance <= epsilon {
+               if distance < smallestFp {
+                  smallestFp = distance
+               }
+               fp++
+            }
+         }
+      }
+   }
+   fmt.Printf("rejected %d pairs using paa filter, returning %d\n", paaFilter, len(ret))
+   // False negative means paa would have rejected a correlated pair, those
+   // are the bad ones.
+   // A high false positive count just means the filter is ineffective.
+   fmt.Printf("false positive count: %d, false negatives: %d\n", fp, fn)
+   fmt.Printf("largest tp: %f, smallest fp: %f\n", largestTp, smallestFp)
    return ret, nil
 }
 
