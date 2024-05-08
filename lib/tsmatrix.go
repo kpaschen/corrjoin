@@ -4,10 +4,10 @@ import (
    "fmt"
    "math"
    "gonum.org/v1/gonum/mat"
-   "corrjoin/lib/buckets"
-   "corrjoin/lib/correlation"
-   "corrjoin/lib/paa"
-   "corrjoin/lib/svd"
+   "github.com/kpaschen/corrjoin/lib/buckets"
+   "github.com/kpaschen/corrjoin/lib/correlation"
+   "github.com/kpaschen/corrjoin/lib/paa"
+   "github.com/kpaschen/corrjoin/lib/svd"
 )
 
 // A TimeseriesWindow is a sliding window over a list of timeseries.

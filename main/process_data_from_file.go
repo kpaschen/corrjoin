@@ -9,7 +9,7 @@ import (
    "runtime/pprof"
    "strings"
    "strconv"
-   "corrjoin/lib"
+   "github.com/kpaschen/corrjoin/lib"
 )
 
 func main() {
