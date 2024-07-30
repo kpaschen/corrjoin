@@ -4,6 +4,7 @@ go_library(
     name = "lib",
     srcs = [
         "process_ts_window.go",
+        "tsaccumulator.go",
         "tsmatrix.go",
     ],
     importpath = "github.com/kpaschen/corrjoin/lib",
@@ -18,9 +19,17 @@ go_library(
 )
 
 go_test(
-    name = "lib_test",
+    name = "matrix_test",
     size = "small",
     srcs = ["tsmatrix_test.go"],
+    embed = [":lib"],
+    deps = ["@org_gonum_v1_gonum//mat"],
+)
+
+go_test(
+    name = "acc_test",
+    size = "small",
+    srcs = ["tsaccumulator_test.go"],
     embed = [":lib"],
     deps = ["@org_gonum_v1_gonum//mat"],
 )

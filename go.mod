@@ -3,8 +3,6 @@ module github.com/kpaschen/corrjoin
 go 1.21.1
 
 require (
-	github.com/gogo/protobuf v1.3.2
-	github.com/golang/snappy v0.0.4
 	github.com/gorilla/mux v1.8.1
 	github.com/prometheus/client_golang v1.19.1
 	github.com/prometheus/common v0.53.0
@@ -17,7 +15,6 @@ require (
 	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.5.2 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/internal v1.5.2 // indirect
 	github.com/AzureAD/microsoft-authentication-library-for-go v1.2.2 // indirect
-	github.com/alecthomas/kingpin/v2 v2.4.0 // indirect
 	github.com/alecthomas/units v0.0.0-20231202071711-9a357b53e9c9 // indirect
 	github.com/aws/aws-sdk-go v1.51.25 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
@@ -28,7 +25,9 @@ require (
 	github.com/go-logfmt/logfmt v0.6.0 // indirect
 	github.com/go-logr/logr v1.4.1 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
+	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang-jwt/jwt/v5 v5.2.1 // indirect
+	github.com/golang/snappy v0.0.4 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/grafana/regexp v0.0.0-20221122212121-6b5c0a4cb7fd // indirect
 	github.com/hashicorp/go-version v1.6.0 // indirect
@@ -44,7 +43,6 @@ require (
 	github.com/prometheus/client_model v0.6.1 // indirect
 	github.com/prometheus/common/sigv4 v0.1.0 // indirect
 	github.com/prometheus/procfs v0.12.0 // indirect
-	github.com/xhit/go-str2duration/v2 v2.1.0 // indirect
 	go.opentelemetry.io/collector/featuregate v1.5.0 // indirect
 	go.opentelemetry.io/collector/pdata v1.5.0 // indirect
 	go.opentelemetry.io/collector/semconv v0.98.0 // indirect
