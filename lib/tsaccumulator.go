@@ -12,11 +12,9 @@ const (
 
 // A TimeseriesAccumulator keeps track of timeseries data as it arrives.
 // It maps the timeseries id (serialised name + labelset) to the tsmatrix
-// rowid and it accumulates data until it has reached the stride length or
-// the windowsize (for the first window).
-// Once it has reached the windowsize, it initializes the timeseries window.
-// Every time the accumulator reaches the stride length, it updates the timeseries
-// window by shifting the new stride into it.
+// rowid and it accumulates data until it has reached the stride length.
+// When it reaches the stride length, it sends the collected buffers to
+// a channel.
 // TODO: decide what to do if there is a computation ongoing at the time the
 // stride is reached.
 // TODO: handle NaN values
@@ -28,6 +26,9 @@ type TimeseriesAccumulator struct {
 	rowmap map[string]int
 
 	// buffers maps rowids to observations
+	// This is a map because it is possible for a timeseries that we have
+	// a rowid for to disappear, but maybe it would be easier to just make
+	// this an array of arrays.
 	buffers              map[int]([]float64)
 	maxRow               int
 	currentStrideStartTs time.Time
@@ -69,7 +70,7 @@ func (a *TimeseriesAccumulator) computeSlotIndex(timestamp time.Time) int32 {
 }
 
 func (a *TimeseriesAccumulator) extractMatrixData() [][]float64 {
-	ret := make([][]float64, len(a.buffers))
+	ret := make([][]float64, a.maxRow)
 	for i, b := range a.buffers {
 		ret[i] = b // This is a move
 		a.buffers[i] = make([]float64, a.stride, a.stride)

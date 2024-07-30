@@ -8,82 +8,131 @@ import (
 	"github.com/kpaschen/corrjoin/lib/svd"
 	"gonum.org/v1/gonum/mat"
 	"math"
+	"slices"
 )
 
 // A TimeseriesWindow is a sliding window over a list of timeseries.
 // TODO: make this keep track of the number of shifts that have happend, or
 // some kind of absolute timestamp.
 type TimeseriesWindow struct {
-	data *mat.Dense
+
+	// This is the raw data.
+	// Every row corresponds to a timeseries.
+	// Rows can be empty if they correspond to a timeseries that we haven't
+	// received data for in a while.
+	// TODO: figure out whether to remove those rows before computation or fill
+	// them with zeroes.
+	buffers [][]float64
+
+	// TODO: maintain the buffers normalized by keeping track of the
+	// normalization factor and the avg of the previous stride
+	normalized [][]float64
+
+	postPAA [][]float64
+
+	postSVD [][]float64
+
+	windowSize int
+
+	IsReady bool
 }
 
-func NewTimeseriesWindow(data *mat.Dense) *TimeseriesWindow {
-	return &TimeseriesWindow{data: data}
+func NewTimeseriesWindow(windowSize int) *TimeseriesWindow {
+	return &TimeseriesWindow{windowSize: windowSize, IsReady: false}
 }
 
 // shift _buffer_ into _w_ from the right, displacing the first buffer.width columns
 // of w.
-func (w *TimeseriesWindow) shiftBuffer(buffer TimeseriesWindow) error {
-	rowCount, columnCount := w.data.Dims()
-	bufferRows, bufferColumns := buffer.data.Dims()
-	if rowCount != bufferRows {
-		return fmt.Errorf("mismatched row count %d vs. %d in shiftBuffer", rowCount, bufferRows)
-	}
-	if bufferColumns > columnCount {
-		return fmt.Errorf("stride length %d is greater than window size %d", bufferColumns, columnCount)
-	}
-	if columnCount%bufferColumns != 0 {
-		return fmt.Errorf("stride length %d should be a divisor of window size %d", bufferColumns, columnCount)
+func (w *TimeseriesWindow) ShiftBuffer(buffer [][]float64) error {
+
+	// Weird but ok?
+	if len(buffer) == 0 {
+		return nil
 	}
 
-	// Should probably experiment with different implementations here.
-	// The code below is implementable using the existing mat.Dense type, which is nice,
-	// but it might not be memory-access-friendly especially for large matrices.
+	currentRowCount := len(w.buffers)
+	newColumnCount := len(buffer[0])
+	newRowCount := len(buffer)
 
-	// Remove the first /bufferColumns/ columns from w.
-	wWithoutBuffer := w.data.Slice(0, rowCount, bufferColumns, columnCount)
+	if currentRowCount > 0 && newRowCount != currentRowCount {
+		return fmt.Errorf("new buffer has wrong row count (%d, needed %d)", newRowCount, currentRowCount)
+	}
 
-	// Append buffer to the reduced slice.
-	// This performs an unnecessary copy of wWithoutBuffer
-	w.data.Augment(wWithoutBuffer, buffer.data)
+	// This is a new ts window receiving its first stride.
+	if currentRowCount == 0 {
+		// Stride should really always be < windowsize, but check here to be sure.
+		if newColumnCount <= w.windowSize {
+			w.buffers = buffer
+			return nil
+		} else {
+			w.buffers = make([][]float64, newRowCount)
+		}
+	}
 
+	currentColumnCount := len(w.buffers[0])
+
+	sliceLengthToDelete := currentColumnCount + newColumnCount - w.windowSize
+	if sliceLengthToDelete < 0 {
+		sliceLengthToDelete = 0
+	} else {
+		w.IsReady = true
+	}
+
+	// Append new data.
+	for i, buf := range w.buffers {
+		// This would leak memory if w.buffers[i] held anything other than a basic data type.
+		w.buffers[i] = append(buf[sliceLengthToDelete:], buffer[i]...)
+	}
 	return nil
 }
 
-// This copies the original matrix instead of modifying it in place because
-// we will need a part of the original matrix when computing the normalizations
-// for the subsequent shifts.
+// This could be computed incrementally after shiftBuffer.
 func (w *TimeseriesWindow) normalizeWindow() *TimeseriesWindow {
-	newMatrix := mat.DenseCopyOf(w.data)
-	rowCount, _ := newMatrix.Dims()
-	for i := 0; i < rowCount; i++ {
-		paa.NormalizeSlice(newMatrix.RawRowView(i))
+	if len(w.normalized) < len(w.buffers) {
+		w.normalized = slices.Grow(w.normalized, len(w.buffers)-len(w.normalized))
 	}
-	return &TimeseriesWindow{data: newMatrix}
+	for i, b := range w.buffers {
+		if i >= len(w.normalized) {
+			w.normalized = append(w.normalized, slices.Clone(b))
+		} else {
+			w.normalized[i] = slices.Clone(b)
+		}
+		paa.NormalizeSlice(w.normalized[i])
+	}
+	return w
 }
 
+// This could be computed incrementally after shiftBuffer.
 func (w *TimeseriesWindow) PAA(targetColumnCount int) *TimeseriesWindow {
-	rowCount, _ := w.data.Dims()
-	result := mat.NewDense(rowCount, targetColumnCount, nil)
-	for i := 0; i < rowCount; i++ {
-		row := paa.PAA(w.data.RawRowView(i), targetColumnCount)
-		result.SetRow(i, row)
+	if len(w.postPAA) < len(w.buffers) {
+		w.postPAA = slices.Grow(w.postPAA, len(w.buffers)-len(w.postPAA))
 	}
-	return &TimeseriesWindow{
-		data: result,
+	if len(w.normalized) < len(w.buffers) {
+		w.normalizeWindow()
 	}
+	for i, b := range w.normalized {
+		if i >= len(w.postPAA) {
+			w.postPAA = append(w.postPAA, paa.PAA(b, targetColumnCount))
+		} else {
+			w.postPAA[i] = paa.PAA(b, targetColumnCount)
+		}
+	}
+	return w
 }
 
-func (w *TimeseriesWindow) AllPairs(matrix *mat.Dense, correlationThreshold float64) (
+func (w *TimeseriesWindow) AllPairs(correlationThreshold float64) (
 	map[buckets.RowPair]float64, error) {
+
 	ret := map[buckets.RowPair]float64{}
 	pearsonFilter := 0
 
-	rc, _ := matrix.Dims()
+	w.normalizeWindow()
+
+	rc := len(w.normalized)
 	for i := 0; i < rc; i++ {
-		r1 := matrix.RawRowView(i)
+		r1 := w.normalized[i]
 		for j := i + 1; j < rc; j++ {
-			r2 := matrix.RawRowView(j)
+			r2 := w.normalized[j]
 			pearson, err := correlation.PearsonCorrelation(r1, r2)
 			if err != nil {
 				return nil, err
@@ -100,20 +149,23 @@ func (w *TimeseriesWindow) AllPairs(matrix *mat.Dense, correlationThreshold floa
 	return ret, nil
 }
 
-func (w *TimeseriesWindow) PAAPairs(originalMatrix *mat.Dense, correlationThreshold float64) (
+func (w *TimeseriesWindow) PAAPairs(paa int, correlationThreshold float64) (
 	map[buckets.RowPair]float64, error) {
 
 	ret := map[buckets.RowPair]float64{}
+	w.normalizeWindow()
+	w.PAA(paa)
 	paaFilter := 0
 	fp := 0
 	fn := 0
 
-	r, c := w.data.Dims()
-	_, originalN := originalMatrix.Dims()
+	r := len(w.postPAA)
+	c := len(w.postPAA[0])
+	originalColumns := len(w.buffers[0])
 
-	fmt.Printf("post-paa matrix has %d columns, original has %d\n", c, originalN)
+	fmt.Printf("post-paa matrix has %d columns, original has %d\n", c, originalColumns)
 
-	epsilon := math.Sqrt(float64(2*c) * (1.0 - correlationThreshold) / float64(originalN))
+	epsilon := math.Sqrt(float64(2*c) * (1.0 - correlationThreshold) / float64(originalColumns))
 	fmt.Printf("epsilon is %f\n", epsilon)
 
 	// The smallest fp is the one closest to the tp line
@@ -122,11 +174,11 @@ func (w *TimeseriesWindow) PAAPairs(originalMatrix *mat.Dense, correlationThresh
 	largestTp := float64(0.0)
 
 	lineCount := r
-	for i := 0; i < lineCount; i++ {
-		r1 := w.data.RawRowView(i)
-		s1 := originalMatrix.RawRowView(i)
+	for i := 0; i < r; i++ {
+		r1 := w.postPAA[i]
+		s1 := w.normalized[i]
 		for j := i + 1; j < lineCount; j++ {
-			r2 := w.data.RawRowView(j)
+			r2 := w.postPAA[j]
 			distance, err := correlation.EuclideanDistance(r1, r2)
 			if err != nil {
 				return nil, err
@@ -134,7 +186,7 @@ func (w *TimeseriesWindow) PAAPairs(originalMatrix *mat.Dense, correlationThresh
 			if distance > epsilon {
 				paaFilter++
 			}
-			s2 := originalMatrix.RawRowView(j)
+			s2 := w.normalized[j]
 			pearson, err := correlation.PearsonCorrelation(s1, s2)
 			if err != nil {
 				return nil, err
@@ -177,9 +229,10 @@ func (w *TimeseriesWindow) PAAPairs(originalMatrix *mat.Dense, correlationThresh
 
 // CorrelationPairs returns a list of pairs of row indices
 // and their pearson correlations.
-func (w *TimeseriesWindow) CorrelationPairs(originalMatrix *mat.Dense,
-	ks int, ke int, correlationThreshold float64) (map[buckets.RowPair]float64, error) {
-	scheme := buckets.NewBucketingScheme(originalMatrix, w.data, ks, ke, correlationThreshold)
+func (w *TimeseriesWindow) CorrelationPairs(ks int, ke int, correlationThreshold float64) (
+	map[buckets.RowPair]float64, error) {
+
+	scheme := buckets.NewBucketingScheme(w.normalized, w.postSVD, ks, ke, correlationThreshold)
 	err := scheme.Initialize()
 	if err != nil {
 		return nil, err
@@ -192,7 +245,7 @@ func (w *TimeseriesWindow) CorrelationPairs(originalMatrix *mat.Dense,
 	fmt.Printf("correlation pair statistics:\npairs compared in r1: %d\npairs rejected by r1: %d\npairs compared in r2: %d\npairs rejected by r2: %d\npairs compared using pearson: %d\npairs rejected by pearson: %d\n",
 		stats[0], stats[1], stats[2], stats[3], stats[4], stats[5])
 
-	r, _ := originalMatrix.Dims()
+	r := len(w.postSVD)
 	totalRows := float32(r * r / 2)
 	fmt.Printf("r1 pruning rate: %f\nr2 pruning rate: %f\n", float32(stats[1])/totalRows,
 		float32(stats[3])/totalRows)
@@ -202,13 +255,37 @@ func (w *TimeseriesWindow) CorrelationPairs(originalMatrix *mat.Dense,
 }
 
 func (w *TimeseriesWindow) SVD(k int) (*TimeseriesWindow, error) {
+	rowCount := len(w.postPAA)
+	if rowCount == 0 {
+		return nil, fmt.Errorf("the postPAA field needs to be filled before you call SVD")
+	}
+	columnCount := len(w.postPAA[0])
+
 	svd := &svd.TruncatedSVD{K: k}
 	// TODO: instead of FitTransform, call Fit() here and save that matrix
 	// so it can be reused by later Transform() calls.
 	// nlp has Save() and Load() for that purpose.
-	ret, err := svd.FitTransform(w.data)
+
+	data := make([]float64, 0, rowCount*columnCount)
+	for _, r := range w.postPAA {
+		data = append(data, r...)
+	}
+
+	matrix := mat.NewDense(rowCount, columnCount, data)
+	ret, err := svd.FitTransform(matrix)
 	if err != nil {
 		return nil, err
 	}
-	return &TimeseriesWindow{data: ret}, nil
+	if len(w.postSVD) < rowCount {
+		w.postSVD = slices.Grow(w.postSVD, rowCount-len(w.postSVD))
+	}
+	for i := 0; i < rowCount; i++ {
+		row := ret.RawRowView(i)
+		if i < len(w.postSVD) {
+			w.postSVD[i] = row
+		} else {
+			w.postSVD = append(w.postSVD, row)
+		}
+	}
+	return w, nil
 }
