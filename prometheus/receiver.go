@@ -60,9 +60,8 @@ func init() {
 
 type tsProcessor struct {
 	accumulator *corrjoin.TimeseriesAccumulator
-	processor   *corrjoin.TimeseriesProcessor
-
-	buffers [][]float64
+	processor   *corrjoin.CorrjoinSettings
+        window *corrjoin.TimeseriesWindow
 }
 
 func (t *tsProcessor) observeTs(req *prompb.WriteRequest) error {
@@ -117,28 +116,6 @@ func (t *tsProcessor) receivePrometheusData(w http.ResponseWriter, r *http.Reque
 	t.observeTs(req)
 }
 
-// TODO: move this to the tswindow code so it can handle the rotation
-func (t *tsProcessor) handleTimeseriesBuffer(buf [][]float64) {
-	// If t.window is nil, check if we can create the first window
-	// Otherwise, rotate the new data in.
-
-	originalLength := len(buffers)
-	originalWidth := 0
-	if originalLength > 0 {
-		originalWidth = len(buffers[0])
-	}
-
-	// Append timeseries data
-	for i, b := range buf {
-		if i < originalLength {
-			buffers[i] = append(buffers[i], b...)
-		} else {
-			prefix := make([]float64, originalWidth, originalWidth)
-			buffers = append(buffers, append(prefix, b...))
-		}
-	}
-}
-
 func main() {
 	var metricsAddr string
 	var listenAddr string
@@ -159,7 +136,7 @@ func main() {
 	processor := &tsProcessor{
 		// windowsize 10, stride 5
 		accumulator: corrjoin.NewTimeseriesAccumulator(5, time.Now().UTC(), bufferChannel),
-		processor: &corrjoin.TimeseriesProcessor{
+		processor: &corrjoin.CorrjoinSettings{
 			SvdDimensions:        3,
 			SvdOutputDimensions:  3, // Use 15
 			EuclidDimensions:     4, // Use 30
@@ -167,6 +144,7 @@ func main() {
 			WindowSize:           10, // 1020
 			// stride should be 102
 		},
+                window: corrjoin.NewTimeseriesWindow(10),
 	}
 
 	router := mux.NewRouter().StrictSlash(true)
@@ -194,12 +172,19 @@ func main() {
 
 	go func() {
 		log.Printf("correlation service waiting for buffers\n")
+                for {
 		select {
 		case buffers := <-bufferChannel:
-			log.Printf("I should make a timeseries window from %+v\n", buffers)
+                        processor.window.ShiftBuffer(buffers)
+                        if processor.window.IsReady {
+                           log.Printf("window is ready now\n")
+                           err := processor.window.ProcessBuffer(processor.settings, buffers)
+                        }
 		case <-time.After(10 * time.Minute):
 			log.Fatalf("got no timeseries data for 10 minutes")
+                        break
 		}
+                }
 	}()
 
 	<-stop

@@ -82,6 +82,7 @@ func (a *TimeseriesAccumulator) AddObservation(tsName string, value float64, tim
 	colcount := a.stride
 	slot := a.computeSlotIndex(timestamp)
 	if slot < 0 {
+		fmt.Printf("publish %d rows to channel\n", len(a.buffers))
 		// publish buffer data to channel
 		a.bufferChannel <- a.extractMatrixData()
 		a.currentStrideStartTs = timestamp
@@ -92,19 +93,13 @@ func (a *TimeseriesAccumulator) AddObservation(tsName string, value float64, tim
 		}
 	}
 
-	fmt.Printf("adding observation at time %s to accumulator with stride time ending at %s\n",
-		timestamp.String(), a.currentStrideMaxTs.String())
-
 	rowid, ok := a.rowmap[tsName]
 	if !ok {
-		fmt.Printf("adding a row for ts %s\n", tsName)
 		rowid = a.maxRow
 		a.rowmap[tsName] = rowid
 		a.buffers[rowid] = make([]float64, colcount, colcount)
 		a.maxRow += 1
 	}
-
-	fmt.Printf("inserting value %f at slot %d\n", value, slot)
 
 	a.buffers[rowid][slot] = value
 

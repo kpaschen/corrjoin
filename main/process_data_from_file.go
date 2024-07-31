@@ -62,36 +62,15 @@ func main() {
 	// a timeseries and each column to a point in time.
 	for {
 		line, err := reader.ReadString('\n')
+		if err != nil {
+			break
+		} // err is usually io.EOF
 		if len(line) == 0 {
 			break
 		}
+
 		line = strings.TrimSuffix(line, "\n")
 		// This is the current line number, and this is how we count how many columns the resulting matrix will have.
-		columnCount++
-		if columnCount >= *stride {
-			columnCount = 0
-			shiftCount++
-			if window.IsReady {
-				fmt.Printf("computation at shift count %d\n", shiftCount)
-				if *full {
-					err = window.FullPearson(settings, data)
-				} else {
-					err = window.ProcessBuffer(settings, data)
-					// err = window.PAAOnly(settings, data)
-				}
-				if err != nil {
-					fmt.Printf("caught error: %v\n", err)
-					break
-				}
-			} else {
-				err = window.ShiftBuffer(data)
-				if err != nil {
-					fmt.Printf("caught error: %v\n", err)
-					break
-				}
-			}
-			data = make([][]float64, lineCount, lineCount)
-		}
 
 		// parse floats out of line with strconv
 		parts := strings.Split(line, " ")
@@ -116,20 +95,32 @@ func main() {
 					columnCount, *filename, p, err))
 			}
 		}
+		columnCount++
+		if columnCount >= *stride {
+			fmt.Printf("shift data %d x %d\n", len(data), len(data[0]))
+			err = window.ShiftBuffer(data)
+			if err != nil {
+				fmt.Printf("caught error: %v\n", err)
+				break
+			}
+			columnCount = 0
+			data = make([][]float64, lineCount, lineCount)
+			shiftCount++
 
-		if err != nil {
-			break
-		} // err is usually io.EOF
-	}
+			if window.IsReady {
+				fmt.Printf("computation at shift count %d\n", shiftCount)
+				if *full {
+					err = window.FullPearson(settings)
+				} else {
+					err = window.ProcessBuffer(settings)
+					// err = window.PAAOnly(settings)
+				}
+				if err != nil {
+					fmt.Printf("caught error: %v\n", err)
+					break
+				}
+			}
+		}
 
-	fmt.Printf("final data round\n")
-	if *full {
-		err = window.FullPearson(settings, data)
-	} else {
-		err = window.ProcessBuffer(settings, data)
-		// err = window.PAAOnly(settings, data)
-	}
-	if err != nil {
-		fmt.Printf("caught error: %v\n", err)
 	}
 }

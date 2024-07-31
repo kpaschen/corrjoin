@@ -231,6 +231,10 @@ func (w *TimeseriesWindow) PAAPairs(paa int, correlationThreshold float64) (
 // and their pearson correlations.
 func (w *TimeseriesWindow) CorrelationPairs(ks int, ke int, correlationThreshold float64) (
 	map[buckets.RowPair]float64, error) {
+	r := len(w.postSVD)
+	if r == 0 {
+		return nil, fmt.Errorf("you must run SVD before you can get correlation pairs")
+	}
 
 	scheme := buckets.NewBucketingScheme(w.normalized, w.postSVD, ks, ke, correlationThreshold)
 	err := scheme.Initialize()
@@ -245,7 +249,6 @@ func (w *TimeseriesWindow) CorrelationPairs(ks int, ke int, correlationThreshold
 	fmt.Printf("correlation pair statistics:\npairs compared in r1: %d\npairs rejected by r1: %d\npairs compared in r2: %d\npairs rejected by r2: %d\npairs compared using pearson: %d\npairs rejected by pearson: %d\n",
 		stats[0], stats[1], stats[2], stats[3], stats[4], stats[5])
 
-	r := len(w.postSVD)
 	totalRows := float32(r * r / 2)
 	fmt.Printf("r1 pruning rate: %f\nr2 pruning rate: %f\n", float32(stats[1])/totalRows,
 		float32(stats[3])/totalRows)

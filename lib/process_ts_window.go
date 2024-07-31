@@ -4,6 +4,12 @@ import (
 	"fmt"
 )
 
+const (
+	ALGO_FULLPEARSON = "full_pearson"
+	ALGO_PAA_ONLY    = "paa_only"
+	ALGO_PAA_SVD     = "paa_svd"
+)
+
 // The stride length is implicit in the width of the buffer.
 type CorrjoinSettings struct {
 	// The number of dimensions used for SVD (aka ks)
@@ -14,23 +20,19 @@ type CorrjoinSettings struct {
 	EuclidDimensions     int
 	CorrelationThreshold float64 // aka T
 	WindowSize           int     // aka n
+	Algorithm            string
 }
 
-func (w *TimeseriesWindow) FullPearson(settings CorrjoinSettings,
-	buffer [][]float64) error {
-	// Shift _buffer_ into _window_. The stride length is equal to the
-	// width of _buffer_.
-	err := w.ShiftBuffer(buffer)
-	if err != nil {
-		return err
+func (w *TimeseriesWindow) FullPearson(settings CorrjoinSettings) error {
+	r := len(w.buffers)
+	if r == 0 {
+		return fmt.Errorf("no data to run FullPearson on")
 	}
-
 	pairs, err := w.AllPairs(settings.CorrelationThreshold)
 	if err != nil {
 		return err
 	}
 
-	r := len(buffer)
 	totalPairs := r * r / 2
 
 	fmt.Printf("found %d correlated pairs out of %d possible (%d)\n", len(pairs), totalPairs,
@@ -39,13 +41,10 @@ func (w *TimeseriesWindow) FullPearson(settings CorrjoinSettings,
 	return nil
 }
 
-func (w *TimeseriesWindow) PAAOnly(settings CorrjoinSettings,
-	buffer [][]float64) error {
-	// Shift _buffer_ into _window_. The stride length is equal to the
-	// width of _buffer_.
-	err := w.ShiftBuffer(buffer)
-	if err != nil {
-		return err
+func (w *TimeseriesWindow) PAAOnly(settings CorrjoinSettings) error {
+	r := len(w.buffers)
+	if r == 0 {
+		return fmt.Errorf("no data to run PAA on")
 	}
 
 	paaPairs, err := w.PAAPairs(settings.SvdDimensions, settings.CorrelationThreshold)
@@ -53,7 +52,6 @@ func (w *TimeseriesWindow) PAAOnly(settings CorrjoinSettings,
 		return err
 	}
 
-	r := len(buffer)
 	totalPairs := r * r / 2
 
 	fmt.Printf("found %d correlated pairs out of %d possible (%d)\n", len(paaPairs), totalPairs,
@@ -61,21 +59,17 @@ func (w *TimeseriesWindow) PAAOnly(settings CorrjoinSettings,
 	return nil
 }
 
-func (w *TimeseriesWindow) ProcessBuffer(settings CorrjoinSettings,
-	buffer [][]float64) error {
-
-	// Shift _buffer_ into _window_. The stride length is equal to the
-	// width of _buffer_.
-	err := w.ShiftBuffer(buffer)
-	if err != nil {
-		return err
+func (w *TimeseriesWindow) ProcessBuffer(settings CorrjoinSettings) error {
+	r := len(w.buffers)
+	if r == 0 {
+		return fmt.Errorf("no data to process")
 	}
 
 	w.normalizeWindow()
 	w.PAA(settings.SvdDimensions)
 
 	// Apply SVD
-	_, err = w.SVD(settings.SvdOutputDimensions)
+	_, err := w.SVD(settings.SvdOutputDimensions)
 	if err != nil {
 		return err
 	}
@@ -86,7 +80,6 @@ func (w *TimeseriesWindow) ProcessBuffer(settings CorrjoinSettings,
 		return err
 	}
 
-	r := len(buffer)
 	totalPairs := r * r / 2
 
 	fmt.Printf("found %d correlated pairs out of %d possible (%d)\n", len(pairs), totalPairs,
