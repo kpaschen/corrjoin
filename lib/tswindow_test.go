@@ -2,7 +2,6 @@ package lib
 
 import (
 	"fmt"
-	//	"gonum.org/v1/gonum/mat"
 	"math"
 	"testing"
 )
@@ -176,22 +175,24 @@ func TestSVD(t *testing.T) {
 	}
 }
 
-/*
 func TestCorrelationPairs(t *testing.T) {
-	initialTsData := []float64{
-		0.1, 0.2, 0.3, 0.4,
-		1.1, 1.2, 1.3, 1.4,
-		1.1, 1.2, 1.3, 1.4,
-		2.1, 2.2, 2.3, 2.4,
+	initialTsData := [][]float64{
+		[]float64{-0.1, 0.8, -0.9, 1.4},
+		[]float64{1.1, 1.2, 1.3, 1.4},
+		[]float64{1.1, 1.2, 1.3, 1.4},
+		[]float64{2.3, -8.2, 1.3, 0.4},
 	}
-	initial := mat.NewDense(4, 4, initialTsData)
 	tswindow := &TimeseriesWindow{
-		data: initial,
+		buffers:    initialTsData,
+		windowSize: 4,
 	}
-	pairs, err := tswindow.CorrelationPairs(initial, 4, 3, 0.9)
+	tswindow.normalizeWindow()
+	tswindow.postSVD = tswindow.normalized
+	pairs, err := tswindow.CorrelationPairs(4, 3, 0.9)
 	if err != nil {
 		t.Errorf("unexpected error in correlationpairs: %v", err)
 	}
-	fmt.Printf("pairs: %+v\n", pairs)
+	if len(pairs) != 1 {
+		t.Errorf("expected to find one correlated pair but got %d", len(pairs))
+	}
 }
-*/
