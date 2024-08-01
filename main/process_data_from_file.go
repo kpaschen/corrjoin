@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/kpaschen/corrjoin/lib"
+        "log"
 	"os"
 	"runtime/pprof"
 	"strconv"
@@ -50,7 +51,11 @@ func main() {
 		EuclidDimensions:     *ke,
 		CorrelationThreshold: float64(*correlationThreshold) / 100.0,
 		WindowSize:           *windowSize,
+		Algorithm:		lib.ALGO_PAA_SVD,
 	}
+        if *full {
+           settings.Algorithm = lib.ALGO_FULL_PEARSON
+        }
 
 	shiftCount := 0
 
@@ -97,29 +102,15 @@ func main() {
 		}
 		columnCount++
 		if columnCount >= *stride {
-			fmt.Printf("shift data %d x %d\n", len(data), len(data[0]))
-			err = window.ShiftBuffer(data)
+			// This triggers computation once the window is full.
+			err = window.ShiftBuffer(data, settings)
 			if err != nil {
-				fmt.Printf("caught error: %v\n", err)
+				log.Printf("caught error: %v\n", err)
 				break
 			}
 			columnCount = 0
 			data = make([][]float64, lineCount, lineCount)
 			shiftCount++
-
-			if window.IsReady {
-				fmt.Printf("computation at shift count %d\n", shiftCount)
-				if *full {
-					err = window.FullPearson(settings)
-				} else {
-					err = window.ProcessBuffer(settings)
-					// err = window.PAAOnly(settings)
-				}
-				if err != nil {
-					fmt.Printf("caught error: %v\n", err)
-					break
-				}
-			}
 		}
 
 	}

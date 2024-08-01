@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/kpaschen/corrjoin/lib/correlation"
 	"github.com/kpaschen/corrjoin/lib/paa"
+	"log"
 	"math"
 )
 
@@ -80,7 +81,7 @@ func NewBucketingScheme(originalMatrix [][]float64,
 	originalColumnCount := len(originalMatrix[0])
 	postSvdColumnCount := len(svdOutputMatrix[0])
 
-	fmt.Printf("using n = %d and svd output columns %d\n", originalColumnCount, postSvdColumnCount)
+	log.Printf("using n = %d and svd output columns %d\n", originalColumnCount, postSvdColumnCount)
 
 	// epsilon1 = sqrt(2 ks (1 - correlationThreshold) / n)
 	epsilon1 := math.Sqrt(float64(2*ks) * (1.0 - correlationThreshold) / float64(originalColumnCount))
@@ -88,7 +89,7 @@ func NewBucketingScheme(originalMatrix [][]float64,
 	// epsilon2 = sqrt(2 ke (1 - correlationThreshold) / n)
 	epsilon2 := math.Sqrt(float64(2*ke) * (1.0 - correlationThreshold) / float64(originalColumnCount))
 
-	fmt.Printf("epsilon1 %f epsilon2 %f, T %f\n", epsilon1, epsilon2, correlationThreshold)
+	log.Printf("epsilon1 %f epsilon2 %f, T %f\n", epsilon1, epsilon2, correlationThreshold)
 
 	return &BucketingScheme{
 		originalMatrix:       originalMatrix,

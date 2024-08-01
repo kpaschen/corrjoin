@@ -60,8 +60,8 @@ func init() {
 
 type tsProcessor struct {
 	accumulator *corrjoin.TimeseriesAccumulator
-	processor   *corrjoin.CorrjoinSettings
-        window *corrjoin.TimeseriesWindow
+	settings    *corrjoin.CorrjoinSettings
+	window      *corrjoin.TimeseriesWindow
 }
 
 func (t *tsProcessor) observeTs(req *prompb.WriteRequest) error {
@@ -119,9 +119,23 @@ func (t *tsProcessor) receivePrometheusData(w http.ResponseWriter, r *http.Reque
 func main() {
 	var metricsAddr string
 	var listenAddr string
+	var windowSize int
+	var stride int
+	var correlationThreshold int
+	var ks int
+	var ke int
+	var svdDimensions int
+	var algorithm string
 
 	flag.StringVar(&metricsAddr, "metrics-address", ":9203", "The address the metrics endpoint binds to.")
 	flag.StringVar(&listenAddr, "listen-address", ":9201", "The address that the storage endpoint binds to.")
+	flag.IntVar(&windowSize, "windowSize", 1020, "number of data points to use in determining correlatedness")
+	flag.IntVar(&stride, "stride", 102, "the number of data points to read before computing correlation again")
+	flag.IntVar(&correlationThreshold, "correlationThreshold", 90, "correlation threshold in percent")
+	flag.IntVar(&ks, "ks", 15, "how many columns to reduce the input to in the first PAA step")
+	flag.IntVar(&ke, "ke", 30, "how many columns to reduce the input to in the second PAA step (during bucketing)")
+	flag.IntVar(&svdDimensions, "svdDimensions", 3, "How many columns to choose after SVD")
+	flag.StringVar(&algorithm, "algorithm", "paa_svd", "Algorithm to use. Possible values: full_pearson, paa_only, paa_svd")
 
 	flag.Parse()
 
@@ -134,17 +148,16 @@ func main() {
 	defer close(bufferChannel)
 
 	processor := &tsProcessor{
-		// windowsize 10, stride 5
-		accumulator: corrjoin.NewTimeseriesAccumulator(5, time.Now().UTC(), bufferChannel),
-		processor: &corrjoin.CorrjoinSettings{
-			SvdDimensions:        3,
-			SvdOutputDimensions:  3, // Use 15
-			EuclidDimensions:     4, // Use 30
-			CorrelationThreshold: 90,
-			WindowSize:           10, // 1020
-			// stride should be 102
+		accumulator: corrjoin.NewTimeseriesAccumulator(stride, time.Now().UTC(), bufferChannel),
+		settings: &corrjoin.CorrjoinSettings{
+			SvdDimensions:        ks,
+			SvdOutputDimensions:  svdDimensions,
+			EuclidDimensions:     ke,
+			CorrelationThreshold: float64(correlationThreshold / 100.0),
+			WindowSize:           windowSize,
+			Algorithm:            algorithm,
 		},
-                window: corrjoin.NewTimeseriesWindow(10),
+		window: corrjoin.NewTimeseriesWindow(windowSize),
 	}
 
 	router := mux.NewRouter().StrictSlash(true)
@@ -172,19 +185,19 @@ func main() {
 
 	go func() {
 		log.Printf("correlation service waiting for buffers\n")
-                for {
-		select {
-		case buffers := <-bufferChannel:
-                        processor.window.ShiftBuffer(buffers)
-                        if processor.window.IsReady {
-                           log.Printf("window is ready now\n")
-                           err := processor.window.ProcessBuffer(processor.settings, buffers)
-                        }
-		case <-time.After(10 * time.Minute):
-			log.Fatalf("got no timeseries data for 10 minutes")
-                        break
+		var err error
+		for {
+			select {
+			case buffers := <-bufferChannel:
+				err = processor.window.ShiftBuffer(buffers, *processor.settings)
+				if err != nil {
+					log.Printf("failed to process window: %v", err)
+				}
+			case <-time.After(10 * time.Minute):
+				log.Fatalf("got no timeseries data for 10 minutes")
+				break
+			}
 		}
-                }
 	}()
 
 	<-stop

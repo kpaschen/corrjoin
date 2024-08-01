@@ -2,6 +2,7 @@ package lib
 
 import (
 	"fmt"
+	"log"
 	"time"
 )
 
@@ -82,7 +83,7 @@ func (a *TimeseriesAccumulator) AddObservation(tsName string, value float64, tim
 	colcount := a.stride
 	slot := a.computeSlotIndex(timestamp)
 	if slot < 0 {
-		fmt.Printf("publish %d rows to channel\n", len(a.buffers))
+		log.Printf("publish %d rows to channel\n", len(a.buffers))
 		// publish buffer data to channel
 		a.bufferChannel <- a.extractMatrixData()
 		a.currentStrideStartTs = timestamp
