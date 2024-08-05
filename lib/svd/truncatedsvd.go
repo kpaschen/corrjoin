@@ -29,7 +29,7 @@ func (t *TruncatedSVD) FitTransform(m mat.Matrix) (*mat.Dense, error) {
 	var svd mat.SVD
 	ok := svd.Factorize(m, mat.SVDThinV)
 	if !ok {
-		return nil, fmt.Errorf("Failed to find SVD of input matrix")
+		return nil, fmt.Errorf("Failed to find SVD of input matrix %+v", m)
 	}
 	//singulars := svd.Values(nil)
 	//fmt.Printf("singular values: %v\n", singulars)

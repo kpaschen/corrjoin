@@ -20,7 +20,7 @@ go_library(
 )
 
 go_binary(
-    name = "prometheus",
+    name = "receiver",
     embed = [":prometheus_lib"],
     visibility = ["//visibility:public"],
 )

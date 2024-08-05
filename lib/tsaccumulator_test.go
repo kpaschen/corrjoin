@@ -12,18 +12,21 @@ func TestComputeSlotIndex(t *testing.T) {
 	defer close(replies)
 	acc := NewTimeseriesAccumulator(6, now, replies)
 
-	s0 := acc.computeSlotIndex(now)
+	s0, err := acc.computeSlotIndex(now)
+	if err != nil {
+		t.Errorf("unexpected error %v for computeSlotIndex", err)
+	}
 	if s0 != 0 {
 		t.Errorf("expected slot 0 for initial time but got %d", s0)
 	}
 
 	// Default sample time is 5, so 6 seconds ~ slot 1
-	s1 := acc.computeSlotIndex(now.Add(time.Second * 6))
+	s1, _ := acc.computeSlotIndex(now.Add(time.Second * 6))
 	if s1 != 1 {
 		t.Errorf("expected slot 1 but got %d", s1)
 	}
 
-	s2 := acc.computeSlotIndex(now.Add(time.Second * 20))
+	s2, _ := acc.computeSlotIndex(now.Add(time.Second * 20))
 	if s2 != 4 {
 		t.Errorf("expected slot 4 for second 20 but got %d", s2)
 	}

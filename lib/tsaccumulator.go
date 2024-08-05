@@ -3,6 +3,7 @@ package lib
 import (
 	"fmt"
 	"log"
+	"math"
 	"time"
 )
 
@@ -18,13 +19,17 @@ const (
 // a channel.
 // TODO: decide what to do if there is a computation ongoing at the time the
 // stride is reached.
-// TODO: handle NaN values
 
 type TimeseriesAccumulator struct {
 	stride int
 
 	// rowmap maps the timeseries names to row ids
 	rowmap map[string]int
+
+	// The ids of the timeseries, in order.
+	// A tsid is a json serialization of the metric name and the labels.
+	// invariant: rowmap[tsids[i]] == i for 0 <= i <= maxRow
+	tsids []string
 
 	// buffers maps rowids to observations
 	// This is a map because it is possible for a timeseries that we have
@@ -52,6 +57,7 @@ func NewTimeseriesAccumulator(stride int, startTime time.Time, bc chan<- [][]flo
 	return &TimeseriesAccumulator{
 		stride:               stride,
 		rowmap:               make(map[string]int),
+		tsids:                make([]string, 0, 5000), // TODO: initialize capacity based on a config value.
 		buffers:              make(map[int][]float64),
 		maxRow:               0,
 		sampleTime:           int(SAMPLE_TIME),
@@ -62,12 +68,15 @@ func NewTimeseriesAccumulator(stride int, startTime time.Time, bc chan<- [][]flo
 	}
 }
 
-func (a *TimeseriesAccumulator) computeSlotIndex(timestamp time.Time) int32 {
+func (a *TimeseriesAccumulator) computeSlotIndex(timestamp time.Time) (int32, error) {
 	if timestamp.After(a.currentStrideMaxTs) {
-		return int32(-1)
+		return int32(-1), nil
+	}
+	if timestamp.Before(a.currentStrideStartTs) {
+		return int32(-2), fmt.Errorf("backfill timestamp, ignore")
 	}
 	diff := timestamp.Sub(a.currentStrideStartTs).Seconds()
-	return int32(diff / float64(a.sampleTime))
+	return int32(diff / float64(a.sampleTime)), nil
 }
 
 func (a *TimeseriesAccumulator) extractMatrixData() [][]float64 {
@@ -81,14 +90,19 @@ func (a *TimeseriesAccumulator) extractMatrixData() [][]float64 {
 
 func (a *TimeseriesAccumulator) AddObservation(tsName string, value float64, timestamp time.Time) error {
 	colcount := a.stride
-	slot := a.computeSlotIndex(timestamp)
+	slot, err := a.computeSlotIndex(timestamp)
+	if err != nil {
+		return err
+	}
 	if slot < 0 {
 		log.Printf("publish %d rows to channel\n", len(a.buffers))
 		// publish buffer data to channel
+
+		// TODO: since this can block, have to guard against concurrent calls.
 		a.bufferChannel <- a.extractMatrixData()
 		a.currentStrideStartTs = timestamp
 		a.currentStrideMaxTs = maxTime(timestamp, a.strideDuration)
-		slot = a.computeSlotIndex(timestamp)
+		slot, err = a.computeSlotIndex(timestamp)
 		if slot < 0 {
 			panic("got negative timestamp after resetting buffers")
 		}
@@ -97,11 +111,18 @@ func (a *TimeseriesAccumulator) AddObservation(tsName string, value float64, tim
 	rowid, ok := a.rowmap[tsName]
 	if !ok {
 		rowid = a.maxRow
+		if rowid >= 10 {
+			return nil
+		}
 		a.rowmap[tsName] = rowid
 		a.buffers[rowid] = make([]float64, colcount, colcount)
+		a.tsids = append(a.tsids, tsName)
 		a.maxRow += 1
 	}
 
+	if math.IsNaN(value) {
+		value = float64(0)
+	}
 	a.buffers[rowid][slot] = value
 
 	return nil

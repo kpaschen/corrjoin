@@ -4,15 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"flag"
-	//   "fmt"
-	//   "github.com/gogo/protobuf/proto"
-	//   "github.com/golang/snappy"
 	"github.com/gorilla/mux"
+	corrjoin "github.com/kpaschen/corrjoin/lib"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/prometheus/common/model"
-	// "github.com/prometheus/common/promlog"
-	corrjoin "github.com/kpaschen/corrjoin/lib"
 	"github.com/prometheus/prometheus/prompb"
 	"github.com/prometheus/prometheus/storage/remote"
 	"log"
@@ -42,7 +38,7 @@ var (
 	)
 	correlationDuration = prometheus.NewHistogram(
 		prometheus.HistogramOpts{
-			Name:                            "correlation_duration_seconds",
+			Name:                            "correlation_duration_milliseconds",
 			Help:                            "Duration of correlation computation calls.",
 			Buckets:                         prometheus.DefBuckets,
 			NativeHistogramBucketFactor:     1.1,
@@ -74,11 +70,18 @@ func (t *tsProcessor) observeTs(req *prompb.WriteRequest) error {
 		if err != nil {
 			return err
 		}
-		receivedSamples.Add(float64(len(ts.Samples)))
+		metricName := string(mjson)
+		sampleCounter := 0
 		for _, s := range ts.Samples {
-			t.accumulator.AddObservation(string(mjson), s.Value, time.Unix(s.Timestamp/1000,
+			// TODO: compare value against 0x7ff0000000000002
+			err = t.accumulator.AddObservation(metricName, s.Value, time.Unix(s.Timestamp/1000,
 				0).UTC())
+			if err != nil {
+				return err
+			} // TODO: can continue here?
+			sampleCounter++
 		}
+		receivedSamples.Add(float64(sampleCounter))
 	}
 	return nil
 }
@@ -110,10 +113,18 @@ func (t *tsProcessor) receivePrometheusData(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	// TODO: either this or the accumulator need to evaluate the stale marker.
+	// That is a special NaN value 0x7ff0000000000002
+
 	// Later: pass samples to the processor here.
 	// samples := t.protoToSamples(req)
 	// For now, convert samples directly and add them as observations
-	t.observeTs(req)
+	err = t.observeTs(req)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
 }
 
 func main() {
@@ -144,7 +155,7 @@ func main() {
 		metricsAddress: metricsAddr,
 	}
 
-	bufferChannel := make(chan [][]float64, 2)
+	bufferChannel := make(chan [][]float64, 1)
 	defer close(bufferChannel)
 
 	processor := &tsProcessor{
@@ -153,7 +164,7 @@ func main() {
 			SvdDimensions:        ks,
 			SvdOutputDimensions:  svdDimensions,
 			EuclidDimensions:     ke,
-			CorrelationThreshold: float64(correlationThreshold / 100.0),
+			CorrelationThreshold: float64(float64(correlationThreshold) / 100.0),
 			WindowSize:           windowSize,
 			Algorithm:            algorithm,
 		},
@@ -185,13 +196,20 @@ func main() {
 
 	go func() {
 		log.Printf("correlation service waiting for buffers\n")
-		var err error
 		for {
 			select {
 			case buffers := <-bufferChannel:
-				err = processor.window.ShiftBuffer(buffers, *processor.settings)
+				requestStart := time.Now()
+				res, err := processor.window.ShiftBuffer(buffers, *processor.settings)
 				if err != nil {
 					log.Printf("failed to process window: %v", err)
+				}
+				requestEnd := time.Now()
+				requestedCorrelationBatches.Inc()
+				elapsed := requestEnd.Sub(requestStart)
+				correlationDuration.Observe(float64(elapsed.Milliseconds()))
+				if res != nil {
+					log.Printf("results: %+v\n", *res)
 				}
 			case <-time.After(10 * time.Minute):
 				log.Fatalf("got no timeseries data for 10 minutes")
