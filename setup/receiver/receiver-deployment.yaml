@@ -19,7 +19,7 @@ spec:
         image: localhost:5001/receiver:v0.1
         imagePullPolicy: Always
         command: ["/bin/receiver"]
-        args: ["-windowSize", "60", "-stride", "30", "-algorithm", "full_pearson"]
+        args: ["-windowSize", "600", "-stride", "30", "-algorithm", "full_pearson"]
         ports:
         - containerPort: 9201
           name: api

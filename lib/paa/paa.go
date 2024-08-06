@@ -26,7 +26,26 @@ func mean(slice []float64) float64 {
 	return sum(slice) / float64(len(slice))
 }
 
-func NormalizeSlice(slice []float64) {
+func isSliceConstant(row []float64, epsilon float64) bool {
+	if epsilon < 0.0 {
+		return false
+	}
+	if len(row) == 0 {
+		return true
+	}
+	firstValue := row[0]
+	for _, v := range row[1:] {
+		if math.Abs(v-firstValue) <= epsilon {
+			return false
+		}
+	}
+	return true
+}
+
+// NormalizeSlice modifies slice by normalizing it using an l2-norm.
+// It returns true if the resulting slice is constant to within
+// 0.0001.
+func NormalizeSlice(slice []float64) bool {
 	length := len(slice)
 	avg := mean(slice)
 	var sumOfSquares float64
@@ -40,11 +59,13 @@ func NormalizeSlice(slice []float64) {
 		for i := 0; i < length; i++ {
 			slice[i] = 0.0
 		}
+		return true
 	} else {
 		for i := 0; i < length; i++ {
 			diff := slice[i] - avg
 			slice[i] = diff / normalizingFactor
 		}
+		return isSliceConstant(slice, 0.0001)
 	}
 }
 

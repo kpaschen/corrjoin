@@ -8,7 +8,7 @@ import (
 
 func TestComputeSlotIndex(t *testing.T) {
 	now := time.Now()
-	replies := make(chan [][]float64, 1)
+	replies := make(chan *ObservationResult, 1)
 	defer close(replies)
 	acc := NewTimeseriesAccumulator(6, now, replies)
 
@@ -34,12 +34,24 @@ func TestComputeSlotIndex(t *testing.T) {
 
 func TestAddObservation(t *testing.T) {
 	now := time.Now()
-	replies := make(chan [][]float64, 1)
+	replies := make(chan *ObservationResult, 1)
 	defer close(replies)
 	acc := NewTimeseriesAccumulator(6, now, replies)
-	acc.AddObservation("ts1", 0.1, now.Add(time.Second*2))
-	acc.AddObservation("ts1", 0.2, now.Add(time.Second*6))
-	acc.AddObservation("ts2", 0.3, now.Add(time.Second*7))
+	acc.AddObservation(&Observation{
+		MetricName: "ts1",
+		Value: 0.1,
+		Timestamp: now.Add(time.Second * 2),
+	})
+	acc.AddObservation(&Observation{
+		MetricName: "ts1",
+		Value: 0.2,
+		Timestamp: now.Add(time.Second * 6),
+	})
+	acc.AddObservation(&Observation{
+		MetricName: "ts2",
+		Value: 0.3,
+		Timestamp: now.Add(time.Second * 7),
+	})
 
 	// Expect two rows in the buffers, one with two entries, the other with
 	// one entry in position 2
@@ -64,13 +76,29 @@ func TestAddObservation(t *testing.T) {
 
 func TestAddObservation_newStride(t *testing.T) {
 	now := time.Now()
-	replies := make(chan [][]float64, 1)
+	replies := make(chan *ObservationResult, 1)
 	defer close(replies)
 	acc := NewTimeseriesAccumulator(2, now, replies)
-	acc.AddObservation("ts1", 0.1, now.Add(time.Second*2))
-	acc.AddObservation("ts1", 0.2, now.Add(time.Second*5))
-	acc.AddObservation("ts2", 0.4, now.Add(time.Second*5))
-	acc.AddObservation("ts1", 0.3, now.Add(time.Second*10))
+	acc.AddObservation(&Observation{
+		MetricName: "ts1",
+		Value: 0.1,
+		Timestamp: now.Add(time.Second * 2),
+	})
+	acc.AddObservation(&Observation{
+		MetricName: "ts1",
+		Value: 0.2,
+		Timestamp: now.Add(time.Second * 5),
+	})
+	acc.AddObservation(&Observation{
+		MetricName: "ts2",
+		Value: 0.4,
+		Timestamp: now.Add(time.Second * 5),
+	})
+	acc.AddObservation(&Observation{
+		MetricName: "ts1",
+		Value: 0.3,
+		Timestamp: now.Add(time.Second * 10),
+	})
 
 	select {
 	case buffers := <-replies:

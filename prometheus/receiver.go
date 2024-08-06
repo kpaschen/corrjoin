@@ -36,9 +36,9 @@ var (
 			Help: "Total number of times a correlation batch computation has been requested.",
 		},
 	)
-	correlationDuration = prometheus.NewHistogram(
+	correlationDurationHist = prometheus.NewHistogram(
 		prometheus.HistogramOpts{
-			Name:                            "correlation_duration_milliseconds",
+			Name:                            "correlation_duration_milliseconds_histogram",
 			Help:                            "Duration of correlation computation calls.",
 			Buckets:                         prometheus.DefBuckets,
 			NativeHistogramBucketFactor:     1.1,
@@ -46,18 +46,39 @@ var (
 			NativeHistogramMinResetDuration: 1 * time.Hour,
 		},
 	)
+
+	correlationDuration = prometheus.NewGauge(
+		prometheus.GaugeOpts{
+			Name: "correlation_duration_milliseconds",
+			Help:                            "Duration of correlation computation calls.",
+		},
+	)
+
+	correlatedPairs = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "correlated_timeseries",
+			Help: "pairs of correlated timeseries",
+		},
+		[]string{
+			"ts1",
+			"ts2",
+		},
+	)
 )
 
 func init() {
 	prometheus.MustRegister(receivedSamples)
 	prometheus.MustRegister(requestedCorrelationBatches)
+	prometheus.MustRegister(correlationDurationHist)
 	prometheus.MustRegister(correlationDuration)
+	prometheus.MustRegister(correlatedPairs)
 }
 
 type tsProcessor struct {
 	accumulator *corrjoin.TimeseriesAccumulator
 	settings    *corrjoin.CorrjoinSettings
 	window      *corrjoin.TimeseriesWindow
+	observationQueue chan(*corrjoin.Observation)
 }
 
 func (t *tsProcessor) observeTs(req *prompb.WriteRequest) error {
@@ -74,11 +95,11 @@ func (t *tsProcessor) observeTs(req *prompb.WriteRequest) error {
 		sampleCounter := 0
 		for _, s := range ts.Samples {
 			// TODO: compare value against 0x7ff0000000000002
-			err = t.accumulator.AddObservation(metricName, s.Value, time.Unix(s.Timestamp/1000,
-				0).UTC())
-			if err != nil {
-				return err
-			} // TODO: can continue here?
+			t.observationQueue <- &corrjoin.Observation{
+				MetricName: metricName,
+				Value: s.Value,
+				Timestamp: time.Unix(s.Timestamp/1000, 0).UTC(),
+			}
 			sampleCounter++
 		}
 		receivedSamples.Add(float64(sampleCounter))
@@ -127,6 +148,31 @@ func (t *tsProcessor) receivePrometheusData(w http.ResponseWriter, r *http.Reque
 	w.WriteHeader(http.StatusOK)
 }
 
+func reportCorrelation(tsids []string, result *corrjoin.CorrjoinResult) {
+	for pair, pearson := range result.CorrelatedPairs {
+		rowIds := pair.RowIds()
+		if rowIds[0] > len(tsids) || rowIds[1] > len(tsids) {
+			log.Printf("nameless rows %d, %d reported as correlated", rowIds[0], rowIds[1])
+			continue
+		}
+		if result.ConstantRows[rowIds[0]] != result.ConstantRows[rowIds[1]] {
+			log.Printf("a constant row correlated with a non-constant one?")
+		        log.Printf("correlated: %s and %s with strength %f", tsids[rowIds[0]], tsids[rowIds[1]], pearson)
+		} else {
+			if result.ConstantRows[rowIds[0]] {
+				log.Print("skipping constant timeseries")
+			}
+		}
+		// TODO: this only updates values when two ts are correlated, not when they aren't.
+		// Should report a 0 for previously-correlated-now-uncorrelated pairs. In order to do that,
+		// have to remember which ones were previously correlated.
+		correlatedPairs.With(prometheus.Labels{
+			"ts1": tsids[rowIds[0]],
+			"ts2": tsids[rowIds[1]],
+		}).Set(pearson)
+	}
+}
+
 func main() {
 	var metricsAddr string
 	var listenAddr string
@@ -137,6 +183,7 @@ func main() {
 	var ke int
 	var svdDimensions int
 	var algorithm string
+	var skipConstantTs bool
 
 	flag.StringVar(&metricsAddr, "metrics-address", ":9203", "The address the metrics endpoint binds to.")
 	flag.StringVar(&listenAddr, "listen-address", ":9201", "The address that the storage endpoint binds to.")
@@ -147,6 +194,7 @@ func main() {
 	flag.IntVar(&ke, "ke", 30, "how many columns to reduce the input to in the second PAA step (during bucketing)")
 	flag.IntVar(&svdDimensions, "svdDimensions", 3, "How many columns to choose after SVD")
 	flag.StringVar(&algorithm, "algorithm", "paa_svd", "Algorithm to use. Possible values: full_pearson, paa_only, paa_svd")
+	flag.BoolVar(&skipConstantTs, "skipConstantTs", true, "Whether to ignore timeseries whose value is constant in the current window")
 
 	flag.Parse()
 
@@ -155,8 +203,11 @@ func main() {
 		metricsAddress: metricsAddr,
 	}
 
-	bufferChannel := make(chan [][]float64, 1)
+	bufferChannel := make(chan *corrjoin.ObservationResult, 1)
 	defer close(bufferChannel)
+
+	observationQueue := make(chan *corrjoin.Observation, 1)
+	defer close(observationQueue)
 
 	processor := &tsProcessor{
 		accumulator: corrjoin.NewTimeseriesAccumulator(stride, time.Now().UTC(), bufferChannel),
@@ -169,6 +220,7 @@ func main() {
 			Algorithm:            algorithm,
 		},
 		window: corrjoin.NewTimeseriesWindow(windowSize),
+		observationQueue: observationQueue,
 	}
 
 	router := mux.NewRouter().StrictSlash(true)
@@ -195,21 +247,38 @@ func main() {
 	}()
 
 	go func() {
-		log.Printf("correlation service waiting for buffers\n")
+		log.Println("correlation service watching observation queue")
+		for {
+		select {
+			case observation := <-observationQueue:
+				processor.accumulator.AddObservation(observation)
+		}
+		}
+	}()
+
+	go func() {
+		log.Println("correlation service waiting for buffers")
 		for {
 			select {
-			case buffers := <-bufferChannel:
+			case observationResult := <-bufferChannel:
+				if observationResult.Err != nil {
+					log.Printf("failed to process window: %v", observationResult.Err)
+					break
+				}
+				requestedCorrelationBatches.Inc()
 				requestStart := time.Now()
-				res, err := processor.window.ShiftBuffer(buffers, *processor.settings)
+				res, err := processor.window.ShiftBuffer(observationResult.Buffers, *processor.settings)
+				// TODO: check for error type.
 				if err != nil {
 					log.Printf("failed to process window: %v", err)
 				}
 				requestEnd := time.Now()
-				requestedCorrelationBatches.Inc()
 				elapsed := requestEnd.Sub(requestStart)
-				correlationDuration.Observe(float64(elapsed.Milliseconds()))
+				correlationDurationHist.Observe(float64(elapsed.Milliseconds()))
+				correlationDuration.Set(float64(elapsed.Milliseconds()))
+				log.Printf("correlation batch successfully processed in %d milliseconds\n", elapsed.Milliseconds())
 				if res != nil {
-					log.Printf("results: %+v\n", *res)
+					reportCorrelation(processor.accumulator.Tsids, res)
 				}
 			case <-time.After(10 * time.Minute):
 				log.Fatalf("got no timeseries data for 10 minutes")

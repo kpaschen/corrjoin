@@ -12,6 +12,17 @@ const (
 	SAMPLE_TIME = 5.0
 )
 
+type Observation struct {
+	MetricName string
+	Value float64
+	Timestamp time.Time
+}
+
+type ObservationResult struct {
+	Buffers [][]float64
+	Err error
+}
+
 // A TimeseriesAccumulator keeps track of timeseries data as it arrives.
 // It maps the timeseries id (serialised name + labelset) to the tsmatrix
 // rowid and it accumulates data until it has reached the stride length.
@@ -28,8 +39,8 @@ type TimeseriesAccumulator struct {
 
 	// The ids of the timeseries, in order.
 	// A tsid is a json serialization of the metric name and the labels.
-	// invariant: rowmap[tsids[i]] == i for 0 <= i <= maxRow
-	tsids []string
+	// invariant: rowmap[Tsids[i]] == i for 0 <= i <= maxRow
+	Tsids []string
 
 	// buffers maps rowids to observations
 	// This is a map because it is possible for a timeseries that we have
@@ -42,7 +53,7 @@ type TimeseriesAccumulator struct {
 	sampleTime           int
 	strideDuration       time.Duration
 
-	bufferChannel chan<- [][]float64
+	bufferChannel chan<- *ObservationResult
 }
 
 func maxTime(startTime time.Time, strideDuration time.Duration) time.Time {
@@ -52,12 +63,12 @@ func maxTime(startTime time.Time, strideDuration time.Duration) time.Time {
 	return t1.Add(-1 * time.Second)
 }
 
-func NewTimeseriesAccumulator(stride int, startTime time.Time, bc chan<- [][]float64) *TimeseriesAccumulator {
+func NewTimeseriesAccumulator(stride int, startTime time.Time, bc chan<- *ObservationResult) *TimeseriesAccumulator {
 	strideDuration, _ := time.ParseDuration(fmt.Sprintf("%ds", stride*SAMPLE_TIME))
 	return &TimeseriesAccumulator{
 		stride:               stride,
 		rowmap:               make(map[string]int),
-		tsids:                make([]string, 0, 5000), // TODO: initialize capacity based on a config value.
+		Tsids:                make([]string, 0, 5000), // TODO: initialize capacity based on a config value.
 		buffers:              make(map[int][]float64),
 		maxRow:               0,
 		sampleTime:           int(SAMPLE_TIME),
@@ -79,51 +90,48 @@ func (a *TimeseriesAccumulator) computeSlotIndex(timestamp time.Time) (int32, er
 	return int32(diff / float64(a.sampleTime)), nil
 }
 
-func (a *TimeseriesAccumulator) extractMatrixData() [][]float64 {
+func (a *TimeseriesAccumulator) extractMatrixData() *ObservationResult {
 	ret := make([][]float64, a.maxRow)
 	for i, b := range a.buffers {
 		ret[i] = b // This is a move
 		a.buffers[i] = make([]float64, a.stride, a.stride)
 	}
-	return ret
+	return &ObservationResult{
+		Buffers: ret,
+		Err: nil,
+	}
 }
 
-func (a *TimeseriesAccumulator) AddObservation(tsName string, value float64, timestamp time.Time) error {
+func (a *TimeseriesAccumulator) AddObservation(observation *Observation) {
 	colcount := a.stride
-	slot, err := a.computeSlotIndex(timestamp)
+	slot, err := a.computeSlotIndex(observation.Timestamp)
 	if err != nil {
-		return err
+		a.bufferChannel <- &ObservationResult{Buffers: nil, Err: err}
 	}
 	if slot < 0 {
 		log.Printf("publish %d rows to channel\n", len(a.buffers))
 		// publish buffer data to channel
 
-		// TODO: since this can block, have to guard against concurrent calls.
 		a.bufferChannel <- a.extractMatrixData()
-		a.currentStrideStartTs = timestamp
-		a.currentStrideMaxTs = maxTime(timestamp, a.strideDuration)
-		slot, err = a.computeSlotIndex(timestamp)
+		a.currentStrideStartTs = observation.Timestamp
+		a.currentStrideMaxTs = maxTime(observation.Timestamp, a.strideDuration)
+		slot, err = a.computeSlotIndex(observation.Timestamp)
 		if slot < 0 {
 			panic("got negative timestamp after resetting buffers")
 		}
 	}
 
-	rowid, ok := a.rowmap[tsName]
+	rowid, ok := a.rowmap[observation.MetricName]
 	if !ok {
 		rowid = a.maxRow
-		if rowid >= 10 {
-			return nil
-		}
-		a.rowmap[tsName] = rowid
+		a.rowmap[observation.MetricName] = rowid
 		a.buffers[rowid] = make([]float64, colcount, colcount)
-		a.tsids = append(a.tsids, tsName)
+		a.Tsids = append(a.Tsids, observation.MetricName)
 		a.maxRow += 1
 	}
 
-	if math.IsNaN(value) {
-		value = float64(0)
+	if math.IsNaN(observation.Value) {
+		observation.Value = float64(0)
 	}
-	a.buffers[rowid][slot] = value
-
-	return nil
+	a.buffers[rowid][slot] = observation.Value
 }

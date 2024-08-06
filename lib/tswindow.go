@@ -14,11 +14,10 @@ import (
 
 type CorrjoinResult struct {
 	CorrelatedPairs map[buckets.RowPair]float64
+	ConstantRows []bool
 }
 
 // A TimeseriesWindow is a sliding window over a list of timeseries.
-// TODO: make this keep track of the number of shifts that have happend, or
-// some kind of absolute timestamp.
 type TimeseriesWindow struct {
 
 	// This is the raw data.
@@ -32,6 +31,8 @@ type TimeseriesWindow struct {
 	// TODO: maintain the buffers normalized by keeping track of the
 	// normalization factor and the avg of the previous stride
 	normalized [][]float64
+
+	constantRows []bool
 
 	postPAA [][]float64
 
@@ -52,6 +53,10 @@ func (w *TimeseriesWindow) ShiftBuffer(buffer [][]float64, settings CorrjoinSett
 	if len(buffer) == 0 {
 		return nil, nil
 	}
+
+	// TODO: make an error type so I can signal whether the window
+	// is busy vs. a different kind of error.
+	// Then the caller can decide what to do.
 
 	currentRowCount := len(w.buffers)
 	newColumnCount := len(buffer[0])
@@ -112,6 +117,9 @@ func (w *TimeseriesWindow) ShiftBuffer(buffer [][]float64, settings CorrjoinSett
 			return nil, err
 		}
 	}
+	if res != nil {
+		res.ConstantRows = w.constantRows
+	}
 
 	return res, nil
 }
@@ -121,13 +129,20 @@ func (w *TimeseriesWindow) normalizeWindow() *TimeseriesWindow {
 	if len(w.normalized) < len(w.buffers) {
 		w.normalized = slices.Grow(w.normalized, len(w.buffers)-len(w.normalized))
 	}
+	if len(w.constantRows) < len(w.buffers) {
+		w.constantRows = slices.Grow(w.constantRows, len(w.buffers) - len(w.constantRows))
+	}
 	for i, b := range w.buffers {
 		if i >= len(w.normalized) {
 			w.normalized = append(w.normalized, slices.Clone(b))
 		} else {
 			w.normalized[i] = slices.Clone(b)
 		}
-		paa.NormalizeSlice(w.normalized[i])
+		if i >= len(w.constantRows) {
+			w.constantRows = append(w.constantRows, paa.NormalizeSlice(w.normalized[i]))
+		} else {
+			w.constantRows[i] = paa.NormalizeSlice(w.normalized[i])
+		}
 	}
 	return w
 }
@@ -140,6 +155,7 @@ func (w *TimeseriesWindow) pAA(targetColumnCount int) *TimeseriesWindow {
 	if len(w.normalized) < len(w.buffers) {
 		w.normalizeWindow()
 	}
+	// TODO: skip constantRows during PAA
 	for i, b := range w.normalized {
 		if i >= len(w.postPAA) {
 			w.postPAA = append(w.postPAA, paa.PAA(b, targetColumnCount))
@@ -296,8 +312,7 @@ func (w *TimeseriesWindow) sVD(k int) (*TimeseriesWindow, error) {
 
 	svd := &svd.TruncatedSVD{K: k}
 
-	// TODO: skip rows that are all-0, or even all constant
-	// rows?
+	// TODO: skip constant rows?
 	// TODO: experiment with running on a random subset of rows
 	data := make([]float64, 0, rowCount*columnCount)
 	for _, r := range w.postPAA {
@@ -305,6 +320,8 @@ func (w *TimeseriesWindow) sVD(k int) (*TimeseriesWindow, error) {
 	}
 
 	matrix := mat.NewDense(rowCount, columnCount, data)
+	// TODO: if skipping constant rows, have to call FitTransform with two matrices,
+	// one for determining SVD and one for the multiplication.
 	ret, err := svd.FitTransform(matrix)
 	if err != nil {
 		return nil, err
