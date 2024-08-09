@@ -25,18 +25,19 @@ type TruncatedSVD struct {
 // This is based on the code in james-bowman/nlp but it returns
 // mat.Dense. I also modified the code so it returns the same
 // results as python's sklearn.decomposition.TruncatedSVD
-func (t *TruncatedSVD) FitTransform(m mat.Matrix) (*mat.Dense, error) {
+func (t *TruncatedSVD) FitTransform(svdMatrix mat.Matrix, dataMatrix mat.Matrix) (*mat.Dense, error) {
 	var svd mat.SVD
-	ok := svd.Factorize(m, mat.SVDThinV)
+	ok := svd.Factorize(svdMatrix, mat.SVDThinV)
 	if !ok {
-		return nil, fmt.Errorf("Failed to find SVD of input matrix %+v", m)
+		// return nil, fmt.Errorf("Failed to find SVD of input matrix %+v", m)
+		return nil, fmt.Errorf("Failed to find SVD")
 	}
 	//singulars := svd.Values(nil)
 
 	var v mat.Dense
 	svd.VTo(&v)
 
-	r, c := m.Dims()
+	r, c := svdMatrix.Dims()
 	actualK := min(t.K, min(r, c))
 
 	truncatedV := v.Slice(0, c, 0, actualK)
@@ -44,7 +45,7 @@ func (t *TruncatedSVD) FitTransform(m mat.Matrix) (*mat.Dense, error) {
 	t.Components = truncatedV.(*mat.Dense)
 
 	var product mat.Dense
-	product.Mul(m, t.Components)
+	product.Mul(dataMatrix, t.Components)
 
 	return &product, nil
 }

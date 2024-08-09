@@ -123,6 +123,7 @@ func (a *TimeseriesAccumulator) AddObservation(observation *Observation) {
 
 	rowid, ok := a.rowmap[observation.MetricName]
 	if !ok {
+		log.Printf("new timeseries: %s\n", observation.MetricName)
 		rowid = a.maxRow
 		a.rowmap[observation.MetricName] = rowid
 		a.buffers[rowid] = make([]float64, colcount, colcount)

@@ -94,7 +94,6 @@ func (t *tsProcessor) observeTs(req *prompb.WriteRequest) error {
 		metricName := string(mjson)
 		sampleCounter := 0
 		for _, s := range ts.Samples {
-			// TODO: compare value against 0x7ff0000000000002
 			t.observationQueue <- &corrjoin.Observation{
 				MetricName: metricName,
 				Value: s.Value,
@@ -263,8 +262,7 @@ func main() {
 			case observationResult := <-bufferChannel:
 				if observationResult.Err != nil {
 					log.Printf("failed to process window: %v", observationResult.Err)
-					break
-				}
+				} else {
 				requestedCorrelationBatches.Inc()
 				requestStart := time.Now()
 				res, err := processor.window.ShiftBuffer(observationResult.Buffers, *processor.settings)
@@ -280,9 +278,9 @@ func main() {
 				if res != nil {
 					reportCorrelation(processor.accumulator.Tsids, res)
 				}
+				}
 			case <-time.After(10 * time.Minute):
-				log.Fatalf("got no timeseries data for 10 minutes")
-				break
+				log.Printf("got no timeseries data for 10 minutes")
 			}
 		}
 	}()

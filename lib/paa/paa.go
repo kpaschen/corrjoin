@@ -35,7 +35,7 @@ func isSliceConstant(row []float64, epsilon float64) bool {
 	}
 	firstValue := row[0]
 	for _, v := range row[1:] {
-		if math.Abs(v-firstValue) <= epsilon {
+		if math.Abs(v-firstValue) > epsilon {
 			return false
 		}
 	}

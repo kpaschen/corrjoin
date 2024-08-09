@@ -6,6 +6,7 @@ import (
 	"github.com/kpaschen/corrjoin/lib/paa"
 	"log"
 	"math"
+	"runtime"
 )
 
 // A Bucket is an n-dimensional epsilon-tree leaf.
@@ -31,6 +32,25 @@ func NewRowPair(r1 int, r2 int) *RowPair {
 	return &RowPair{r1: r1, r2: r2}
 }
 
+func printMemUsage() {
+        var m runtime.MemStats
+        runtime.ReadMemStats(&m)
+        // For info on each, see: https://golang.org/pkg/runtime/#MemStats
+        log.Printf("Alloc = %v MiB", bToMb(m.Alloc))
+        log.Printf("\tTotalAlloc = %v MiB", bToMb(m.TotalAlloc))
+        log.Printf("\tSys = %v MiB", bToMb(m.Sys))
+        log.Printf("\tNumGC = %v\n", m.NumGC)
+}
+
+func bToMb(b uint64) uint64 {
+    return b / 1024 / 1024
+}
+
+func reportMemory(message string) {
+        log.Println(message)
+        printMemUsage()
+}
+
 // k-dimensional items are assigned into a k-dimensional bucketing scheme
 // by finding a bucket at each dimension.
 type BucketingScheme struct {
@@ -40,6 +60,12 @@ type BucketingScheme struct {
 	originalMatrix [][]float64
 	// the matrix that came out of SVD
 	svdOutputMatrix [][]float64
+	
+	// Optional; when the ith entry in this slice is true,
+	// that row is constant or nearly constant.
+	// As an optimization, can skip that row from processing.
+	constantRows []bool
+
 	// the number of columns that was used for the first PAA step
 	// This equals the number of columns in the svd input matrix
 	ks int
@@ -77,10 +103,10 @@ type BucketingScheme struct {
 	pearsonFilterCount    int
 }
 
-// Initialize a new bucketing scheme.
+// Create a new bucketing scheme.
 func NewBucketingScheme(originalMatrix [][]float64,
-	svdOutputMatrix [][]float64, ks int, ke int,
-	correlationThreshold float64) *BucketingScheme {
+	svdOutputMatrix [][]float64,
+	constantRows []bool, ks int, ke int, correlationThreshold float64) *BucketingScheme {
 
 	originalColumnCount := len(originalMatrix[0])
 	postSvdColumnCount := len(svdOutputMatrix[0])
@@ -98,6 +124,7 @@ func NewBucketingScheme(originalMatrix [][]float64,
 	return &BucketingScheme{
 		originalMatrix:       originalMatrix,
 		svdOutputMatrix:      svdOutputMatrix,
+		constantRows:	      constantRows,
 		ke:                   ke,
 		ks:                   ks,
 		dimensions:           postSvdColumnCount,
@@ -131,7 +158,21 @@ func (s *BucketingScheme) Initialize() error {
 		return fmt.Errorf("svd output matrix needs to be length %d but is length %d",
 			s.dimensions, columnCount)
 	}
+        // When svd works perfectly, this should be something like 2.0 / epsilon1,
+        // but it is usually 3 - 7.
+	maxValuesPerDimension := 10.0
+	log.Printf("expect %f values per dimension\n", maxValuesPerDimension)
+	maxBucketCount := math.Pow(maxValuesPerDimension, float64(columnCount))
+	averageEntriesPerBucket := int(float64(rowCount) / maxBucketCount)
+	if averageEntriesPerBucket < 1 {
+		averageEntriesPerBucket = 1
+	}
+	log.Printf("there are at most %d buckets, expect %d entries per bucket on average",
+		int(maxBucketCount), averageEntriesPerBucket)
 	for i := 0; i < rowCount; i++ {
+		if len(s.constantRows) > 0 && s.constantRows[i] {
+	           continue
+	        }
 		vec := s.svdOutputMatrix[i]
 		coordinates := make([]int, columnCount, columnCount)
 		for j, v := range vec {
@@ -144,9 +185,15 @@ func (s *BucketingScheme) Initialize() error {
 		} else {
 			s.buckets[name] = &Bucket{
 				coordinates: coordinates,
-				members:     []int{i},
+				members:     make([]int, 1, averageEntriesPerBucket),
 			}
+			s.buckets[name].members[0] = i
 		}
+	}
+
+	reportMemory(fmt.Sprintf("initialized buckets. There are %d buckets\n", len(s.buckets)))
+	for name, b := range s.buckets {
+		log.Printf("bucket with name %s has %d members\n", name, len(b.members))
 	}
 
 	return nil
@@ -164,11 +211,12 @@ func (s *BucketingScheme) CorrelationCandidates() (map[RowPair]float64, error) {
 	s.r2FilterCount = 0
 	s.pearsonProcessedCount = 0
 	s.pearsonFilterCount = 0
-	for _, bucket := range s.buckets {
+	for i, bucket := range s.buckets {
 		candidates, err := s.candidatesForBucket(bucket)
 		if err != nil {
 			return nil, err
 		}
+		reportMemory(fmt.Sprintf("there are %d candidates for bucket %s", len(candidates), i))
 		for _, c := range candidates {
 			s.pearsonProcessedCount++
 			pearson, err := correlation.PearsonCorrelation(
@@ -183,6 +231,7 @@ func (s *BucketingScheme) CorrelationCandidates() (map[RowPair]float64, error) {
 				s.pearsonFilterCount++
 			}
 		}
+		reportMemory(fmt.Sprintf("done comparing candidates for bucket %s", i))
 	}
 	return ret, nil
 }

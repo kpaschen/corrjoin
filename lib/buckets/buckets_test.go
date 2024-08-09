@@ -1,14 +1,13 @@
 package buckets
 
 import (
-	"fmt"
 	"testing"
 )
 
 func setupBucketingScheme() *BucketingScheme {
 	originalMatrix := [][]float64{
 		[]float64{0.1, 0.2, 0.3},
-		[]float64{1.1, 1.2, 1.3},
+		[]float64{0.1, 0.2, 0.3},
 		[]float64{2.1, 2.2, 2.3},
 	}
 	svdOutputMatrix := [][]float64{
@@ -16,7 +15,7 @@ func setupBucketingScheme() *BucketingScheme {
 		[]float64{0.1, 0.2},
 		[]float64{2.1, 2.2},
 	}
-	return NewBucketingScheme(originalMatrix, svdOutputMatrix, 3, 2, 0.9)
+	return NewBucketingScheme(originalMatrix, svdOutputMatrix, []bool{}, 3, 2, 0.9)
 }
 
 func TestBucketIndex(t *testing.T) {
@@ -59,17 +58,17 @@ func TestCorrelationCandidates(t *testing.T) {
 	scheme.Initialize()
 	cand, err := scheme.CorrelationCandidates()
 	if err != nil {
-		fmt.Errorf("unexpected error in CorrelationCandidates: %v", err)
+		t.Errorf("unexpected error in CorrelationCandidates: %v", err)
 	}
 	if len(cand) != 1 {
-		fmt.Errorf("expected one correlated pair to be found but got %d", len(cand))
+		t.Errorf("expected one correlated pair to be found but got %d", len(cand))
 	}
 	for rowPair, correlation := range cand {
 		if rowPair.r1 != 0 || rowPair.r2 != 1 {
-			fmt.Errorf("expected rows 0 and 1 to be correlated but got %d %d", rowPair.r1, rowPair.r2)
+			t.Errorf("expected rows 0 and 1 to be correlated but got %d %d", rowPair.r1, rowPair.r2)
 		}
 		if correlation != 1 {
-			fmt.Errorf("expected perfect correlation but got %f", correlation)
+			t.Errorf("expected perfect correlation but got %f", correlation)
 		}
 	}
 }

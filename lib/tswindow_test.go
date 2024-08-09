@@ -15,6 +15,7 @@ var (
 func TestNormalizeWindow(t *testing.T) {
 	tswindow := &TimeseriesWindow{
 		windowSize: 3,
+		maxRowsForSvd: 2,
 	}
 	bufferWindow := [][]float64{
 		[]float64{0.1, 0.2, 0.3},
@@ -147,6 +148,7 @@ func TestSVD(t *testing.T) {
 	// But we compute ThinV, so V is only 3x2 because there's just 2 nonzero eigenvalues.
 	tswindow := &TimeseriesWindow{
 		windowSize: 3,
+		maxRowsForSvd: 3,
 	}
 	bufferWindow := [][]float64{
 		[]float64{3.0, 2.0, 2.0},
@@ -193,6 +195,7 @@ func TestCorrelationPairs(t *testing.T) {
 		windowSize: 4,
 	}
 	tswindow.normalizeWindow()
+	fmt.Printf("window now has constant rows: %+v\n", tswindow.normalized)
 	tswindow.postSVD = tswindow.normalized
 	pairs, err := tswindow.correlationPairs(4, 3, 0.9)
 	if err != nil {

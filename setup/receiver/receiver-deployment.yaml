@@ -18,8 +18,15 @@ spec:
       - name: receiver
         image: localhost:5001/receiver:v0.1
         imagePullPolicy: Always
-        command: ["/bin/receiver"]
-        args: ["-windowSize", "600", "-stride", "30", "-algorithm", "full_pearson"]
+        command: ["/receiver"]
+        args: ["-windowSize", "600", "-stride", "120", "-algorithm", "paa_svd"]
+        resources:
+           limits:
+              cpu: "2"
+              memory: "10Gi"
+           requests:
+              cpu: "2"
+              memory: "10Gi"
         ports:
         - containerPort: 9201
           name: api

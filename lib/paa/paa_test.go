@@ -17,7 +17,11 @@ func TestSumVec(t *testing.T) {
 
 func TestNormalizeSlice(t *testing.T) {
 	vec := []float64{0.1, 0.2, 0.3}
-	NormalizeSlice(vec)
+	isConstant := NormalizeSlice(vec)
+
+	if isConstant {
+		t.Errorf("did not expect %v to be considered constant", vec)
+	}
 
 	// The average should be 0.2, so the first value
 	// in the normalized vector must be negative, the
