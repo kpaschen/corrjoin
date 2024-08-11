@@ -15,7 +15,7 @@ import (
 
 type CorrjoinResult struct {
 	CorrelatedPairs map[buckets.RowPair]float64
-	ConstantRows []bool
+	ConstantRows    []bool
 }
 
 // A TimeseriesWindow is a sliding window over a list of timeseries.
@@ -39,7 +39,7 @@ type TimeseriesWindow struct {
 
 	postSVD [][]float64
 
-        maxRowsForSvd int
+	maxRowsForSvd int
 
 	windowSize int
 }
@@ -86,6 +86,8 @@ func (w *TimeseriesWindow) ShiftBuffer(buffer [][]float64, settings CorrjoinSett
 	if sliceLengthToDelete < 0 {
 		sliceLengthToDelete = 0
 	}
+	log.Printf("shifting %d columns into window; shifting %d columns out of window\n",
+		newColumnCount, sliceLengthToDelete)
 
 	// Append new data.
 	for i, buf := range w.buffers {
@@ -135,7 +137,7 @@ func (w *TimeseriesWindow) normalizeWindow() *TimeseriesWindow {
 		w.normalized = slices.Grow(w.normalized, len(w.buffers)-len(w.normalized))
 	}
 	if len(w.constantRows) < len(w.buffers) {
-		w.constantRows = slices.Grow(w.constantRows, len(w.buffers) - len(w.constantRows))
+		w.constantRows = slices.Grow(w.constantRows, len(w.buffers)-len(w.constantRows))
 	}
 	constantRowCounter := 0
 	for i, b := range w.buffers {
@@ -299,7 +301,7 @@ func (w *TimeseriesWindow) correlationPairs(ks int, ke int, correlationThreshold
 	}
 
 	scheme := buckets.NewBucketingScheme(w.normalized, w.postSVD, w.constantRows,
-		 ks, ke, correlationThreshold)
+		ks, ke, correlationThreshold)
 	reportMemory("created scheme")
 	err := scheme.Initialize()
 	reportMemory("initialized scheme")
@@ -312,8 +314,8 @@ func (w *TimeseriesWindow) correlationPairs(ks int, ke int, correlationThreshold
 		return nil, err
 	}
 	stats := scheme.Stats()
-	log.Printf("correlation pair statistics:\npairs compared in r1: %d\npairs rejected by r1: %d\npairs compared in r2: %d\npairs rejected by r2: %d\npairs compared using pearson: %d\npairs rejected by pearson: %d\n",
-		stats[0], stats[1], stats[2], stats[3], stats[4], stats[5])
+	log.Printf("correlation pair statistics:\npairs compared in r1: %d\npairs rejected by r1: %d\npairs compared in r2: %d\npairs rejected by r2: %d\npairs compared using pearson: %d\npairs rejected by pearson: %d, constant ts dropped: %d\n",
+		stats[0], stats[1], stats[2], stats[3], stats[4], stats[5], stats[6])
 
 	totalRows := float32(r * r / 2)
 	log.Printf("r1 pruning rate: %f\nr2 pruning rate: %f\n", float32(stats[1])/totalRows,
@@ -336,10 +338,10 @@ func (w *TimeseriesWindow) sVD(k int) (*TimeseriesWindow, error) {
 	fullData := make([]float64, 0, rowCount*columnCount)
 	svdData := make([]float64, 0, w.maxRowsForSvd*columnCount)
 	// I ran into failures (with no error messages) for svd on large
-        // inputs (over 40k rows with 600 columns). It looks like some implementations
-        // struggle at that size.
-        // The following samples the data so we stay below maxRowsForSvd rows.
-        svdRowCount := 0
+	// inputs (over 40k rows with 600 columns). It looks like some implementations
+	// struggle at that size.
+	// The following samples the data so we stay below maxRowsForSvd rows.
+	svdRowCount := 0
 	var modulus int
 	if w.maxRowsForSvd == 0 || w.maxRowsForSvd >= rowCount {
 		log.Printf("will attempt to compute svd on full %d rows", rowCount)
@@ -350,17 +352,17 @@ func (w *TimeseriesWindow) sVD(k int) (*TimeseriesWindow, error) {
 	}
 	for i, r := range w.postPAA {
 		fullData = append(fullData, r...)
-                if svdRowCount < w.maxRowsForSvd && (len(w.constantRows) <= i || !w.constantRows[i]) {
-			if i % modulus == 0 {
+		if svdRowCount < w.maxRowsForSvd && (len(w.constantRows) <= i || !w.constantRows[i]) {
+			if i%modulus == 0 {
 				svdData = append(svdData, r...)
 				svdRowCount++
 			}
-                }
+		}
 	}
 
 	fullMatrix := mat.NewDense(rowCount, columnCount, fullData)
 	svdMatrix := mat.NewDense(svdRowCount, columnCount, svdData)
-	
+
 	ret, err := svd.FitTransform(svdMatrix, fullMatrix)
 	if err != nil {
 		return nil, err
@@ -416,24 +418,24 @@ func (w *TimeseriesWindow) pAAOnly(settings CorrjoinSettings) (*CorrjoinResult, 
 	return &CorrjoinResult{CorrelatedPairs: paaPairs}, nil
 }
 
-// printMemUsage outputs the current, total and OS memory being used. As well as the number 
+// printMemUsage outputs the current, total and OS memory being used. As well as the number
 // of garage collection cycles completed.
 func printMemUsage() {
-        var m runtime.MemStats
-        runtime.ReadMemStats(&m)
-        // For info on each, see: https://golang.org/pkg/runtime/#MemStats
-        log.Printf("Alloc = %v MiB", bToMb(m.Alloc))
-        log.Printf("\tTotalAlloc = %v MiB", bToMb(m.TotalAlloc))
-        log.Printf("\tSys = %v MiB", bToMb(m.Sys))
-        log.Printf("\tNumGC = %v\n", m.NumGC)
+	var m runtime.MemStats
+	runtime.ReadMemStats(&m)
+	// For info on each, see: https://golang.org/pkg/runtime/#MemStats
+	log.Printf("Alloc = %v MiB", bToMb(m.Alloc))
+	log.Printf("\tTotalAlloc = %v MiB", bToMb(m.TotalAlloc))
+	log.Printf("\tSys = %v MiB", bToMb(m.Sys))
+	log.Printf("\tNumGC = %v\n", m.NumGC)
 }
 
 func bToMb(b uint64) uint64 {
-    return b / 1024 / 1024
+	return b / 1024 / 1024
 }
 
 func reportMemory(message string) {
-   	log.Println(message)
+	log.Println(message)
 	printMemUsage()
 }
 

@@ -14,7 +14,7 @@ var (
 
 func TestNormalizeWindow(t *testing.T) {
 	tswindow := &TimeseriesWindow{
-		windowSize: 3,
+		windowSize:    3,
 		maxRowsForSvd: 2,
 	}
 	bufferWindow := [][]float64{
@@ -147,7 +147,7 @@ func TestSVD(t *testing.T) {
 	// U should be 2x2, V should be 3x3
 	// But we compute ThinV, so V is only 3x2 because there's just 2 nonzero eigenvalues.
 	tswindow := &TimeseriesWindow{
-		windowSize: 3,
+		windowSize:    3,
 		maxRowsForSvd: 3,
 	}
 	bufferWindow := [][]float64{

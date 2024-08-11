@@ -23,10 +23,10 @@ spec:
         resources:
            limits:
               cpu: "2"
-              memory: "10Gi"
+              memory: "8"
            requests:
               cpu: "2"
-              memory: "10Gi"
+              memory: "8Gi"
         ports:
         - containerPort: 9201
           name: api

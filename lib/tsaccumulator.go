@@ -14,13 +14,13 @@ const (
 
 type Observation struct {
 	MetricName string
-	Value float64
-	Timestamp time.Time
+	Value      float64
+	Timestamp  time.Time
 }
 
 type ObservationResult struct {
 	Buffers [][]float64
-	Err error
+	Err     error
 }
 
 // A TimeseriesAccumulator keeps track of timeseries data as it arrives.
@@ -98,7 +98,7 @@ func (a *TimeseriesAccumulator) extractMatrixData() *ObservationResult {
 	}
 	return &ObservationResult{
 		Buffers: ret,
-		Err: nil,
+		Err:     nil,
 	}
 }
 

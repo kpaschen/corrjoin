@@ -33,26 +33,32 @@ func NewRowPair(r1 int, r2 int) *RowPair {
 }
 
 func printMemUsage() {
-        var m runtime.MemStats
-        runtime.ReadMemStats(&m)
-        // For info on each, see: https://golang.org/pkg/runtime/#MemStats
-        log.Printf("Alloc = %v MiB", bToMb(m.Alloc))
-        log.Printf("\tTotalAlloc = %v MiB", bToMb(m.TotalAlloc))
-        log.Printf("\tSys = %v MiB", bToMb(m.Sys))
-        log.Printf("\tNumGC = %v\n", m.NumGC)
+	var m runtime.MemStats
+	runtime.ReadMemStats(&m)
+	// For info on each, see: https://golang.org/pkg/runtime/#MemStats
+	log.Printf("Alloc = %v MiB", bToMb(m.Alloc))
+	log.Printf("\tTotalAlloc = %v MiB", bToMb(m.TotalAlloc))
+	log.Printf("\tSys = %v MiB", bToMb(m.Sys))
+	log.Printf("\tNumGC = %v\n", m.NumGC)
 }
 
 func bToMb(b uint64) uint64 {
-    return b / 1024 / 1024
+	return b / 1024 / 1024
 }
 
 func reportMemory(message string) {
-        log.Println(message)
-        printMemUsage()
+	log.Println(message)
+	printMemUsage()
 }
 
-// k-dimensional items are assigned into a k-dimensional bucketing scheme
-// by finding a bucket at each dimension.
+// k-dimensional items are assigned into a k-dimensional bucketing scheme.
+// Think of the scheme like an epsilon-tree, with one level per dimension
+// plus the root node.
+// So a 3-dimensional bucketing scheme has a tree with four levels.
+// The buckets are the leaves, and the 'bucket coordinates' tell you the
+// path from the root node to the leaf.
+// At every level, we have floor(2/epsilon1) + 1 child nodes per node.
+// The code creates only the non-empty leaf nodes.
 type BucketingScheme struct {
 	// Information that we need as input
 	// ----------------------------------
@@ -60,7 +66,7 @@ type BucketingScheme struct {
 	originalMatrix [][]float64
 	// the matrix that came out of SVD
 	svdOutputMatrix [][]float64
-	
+
 	// Optional; when the ith entry in this slice is true,
 	// that row is constant or nearly constant.
 	// As an optimization, can skip that row from processing.
@@ -101,6 +107,7 @@ type BucketingScheme struct {
 	r2FilterCount         int
 	pearsonProcessedCount int
 	pearsonFilterCount    int
+	dropConstantRowsCount int
 }
 
 // Create a new bucketing scheme.
@@ -124,7 +131,7 @@ func NewBucketingScheme(originalMatrix [][]float64,
 	return &BucketingScheme{
 		originalMatrix:       originalMatrix,
 		svdOutputMatrix:      svdOutputMatrix,
-		constantRows:	      constantRows,
+		constantRows:         constantRows,
 		ke:                   ke,
 		ks:                   ks,
 		dimensions:           postSvdColumnCount,
@@ -143,11 +150,12 @@ func (s *BucketingScheme) BucketIndex(value float64) int {
 	return int(math.Floor(value / float64(s.epsilon1)))
 }
 
-func (s *BucketingScheme) Stats() [6]int {
-	return [6]int{
+func (s *BucketingScheme) Stats() [7]int {
+	return [7]int{
 		s.r1ProcessedCount, s.r1FilterCount,
 		s.r2ProcessedCount, s.r2FilterCount,
 		s.pearsonProcessedCount, s.pearsonFilterCount,
+		s.dropConstantRowsCount,
 	}
 }
 
@@ -158,8 +166,8 @@ func (s *BucketingScheme) Initialize() error {
 		return fmt.Errorf("svd output matrix needs to be length %d but is length %d",
 			s.dimensions, columnCount)
 	}
-        // When svd works perfectly, this should be something like 2.0 / epsilon1,
-        // but it is usually 3 - 7.
+	// When svd works perfectly, this should be something like 2.0 / epsilon1,
+	// but it is usually 3 - 7.
 	maxValuesPerDimension := 10.0
 	log.Printf("expect %f values per dimension\n", maxValuesPerDimension)
 	maxBucketCount := math.Pow(maxValuesPerDimension, float64(columnCount))
@@ -171,8 +179,8 @@ func (s *BucketingScheme) Initialize() error {
 		int(maxBucketCount), averageEntriesPerBucket)
 	for i := 0; i < rowCount; i++ {
 		if len(s.constantRows) > 0 && s.constantRows[i] {
-	           continue
-	        }
+			continue
+		}
 		vec := s.svdOutputMatrix[i]
 		coordinates := make([]int, columnCount, columnCount)
 		for j, v := range vec {
@@ -252,7 +260,7 @@ func (s *BucketingScheme) candidatesForBucket(bucket *Bucket) ([]RowPair, error)
 				r1, r2 = r2, r1
 			}
 			rp := RowPair{r1: r1, r2: r2}
-			ok, err := s.filterPair(rp)
+			ok, err := s.filterPair(rp, true)
 			if err != nil {
 				return nil, err
 			}
@@ -277,7 +285,7 @@ func (s *BucketingScheme) candidatesForBucket(bucket *Bucket) ([]RowPair, error)
 					if r1 > r2 {
 						rp = RowPair{r1: r2, r2: r1}
 					}
-					ok, err := s.filterPair(rp)
+					ok, err := s.filterPair(rp, false)
 					if err != nil {
 						return nil, err
 					}
@@ -291,24 +299,44 @@ func (s *BucketingScheme) candidatesForBucket(bucket *Bucket) ([]RowPair, error)
 	return ret, nil
 }
 
-func (s *BucketingScheme) filterPair(pair RowPair) (bool, error) {
+func (s *BucketingScheme) ignoreConstantRows(pair RowPair) (bool, error) {
+	if len(s.constantRows) == 0 {
+		return false, nil
+	}
+	if s.constantRows[pair.r1] != s.constantRows[pair.r2] {
+		return false, fmt.Errorf("only one of row pair %v is constant?", pair)
+	}
+	return s.constantRows[pair.r1], nil
+}
+
+func (s *BucketingScheme) filterPair(pair RowPair, sameBucket bool) (bool, error) {
 	_, exists := s.scores[pair]
 	if exists {
 		return false, nil
 	}
-
-	// This is unnecessary if the pair came from the same bucket.
-	vec1 := s.svdOutputMatrix[pair.r1]
-	vec2 := s.svdOutputMatrix[pair.r2]
-	s.r1ProcessedCount++
-	distance, err := correlation.EuclideanDistance(vec1, vec2)
+	ignore, err := s.ignoreConstantRows(pair)
 	if err != nil {
 		return false, err
 	}
-	s.scores[pair] = distance
-	if distance > s.epsilon1 {
-		s.r1FilterCount++
-		return false, nil
+	if ignore {
+		s.dropConstantRowsCount++
+		return true, nil
+	}
+
+	// This is unnecessary if the pair came from the same bucket.
+	if !sameBucket {
+		vec1 := s.svdOutputMatrix[pair.r1]
+		vec2 := s.svdOutputMatrix[pair.r2]
+		s.r1ProcessedCount++
+		distance, err := correlation.EuclideanDistance(vec1, vec2)
+		if err != nil {
+			return false, err
+		}
+		s.scores[pair] = distance
+		if distance > s.epsilon1 {
+			s.r1FilterCount++
+			return false, nil
+		}
 	}
 	// Next filtering step needs to apply PAA (with s.ke target dimensions)
 	// to s.originalMatrix[firstElement] and secondElement and compare
@@ -326,7 +354,7 @@ func (s *BucketingScheme) filterPair(pair RowPair) (bool, error) {
 		s.paa2[pair.r2] = paaVec2
 	}
 	s.r2ProcessedCount++
-	distance, err = correlation.EuclideanDistance(paaVec1, paaVec2)
+	distance, err := correlation.EuclideanDistance(paaVec1, paaVec2)
 	if err != nil {
 		return false, err
 	}

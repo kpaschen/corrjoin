@@ -50,7 +50,7 @@ var (
 	correlationDuration = prometheus.NewGauge(
 		prometheus.GaugeOpts{
 			Name: "correlation_duration_milliseconds",
-			Help:                            "Duration of correlation computation calls.",
+			Help: "Duration of correlation computation calls.",
 		},
 	)
 
@@ -75,10 +75,10 @@ func init() {
 }
 
 type tsProcessor struct {
-	accumulator *corrjoin.TimeseriesAccumulator
-	settings    *corrjoin.CorrjoinSettings
-	window      *corrjoin.TimeseriesWindow
-	observationQueue chan(*corrjoin.Observation)
+	accumulator      *corrjoin.TimeseriesAccumulator
+	settings         *corrjoin.CorrjoinSettings
+	window           *corrjoin.TimeseriesWindow
+	observationQueue chan (*corrjoin.Observation)
 }
 
 func (t *tsProcessor) observeTs(req *prompb.WriteRequest) error {
@@ -96,8 +96,8 @@ func (t *tsProcessor) observeTs(req *prompb.WriteRequest) error {
 		for _, s := range ts.Samples {
 			t.observationQueue <- &corrjoin.Observation{
 				MetricName: metricName,
-				Value: s.Value,
-				Timestamp: time.Unix(s.Timestamp/1000, 0).UTC(),
+				Value:      s.Value,
+				Timestamp:  time.Unix(s.Timestamp/1000, 0).UTC(),
 			}
 			sampleCounter++
 		}
@@ -156,7 +156,7 @@ func reportCorrelation(tsids []string, result *corrjoin.CorrjoinResult) {
 		}
 		if result.ConstantRows[rowIds[0]] != result.ConstantRows[rowIds[1]] {
 			log.Printf("a constant row correlated with a non-constant one?")
-		        log.Printf("correlated: %s and %s with strength %f", tsids[rowIds[0]], tsids[rowIds[1]], pearson)
+			log.Printf("correlated: %s and %s with strength %f", tsids[rowIds[0]], tsids[rowIds[1]], pearson)
 		} else {
 			if result.ConstantRows[rowIds[0]] {
 				log.Print("skipping constant timeseries")
@@ -218,7 +218,7 @@ func main() {
 			WindowSize:           windowSize,
 			Algorithm:            algorithm,
 		},
-		window: corrjoin.NewTimeseriesWindow(windowSize),
+		window:           corrjoin.NewTimeseriesWindow(windowSize),
 		observationQueue: observationQueue,
 	}
 
@@ -248,10 +248,10 @@ func main() {
 	go func() {
 		log.Println("correlation service watching observation queue")
 		for {
-		select {
+			select {
 			case observation := <-observationQueue:
 				processor.accumulator.AddObservation(observation)
-		}
+			}
 		}
 	}()
 
@@ -263,21 +263,21 @@ func main() {
 				if observationResult.Err != nil {
 					log.Printf("failed to process window: %v", observationResult.Err)
 				} else {
-				requestedCorrelationBatches.Inc()
-				requestStart := time.Now()
-				res, err := processor.window.ShiftBuffer(observationResult.Buffers, *processor.settings)
-				// TODO: check for error type.
-				if err != nil {
-					log.Printf("failed to process window: %v", err)
-				}
-				requestEnd := time.Now()
-				elapsed := requestEnd.Sub(requestStart)
-				correlationDurationHist.Observe(float64(elapsed.Milliseconds()))
-				correlationDuration.Set(float64(elapsed.Milliseconds()))
-				log.Printf("correlation batch successfully processed in %d milliseconds\n", elapsed.Milliseconds())
-				if res != nil {
-					reportCorrelation(processor.accumulator.Tsids, res)
-				}
+					requestedCorrelationBatches.Inc()
+					requestStart := time.Now()
+					res, err := processor.window.ShiftBuffer(observationResult.Buffers, *processor.settings)
+					// TODO: check for error type.
+					if err != nil {
+						log.Printf("failed to process window: %v", err)
+					}
+					requestEnd := time.Now()
+					elapsed := requestEnd.Sub(requestStart)
+					correlationDurationHist.Observe(float64(elapsed.Milliseconds()))
+					correlationDuration.Set(float64(elapsed.Milliseconds()))
+					log.Printf("correlation batch successfully processed in %d milliseconds\n", elapsed.Milliseconds())
+					if res != nil {
+						reportCorrelation(processor.accumulator.Tsids, res)
+					}
 				}
 			case <-time.After(10 * time.Minute):
 				log.Printf("got no timeseries data for 10 minutes")

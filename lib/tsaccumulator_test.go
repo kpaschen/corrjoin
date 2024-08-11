@@ -39,18 +39,18 @@ func TestAddObservation(t *testing.T) {
 	acc := NewTimeseriesAccumulator(6, now, replies)
 	acc.AddObservation(&Observation{
 		MetricName: "ts1",
-		Value: 0.1,
-		Timestamp: now.Add(time.Second * 2),
+		Value:      0.1,
+		Timestamp:  now.Add(time.Second * 2),
 	})
 	acc.AddObservation(&Observation{
 		MetricName: "ts1",
-		Value: 0.2,
-		Timestamp: now.Add(time.Second * 6),
+		Value:      0.2,
+		Timestamp:  now.Add(time.Second * 6),
 	})
 	acc.AddObservation(&Observation{
 		MetricName: "ts2",
-		Value: 0.3,
-		Timestamp: now.Add(time.Second * 7),
+		Value:      0.3,
+		Timestamp:  now.Add(time.Second * 7),
 	})
 
 	// Expect two rows in the buffers, one with two entries, the other with
@@ -81,23 +81,23 @@ func TestAddObservation_newStride(t *testing.T) {
 	acc := NewTimeseriesAccumulator(2, now, replies)
 	acc.AddObservation(&Observation{
 		MetricName: "ts1",
-		Value: 0.1,
-		Timestamp: now.Add(time.Second * 2),
+		Value:      0.1,
+		Timestamp:  now.Add(time.Second * 2),
 	})
 	acc.AddObservation(&Observation{
 		MetricName: "ts1",
-		Value: 0.2,
-		Timestamp: now.Add(time.Second * 5),
+		Value:      0.2,
+		Timestamp:  now.Add(time.Second * 5),
 	})
 	acc.AddObservation(&Observation{
 		MetricName: "ts2",
-		Value: 0.4,
-		Timestamp: now.Add(time.Second * 5),
+		Value:      0.4,
+		Timestamp:  now.Add(time.Second * 5),
 	})
 	acc.AddObservation(&Observation{
 		MetricName: "ts1",
-		Value: 0.3,
-		Timestamp: now.Add(time.Second * 10),
+		Value:      0.3,
+		Timestamp:  now.Add(time.Second * 10),
 	})
 
 	select {
