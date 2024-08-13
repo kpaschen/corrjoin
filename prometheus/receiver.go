@@ -6,6 +6,7 @@ import (
 	"flag"
 	"github.com/gorilla/mux"
 	corrjoin "github.com/kpaschen/corrjoin/lib"
+	"github.com/kpaschen/corrjoin/lib/buckets"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/prometheus/common/model"
@@ -53,17 +54,6 @@ var (
 			Help: "Duration of correlation computation calls.",
 		},
 	)
-
-	correlatedPairs = prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{
-			Name: "correlated_timeseries",
-			Help: "pairs of correlated timeseries",
-		},
-		[]string{
-			"ts1",
-			"ts2",
-		},
-	)
 )
 
 func init() {
@@ -71,7 +61,6 @@ func init() {
 	prometheus.MustRegister(requestedCorrelationBatches)
 	prometheus.MustRegister(correlationDurationHist)
 	prometheus.MustRegister(correlationDuration)
-	prometheus.MustRegister(correlatedPairs)
 }
 
 type tsProcessor struct {
@@ -147,28 +136,18 @@ func (t *tsProcessor) receivePrometheusData(w http.ResponseWriter, r *http.Reque
 	w.WriteHeader(http.StatusOK)
 }
 
-func reportCorrelation(tsids []string, result *corrjoin.CorrjoinResult) {
+func reportCorrelation(tsids []string, result *buckets.CorrjoinResult) {
+	log.Printf("received %d correlated pairs\n", len(result.CorrelatedPairs))
 	for pair, pearson := range result.CorrelatedPairs {
 		rowIds := pair.RowIds()
 		if rowIds[0] > len(tsids) || rowIds[1] > len(tsids) {
 			log.Printf("nameless rows %d, %d reported as correlated", rowIds[0], rowIds[1])
 			continue
 		}
-		if result.ConstantRows[rowIds[0]] != result.ConstantRows[rowIds[1]] {
-			log.Printf("a constant row correlated with a non-constant one?")
-			log.Printf("correlated: %s and %s with strength %f", tsids[rowIds[0]], tsids[rowIds[1]], pearson)
-		} else {
-			if result.ConstantRows[rowIds[0]] {
-				log.Print("skipping constant timeseries")
-			}
-		}
-		// TODO: this only updates values when two ts are correlated, not when they aren't.
-		// Should report a 0 for previously-correlated-now-uncorrelated pairs. In order to do that,
-		// have to remember which ones were previously correlated.
-		correlatedPairs.With(prometheus.Labels{
-			"ts1": tsids[rowIds[0]],
-			"ts2": tsids[rowIds[1]],
-		}).Set(pearson)
+		_ = pearson
+
+		// TODO: also write to logfile
+		// log.Printf("correlated r1: %s\n,r2: %s,pearson: %f\n", tsids[rowIds[0]], tsids[rowIds[1]], pearson)
 	}
 }
 
@@ -202,11 +181,18 @@ func main() {
 		metricsAddress: metricsAddr,
 	}
 
+	// The observation queue is how we hand timeseries data to the accumulator.
+	observationQueue := make(chan *corrjoin.Observation, 1)
+	defer close(observationQueue)
+
+	// The buffer channel is how the accumulator lets us know there are enough
+	// timeseries data in the buffer for a stride.
 	bufferChannel := make(chan *corrjoin.ObservationResult, 1)
 	defer close(bufferChannel)
 
-	observationQueue := make(chan *corrjoin.Observation, 1)
-	defer close(observationQueue)
+	// The results channel is where we hear about correlated timeseries.
+	resultsChannel := make(chan *buckets.CorrjoinResult, 1)
+	defer close(resultsChannel)
 
 	processor := &tsProcessor{
 		accumulator: corrjoin.NewTimeseriesAccumulator(stride, time.Now().UTC(), bufferChannel),
@@ -232,6 +218,8 @@ func main() {
 		Addr:    cfg.listenAddress,
 		Handler: router,
 	}
+
+	strideStartTimes := make(map[int]time.Time)
 
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, os.Interrupt)
@@ -265,22 +253,39 @@ func main() {
 				} else {
 					requestedCorrelationBatches.Inc()
 					requestStart := time.Now()
-					res, err := processor.window.ShiftBuffer(observationResult.Buffers, *processor.settings)
+					strideStartTimes[processor.window.StrideCounter] = requestStart
+					err := processor.window.ShiftBuffer(observationResult.Buffers, *processor.settings, resultsChannel)
 					// TODO: check for error type.
 					if err != nil {
 						log.Printf("failed to process window: %v", err)
 					}
-					requestEnd := time.Now()
-					elapsed := requestEnd.Sub(requestStart)
-					correlationDurationHist.Observe(float64(elapsed.Milliseconds()))
-					correlationDuration.Set(float64(elapsed.Milliseconds()))
-					log.Printf("correlation batch successfully processed in %d milliseconds\n", elapsed.Milliseconds())
-					if res != nil {
-						reportCorrelation(processor.accumulator.Tsids, res)
-					}
 				}
 			case <-time.After(10 * time.Minute):
 				log.Printf("got no timeseries data for 10 minutes")
+			}
+		}
+	}()
+
+	go func() {
+		log.Println("Correlation service waiting for correlation results")
+		for {
+			select {
+			case correlationResult := <-resultsChannel:
+				if len(correlationResult.CorrelatedPairs) == 0 {
+					log.Printf("empty correlation result, done with stride %d\n",
+					correlationResult.StrideCounter)
+					requestEnd := time.Now()
+					requestStart, ok := strideStartTimes[correlationResult.StrideCounter]
+					if !ok {
+						log.Printf("missing start time for stride %d?\n", correlationResult.StrideCounter)
+					} else {
+						elapsed := requestEnd.Sub(requestStart)
+						correlationDurationHist.Observe(float64(elapsed.Milliseconds()))
+						correlationDuration.Set(float64(elapsed.Milliseconds()))
+						log.Printf("correlation batch processed in %d milliseconds\n", elapsed.Milliseconds())
+					}
+				}
+				reportCorrelation(processor.accumulator.Tsids, correlationResult)
 			}
 		}
 	}()

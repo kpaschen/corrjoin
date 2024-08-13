@@ -19,11 +19,11 @@ spec:
         image: localhost:5001/receiver:v0.1
         imagePullPolicy: Always
         command: ["/receiver"]
-        args: ["-windowSize", "600", "-stride", "120", "-algorithm", "paa_svd"]
+        args: ["-windowSize", "600", "-stride", "120", "-svdDimensions", "5", "-algorithm", "paa_svd"]
         resources:
            limits:
               cpu: "2"
-              memory: "8"
+              memory: "8Gi"
            requests:
               cpu: "2"
               memory: "8Gi"

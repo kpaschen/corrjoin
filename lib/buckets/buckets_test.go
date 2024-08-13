@@ -4,7 +4,7 @@ import (
 	"testing"
 )
 
-func setupBucketingScheme() *BucketingScheme {
+func setupBucketingScheme() (*BucketingScheme, chan *CorrjoinResult) {
 	originalMatrix := [][]float64{
 		[]float64{0.1, 0.2, 0.3},
 		[]float64{0.1, 0.2, 0.3},
@@ -15,11 +15,12 @@ func setupBucketingScheme() *BucketingScheme {
 		[]float64{0.1, 0.2},
 		[]float64{2.1, 2.2},
 	}
-	return NewBucketingScheme(originalMatrix, svdOutputMatrix, []bool{}, 3, 2, 0.9)
+	replies := make(chan *CorrjoinResult, 1)
+	return NewBucketingScheme(originalMatrix, svdOutputMatrix, []bool{}, 3, 2, 0.9, 0, replies), replies
 }
 
 func TestBucketIndex(t *testing.T) {
-	scheme := setupBucketingScheme()
+	scheme, _ := setupBucketingScheme()
 	b := scheme.BucketIndex(0.0)
 	if b != 0 {
 		t.Errorf("expected bucket 0 for value 0.0 but got %d", b)
@@ -32,7 +33,7 @@ func TestBucketIndex(t *testing.T) {
 }
 
 func TestInitialize(t *testing.T) {
-	scheme := setupBucketingScheme()
+	scheme, _ := setupBucketingScheme()
 	err := scheme.Initialize()
 	if err != nil {
 		t.Errorf("unexpected error in bucket scheme initialization: %v", err)
@@ -54,21 +55,34 @@ func TestNeighbourCoordinates(t *testing.T) {
 }
 
 func TestCorrelationCandidates(t *testing.T) {
-	scheme := setupBucketingScheme()
+	scheme, resultChannel := setupBucketingScheme()
 	scheme.Initialize()
-	cand, err := scheme.CorrelationCandidates()
+	go func() {
+		found := false
+		for true {
+			results, ok := <-resultChannel
+			if !ok {
+				break
+			}
+			if ok && len(results.CorrelatedPairs) > 1 {
+				t.Errorf("expected one correlated pair to be found but got %d", len(results.CorrelatedPairs))
+			}
+			for rowPair, correlation := range results.CorrelatedPairs {
+				if rowPair.r1 != 0 || rowPair.r2 != 1 {
+					t.Errorf("expected rows 0 and 1 to be correlated but got %d %d", rowPair.r1, rowPair.r2)
+				}
+				if correlation != 1 {
+					t.Errorf("expected perfect correlation but got %f", correlation)
+				}
+				found = true
+			}
+		}
+		if !found {
+			t.Errorf("expected one correlated pair")
+		}
+	}()
+	err := scheme.CorrelationCandidates()
 	if err != nil {
 		t.Errorf("unexpected error in CorrelationCandidates: %v", err)
-	}
-	if len(cand) != 1 {
-		t.Errorf("expected one correlated pair to be found but got %d", len(cand))
-	}
-	for rowPair, correlation := range cand {
-		if rowPair.r1 != 0 || rowPair.r2 != 1 {
-			t.Errorf("expected rows 0 and 1 to be correlated but got %d %d", rowPair.r1, rowPair.r2)
-		}
-		if correlation != 1 {
-			t.Errorf("expected perfect correlation but got %f", correlation)
-		}
 	}
 }

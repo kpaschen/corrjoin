@@ -3768,7 +3768,7 @@ prometheus:
     - url: http://correlation-service.default:9201/api/v1/write
       writeRelabelConfigs:
       - sourceLabels: ["__name__"]
-        regex: "node_os_|node_network_iface_|node_network_info|node_network_name_|prometheus_operator_build_info|ALERTS"
+        regex: "correlated_timeseries|node_os_|node_network_iface_|node_network_info|node_network_name_|prometheus_operator_build_info|ALERTS"
         action: Drop
       - regex: "instance|job|prometheus|service"
         action: LabelDrop

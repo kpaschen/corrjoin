@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/kpaschen/corrjoin/lib"
+	"github.com/kpaschen/corrjoin/lib/buckets"
 	"log"
 	"os"
 	"runtime/pprof"
@@ -21,6 +22,7 @@ func main() {
 	ks := flag.Int("ks", 15, "How many columns to reduce the input to in the first paa step")
 	// paper says 30 is good
 	ke := flag.Int("ke", 30, "How many columns to reduce the input to in the second paa step")
+	// Use more than 3 when you have more than about 20k timeseries.
 	svdDimensions := flag.Int("svdOutput", 3, "How many columns to choose after svd") // aka kb
 	full := flag.Bool("full", false, "Whether to run pearson on all pairs")
 	cpuprofile := flag.String("cpuprofile", "", "write cpu profile here")
@@ -60,6 +62,27 @@ func main() {
 	shiftCount := 0
 
 	window := lib.NewTimeseriesWindow(*windowSize)
+
+	results := make(chan *buckets.CorrjoinResult, 1)
+	defer close(results)
+
+	result_ctr := 0
+	go func() {
+		log.Println("waiting for results")
+		for {
+			select {
+			case correlationResult := <-results:
+				if len(correlationResult.CorrelatedPairs) == 0 {
+					log.Printf("total %d results for stride %d\n",
+						result_ctr,
+						correlationResult.StrideCounter)
+					result_ctr = 0
+					continue
+				}
+				result_ctr += len(correlationResult.CorrelatedPairs)
+			}
+		}
+	}()
 
 	// The data in the sample files is in column-major order, so the nth line of a file
 	// is the data at time n, and each line contains an entry for each time series.
@@ -105,7 +128,7 @@ func main() {
 			// This triggers computation once the window is full.
 			// You can capture and print the results here but it'll make the system appear slow, so I don't
 			// do it by default.
-			_, err = window.ShiftBuffer(data, settings)
+			err = window.ShiftBuffer(data, settings, results)
 			if err != nil {
 				log.Printf("caught error: %v\n", err)
 				break

@@ -13,11 +13,6 @@ import (
 	"slices"
 )
 
-type CorrjoinResult struct {
-	CorrelatedPairs map[buckets.RowPair]float64
-	ConstantRows    []bool
-}
-
 // A TimeseriesWindow is a sliding window over a list of timeseries.
 type TimeseriesWindow struct {
 
@@ -25,8 +20,7 @@ type TimeseriesWindow struct {
 	// Every row corresponds to a timeseries.
 	// Rows can be empty if they correspond to a timeseries that we haven't
 	// received data for in a while.
-	// TODO: figure out whether to remove those rows before computation or fill
-	// them with zeroes.
+	// TODO: compact these rows from time to time.
 	buffers [][]float64
 
 	// TODO: maintain the buffers normalized by keeping track of the
@@ -41,20 +35,22 @@ type TimeseriesWindow struct {
 
 	maxRowsForSvd int
 
-	windowSize int
+	windowSize    int
+	StrideCounter int
 }
 
 func NewTimeseriesWindow(windowSize int) *TimeseriesWindow {
-	return &TimeseriesWindow{windowSize: windowSize, maxRowsForSvd: 10000}
+	return &TimeseriesWindow{windowSize: windowSize, maxRowsForSvd: 10000, StrideCounter: 0}
 }
 
 // shift _buffer_ into _w_ from the right, displacing the first buffer.width columns
 // of w.
-func (w *TimeseriesWindow) ShiftBuffer(buffer [][]float64, settings CorrjoinSettings) (*CorrjoinResult, error) {
+func (w *TimeseriesWindow) ShiftBuffer(buffer [][]float64, settings CorrjoinSettings,
+	results chan<- *buckets.CorrjoinResult) error {
 
 	// Weird but ok?
 	if len(buffer) == 0 {
-		return nil, nil
+		return nil
 	}
 
 	// TODO: make an error type so I can signal whether the window
@@ -66,7 +62,7 @@ func (w *TimeseriesWindow) ShiftBuffer(buffer [][]float64, settings CorrjoinSett
 	newRowCount := len(buffer)
 
 	if newRowCount < currentRowCount {
-		return nil, fmt.Errorf("new buffer has wrong row count (%d, needed %d)", newRowCount, currentRowCount)
+		return fmt.Errorf("new buffer has wrong row count (%d, needed %d)", newRowCount, currentRowCount)
 	}
 
 	// This is a new ts window receiving its first stride.
@@ -74,7 +70,7 @@ func (w *TimeseriesWindow) ShiftBuffer(buffer [][]float64, settings CorrjoinSett
 		// Stride should really always be < windowsize, but check here to be sure.
 		if newColumnCount < w.windowSize {
 			w.buffers = buffer
-			return nil, nil
+			return nil
 		} else {
 			w.buffers = make([][]float64, newRowCount)
 		}
@@ -103,31 +99,28 @@ func (w *TimeseriesWindow) ShiftBuffer(buffer [][]float64, settings CorrjoinSett
 		}
 	}
 
+	w.StrideCounter++
+
 	var err error
-	var res *CorrjoinResult
-	res = nil
 	if sliceLengthToDelete > 0 {
 		log.Printf("starting a run of %v on %d rows\n", settings.Algorithm, newRowCount)
 		switch settings.Algorithm {
 		case ALGO_FULL_PEARSON:
-			res, err = w.fullPearson(settings)
+			err = w.fullPearson(settings, results)
 		case ALGO_PAA_ONLY:
-			res, err = w.pAAOnly(settings)
+			err = w.pAAOnly(settings, results)
 		case ALGO_PAA_SVD:
-			res, err = w.processBuffer(settings)
+			err = w.processBuffer(settings, results)
 		case ALGO_NONE: // No-op
 		default:
 			err = fmt.Errorf("unsupported algorithm choice %s", settings.Algorithm)
 		}
 		if err != nil {
-			return nil, err
+			return err
 		}
 	}
-	if res != nil {
-		res.ConstantRows = w.constantRows
-	}
 
-	return res, nil
+	return nil
 }
 
 // This could be computed incrementally after shiftBuffer.
@@ -180,9 +173,7 @@ func (w *TimeseriesWindow) pAA(targetColumnCount int) *TimeseriesWindow {
 	return w
 }
 
-func (w *TimeseriesWindow) allPairs(correlationThreshold float64) (
-	map[buckets.RowPair]float64, error) {
-
+func (w *TimeseriesWindow) allPairs(correlationThreshold float64, results chan<- *buckets.CorrjoinResult) error {
 	log.Println("start allPairs")
 
 	ret := map[buckets.RowPair]float64{}
@@ -191,6 +182,7 @@ func (w *TimeseriesWindow) allPairs(correlationThreshold float64) (
 	w.normalizeWindow()
 
 	ctr := 0
+	found := 0
 	rc := len(w.normalized)
 	for i := 0; i < rc; i++ {
 		r1 := w.normalized[i]
@@ -198,24 +190,35 @@ func (w *TimeseriesWindow) allPairs(correlationThreshold float64) (
 			r2 := w.normalized[j]
 			pearson, err := correlation.PearsonCorrelation(r1, r2)
 			if err != nil {
-				return nil, err
+				return err
 			}
 			ctr++
 			if pearson >= correlationThreshold {
 				pair := buckets.NewRowPair(i, j)
 				ret[*pair] = pearson
+				if len(ret) >= 1000 {
+					found += len(ret)
+					results <- &buckets.CorrjoinResult{CorrelatedPairs: ret,
+						StrideCounter: w.StrideCounter}
+					ret = make(map[buckets.RowPair](float64))
+				}
 			} else {
 				pearsonFilter++
 			}
 		}
 	}
-	log.Printf("full pairs: rejected %d out of %d pairs using pearson threshold, found %d\n", pearsonFilter, ctr, len(ret))
-	return ret, nil
+	if len(ret) > 0 {
+		found += len(ret)
+		results <- &buckets.CorrjoinResult{CorrelatedPairs: ret,
+			StrideCounter: w.StrideCounter}
+	}
+
+	log.Printf("full pairs for stride %d: rejected %d out of %d pairs using pearson threshold, found %d\n",
+		w.StrideCounter, pearsonFilter, ctr, found)
+	return nil
 }
 
-func (w *TimeseriesWindow) pAAPairs(paa int, correlationThreshold float64) (
-	map[buckets.RowPair]float64, error) {
-
+func (w *TimeseriesWindow) pAAPairs(paa int, correlationThreshold float64, results chan<- *buckets.CorrjoinResult) error {
 	log.Println("start paaPairs")
 	ret := map[buckets.RowPair]float64{}
 	w.normalizeWindow()
@@ -236,6 +239,8 @@ func (w *TimeseriesWindow) pAAPairs(paa int, correlationThreshold float64) (
 	// The largest tp is closest to the tp line on the other side
 	largestTp := float64(0.0)
 
+	counter := 0
+
 	lineCount := r
 	for i := 0; i < r; i++ {
 		r1 := w.postPAA[i]
@@ -244,7 +249,7 @@ func (w *TimeseriesWindow) pAAPairs(paa int, correlationThreshold float64) (
 			r2 := w.postPAA[j]
 			distance, err := correlation.EuclideanDistance(r1, r2)
 			if err != nil {
-				return nil, err
+				return err
 			}
 			if distance > epsilon {
 				paaFilter++
@@ -252,7 +257,7 @@ func (w *TimeseriesWindow) pAAPairs(paa int, correlationThreshold float64) (
 			s2 := w.normalized[j]
 			pearson, err := correlation.PearsonCorrelation(s1, s2)
 			if err != nil {
-				return nil, err
+				return err
 			}
 
 			// pearson > T and distance <= epsilon: true positive
@@ -271,6 +276,12 @@ func (w *TimeseriesWindow) pAAPairs(paa int, correlationThreshold float64) (
 						largestTp = distance
 					}
 				}
+				if len(ret) >= 1000 {
+					counter += len(ret)
+					results <- &buckets.CorrjoinResult{CorrelatedPairs: ret,
+						StrideCounter: w.StrideCounter}
+					ret = make(map[buckets.RowPair]float64)
+				}
 			} else {
 				if distance <= epsilon {
 					if distance < smallestFp {
@@ -281,48 +292,43 @@ func (w *TimeseriesWindow) pAAPairs(paa int, correlationThreshold float64) (
 			}
 		}
 	}
-	log.Printf("rejected %d pairs using paa filter, returning %d\n", paaFilter, len(ret))
+	if len(ret) > 0 {
+		counter += len(ret)
+		results <- &buckets.CorrjoinResult{CorrelatedPairs: ret,
+			StrideCounter: w.StrideCounter}
+	}
+	log.Printf("stride %d: rejected %d pairs using paa filter, returning %d\n",
+		w.StrideCounter, paaFilter, counter)
 	// False negative means paa would have rejected a correlated pair, those
 	// are the bad ones.
 	// A high false positive count just means the filter is ineffective.
 	log.Printf("false positive count: %d, false negatives: %d\n", fp, fn)
 	log.Printf("largest tp: %f, smallest fp: %f\n", largestTp, smallestFp)
-	return ret, nil
+	return nil
 }
 
-// correlationPairs returns a list of pairs of row indices
-// and their pearson correlations.
-func (w *TimeseriesWindow) correlationPairs(ks int, ke int, correlationThreshold float64) (
-	map[buckets.RowPair]float64, error) {
-	log.Println("start correlationPairs")
+func (w *TimeseriesWindow) correlationPairs(ks int, ke int, correlationThreshold float64,
+	results chan<- *buckets.CorrjoinResult) error {
 	r := len(w.postSVD)
 	if r == 0 {
-		return nil, fmt.Errorf("you must run SVD before you can get correlation pairs")
+		return fmt.Errorf("you must run SVD before you can get correlation pairs")
 	}
 
 	scheme := buckets.NewBucketingScheme(w.normalized, w.postSVD, w.constantRows,
-		ks, ke, correlationThreshold)
+		ks, ke, correlationThreshold, w.StrideCounter, results)
 	reportMemory("created scheme")
 	err := scheme.Initialize()
 	reportMemory("initialized scheme")
 	if err != nil {
-		return nil, err
+		return err
 	}
-	pairs, err := scheme.CorrelationCandidates()
-	reportMemory("got candidates")
+	err = scheme.CorrelationCandidates()
+	reportMemory("asked for candidates")
 	if err != nil {
-		return nil, err
+		return err
 	}
-	stats := scheme.Stats()
-	log.Printf("correlation pair statistics:\npairs compared in r1: %d\npairs rejected by r1: %d\npairs compared in r2: %d\npairs rejected by r2: %d\npairs compared using pearson: %d\npairs rejected by pearson: %d, constant ts dropped: %d\n",
-		stats[0], stats[1], stats[2], stats[3], stats[4], stats[5], stats[6])
 
-	totalRows := float32(r * r / 2)
-	log.Printf("r1 pruning rate: %f\nr2 pruning rate: %f\n", float32(stats[1])/totalRows,
-		float32(stats[3])/totalRows)
-	log.Printf("there were %f total comparisons and after bucketing we did %d or %f\n",
-		totalRows, stats[0], float32(stats[0])/totalRows)
-	return pairs, nil
+	return nil
 }
 
 func (w *TimeseriesWindow) sVD(k int) (*TimeseriesWindow, error) {
@@ -382,40 +388,31 @@ func (w *TimeseriesWindow) sVD(k int) (*TimeseriesWindow, error) {
 	return w, nil
 }
 
-func (w *TimeseriesWindow) fullPearson(settings CorrjoinSettings) (*CorrjoinResult, error) {
+func (w *TimeseriesWindow) fullPearson(settings CorrjoinSettings, results chan<- *buckets.CorrjoinResult) error {
 	r := len(w.buffers)
 	if r == 0 {
-		return nil, fmt.Errorf("no data to run FullPearson on")
+		return fmt.Errorf("no data to run FullPearson on")
 	}
-	pairs, err := w.allPairs(settings.CorrelationThreshold)
+	err := w.allPairs(settings.CorrelationThreshold, results)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	totalPairs := r * (r - 1) / 2
-
-	log.Printf("FullPearson: found %d correlated pairs out of %d possible (%d)\n", len(pairs), totalPairs,
-		100*len(pairs)/totalPairs)
-
-	return &CorrjoinResult{CorrelatedPairs: pairs}, nil
+	return nil
 }
 
-func (w *TimeseriesWindow) pAAOnly(settings CorrjoinSettings) (*CorrjoinResult, error) {
+func (w *TimeseriesWindow) pAAOnly(settings CorrjoinSettings, results chan<- *buckets.CorrjoinResult) error {
 	r := len(w.buffers)
 	if r == 0 {
-		return nil, fmt.Errorf("no data to run PAA on")
+		return fmt.Errorf("no data to run PAA on")
 	}
 
-	paaPairs, err := w.pAAPairs(settings.SvdDimensions, settings.CorrelationThreshold)
+	err := w.pAAPairs(settings.SvdDimensions, settings.CorrelationThreshold, results)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	totalPairs := r * (r - 1) / 2
-
-	log.Printf("PAAOnly: found %d correlated pairs out of %d possible (%d)\n", len(paaPairs), totalPairs,
-		100*len(paaPairs)/totalPairs)
-	return &CorrjoinResult{CorrelatedPairs: paaPairs}, nil
+	return nil
 }
 
 // printMemUsage outputs the current, total and OS memory being used. As well as the number
@@ -439,11 +436,11 @@ func reportMemory(message string) {
 	printMemUsage()
 }
 
-func (w *TimeseriesWindow) processBuffer(settings CorrjoinSettings) (*CorrjoinResult, error) {
+func (w *TimeseriesWindow) processBuffer(settings CorrjoinSettings, results chan<- *buckets.CorrjoinResult) error {
 	reportMemory("start processBuffers")
 	r := len(w.buffers)
 	if r == 0 {
-		return nil, fmt.Errorf("no data to process")
+		return fmt.Errorf("no data to process")
 	}
 
 	reportMemory("start normalizeWindow")
@@ -456,22 +453,17 @@ func (w *TimeseriesWindow) processBuffer(settings CorrjoinSettings) (*CorrjoinRe
 	_, err := w.sVD(settings.SvdOutputDimensions)
 	if err != nil {
 		log.Printf("svd failed for input %+v\n", w.postPAA)
-		return nil, err
+		return err
 	}
 	// CorrelationBuckets outputs a set of row index pairs.
 	reportMemory("start correlationPairs")
-	pairs, err := w.correlationPairs(settings.SvdDimensions, settings.EuclidDimensions,
-		settings.CorrelationThreshold)
+	err = w.correlationPairs(settings.SvdDimensions, settings.EuclidDimensions,
+		settings.CorrelationThreshold, results)
 	if err != nil {
 		log.Printf("failed to find correlation pairs: %v", err)
-		return nil, err
+		return err
 	}
 
-	totalPairs := r * (r - 1) / 2
-
-	log.Printf("ProcessBuffer: found %d correlated pairs out of %d possible (%d)\n", len(pairs), totalPairs,
-		100*len(pairs)/totalPairs)
-
 	reportMemory("return from processBuffers")
-	return &CorrjoinResult{CorrelatedPairs: pairs}, nil
+	return nil
 }

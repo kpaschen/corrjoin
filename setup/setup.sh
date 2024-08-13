@@ -58,13 +58,17 @@ EOF
 
 # Enable metrics server
 
-helm repo add metrics-server https://kubernetes-sigs.github.io/metrics-server
+#helm repo add metrics-server https://kubernetes-sigs.github.io/metrics-server
 helm repo update
 helm upgrade --install --set args={--kubelet-insecure-tls} metrics-server metrics-server/metrics-server --namespace kube-system
 
 
 # Start kube-prometheus operator with local values file.
-helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+#helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
 helm repo update
 kubectl create ns monitoring
 helm upgrade --install prometheus prometheus-community/kube-prometheus-stack -f prometheus-values.yaml
+
+kubectl apply -f receiver/receiver-deployment.yaml
+kubectl apply -f receiver/receiver-svc.yaml
+kubectl apply -f receiver/receiver-service-monitor.yaml

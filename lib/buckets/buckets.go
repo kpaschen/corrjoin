@@ -24,6 +24,11 @@ type RowPair struct {
 	r2 int
 }
 
+type CorrjoinResult struct {
+	CorrelatedPairs map[RowPair]float64
+	StrideCounter   int
+}
+
 func (r RowPair) RowIds() [2]int {
 	return [2]int{r.r1, r.r2}
 }
@@ -95,8 +100,6 @@ type BucketingScheme struct {
 
 	// intermediate data storage
 	// ---------------------------
-	// This is where we remember row pairs we've already evaluated.
-	scores map[RowPair]float64
 	// lazily computed paa2 values
 	paa2    map[int][]float64
 	buckets map[string]*Bucket
@@ -108,12 +111,17 @@ type BucketingScheme struct {
 	pearsonProcessedCount int
 	pearsonFilterCount    int
 	dropConstantRowsCount int
+
+	strideCounter int
+	resultChannel chan<- *CorrjoinResult
 }
 
 // Create a new bucketing scheme.
 func NewBucketingScheme(originalMatrix [][]float64,
 	svdOutputMatrix [][]float64,
-	constantRows []bool, ks int, ke int, correlationThreshold float64) *BucketingScheme {
+	constantRows []bool, ks int, ke int, correlationThreshold float64,
+	strideCounter int,
+	resultChannel chan<- *CorrjoinResult) *BucketingScheme {
 
 	originalColumnCount := len(originalMatrix[0])
 	postSvdColumnCount := len(svdOutputMatrix[0])
@@ -138,9 +146,10 @@ func NewBucketingScheme(originalMatrix [][]float64,
 		correlationThreshold: correlationThreshold,
 		epsilon1:             epsilon1,
 		epsilon2:             epsilon2,
-		scores:               map[RowPair]float64{},
 		paa2:                 map[int][]float64{},
 		buckets:              map[string]*Bucket{},
+		strideCounter:        strideCounter,
+		resultChannel:        resultChannel,
 	}
 }
 
@@ -207,53 +216,75 @@ func (s *BucketingScheme) Initialize() error {
 	return nil
 }
 
+func (s *BucketingScheme) applyPearson(c RowPair) (float64, error) {
+	s.pearsonProcessedCount++
+	pearson, err := correlation.PearsonCorrelation(
+		s.originalMatrix[c.r1],
+		s.originalMatrix[c.r2])
+	if err != nil {
+		return -1.0, err
+	}
+	if pearson >= s.correlationThreshold {
+		return pearson, nil
+	}
+	s.pearsonFilterCount++
+	return -1.0, nil
+}
+
 func BucketName(coordinates []int) string {
 	return fmt.Sprintf("%v", coordinates)
 }
 
-func (s *BucketingScheme) CorrelationCandidates() (map[RowPair]float64, error) {
-	ret := map[RowPair]float64{}
+func (s *BucketingScheme) CorrelationCandidates() error {
 	s.r1ProcessedCount = 0
 	s.r1FilterCount = 0
 	s.r2ProcessedCount = 0
 	s.r2FilterCount = 0
 	s.pearsonProcessedCount = 0
 	s.pearsonFilterCount = 0
-	for i, bucket := range s.buckets {
-		candidates, err := s.candidatesForBucket(bucket)
+	for _, bucket := range s.buckets {
+		err := s.candidatesForBucket(bucket)
 		if err != nil {
-			return nil, err
+			return err
 		}
-		reportMemory(fmt.Sprintf("there are %d candidates for bucket %s", len(candidates), i))
-		for _, c := range candidates {
-			s.pearsonProcessedCount++
-			pearson, err := correlation.PearsonCorrelation(
-				s.originalMatrix[c.r1],
-				s.originalMatrix[c.r2])
-			if err != nil {
-				return nil, err
-			}
-			if pearson >= s.correlationThreshold {
-				ret[c] = pearson
-			} else {
-				s.pearsonFilterCount++
-			}
-		}
-		reportMemory(fmt.Sprintf("done comparing candidates for bucket %s", i))
 	}
-	return ret, nil
+	// Write an empty map to the channel to signal it's done.
+	log.Printf("sending end of stride %d\n", s.strideCounter)
+	s.resultChannel <- &CorrjoinResult{
+		CorrelatedPairs: map[RowPair]float64{},
+		StrideCounter:   s.strideCounter,
+	}
+	stats := s.Stats()
+	r := len(s.svdOutputMatrix)
+	log.Printf("stride %d:\n", s.strideCounter)
+	log.Printf("correlation pair statistics:\npairs compared in r1: %d\npairs rejected by r1: %d\npairs compared in r2: %d\npairs rejected by r2: %d\npairs compared using pearson: %d\npairs rejected by pearson: %d, constant ts dropped: %d\n",
+		stats[0], stats[1], stats[2], stats[3], stats[4], stats[5], stats[6])
+
+	totalRows := float32(r * r / 2)
+	log.Printf("r1 pruning rate: %f\nr2 pruning rate: %f\n", float32(stats[1])/totalRows,
+		float32(stats[3])/totalRows)
+	log.Printf("there were %d total comparisons and after bucketing we did %d or %f\n",
+		int(totalRows), stats[0], float32(stats[0])/totalRows)
+
+	return nil
 }
 
-// candidatesForBucket returns a list of rowPairs for Bucket
-// and its neighbours.
-func (s *BucketingScheme) candidatesForBucket(bucket *Bucket) ([]RowPair, error) {
-	ret := make([]RowPair, 0)
+// candidatesForBucket processes rowPairs for a Bucket and its neighbours.
+func (s *BucketingScheme) candidatesForBucket(bucket *Bucket) error {
+	log.Printf("starting on bucket %s with %d members\n", BucketName(bucket.coordinates),
+		len(bucket.members))
+	ctr := 0
+	ret := map[RowPair]float64{}
 	for i := 0; i < len(bucket.members); i++ {
 		r1 := bucket.members[i]
 		for j := i + 1; j < len(bucket.members); j++ {
+			ctr++
+			if ctr%100000 == 0 {
+				reportMemory(fmt.Sprintf("after %d comparisons\n", ctr))
+			}
 			r2 := bucket.members[j]
 			if r1 == r2 {
-				return nil, fmt.Errorf("duplicate entry %d in bucket %s", r1,
+				return fmt.Errorf("duplicate entry %d in bucket %s", r1,
 					BucketName(bucket.coordinates))
 			}
 			if r1 > r2 {
@@ -262,10 +293,22 @@ func (s *BucketingScheme) candidatesForBucket(bucket *Bucket) ([]RowPair, error)
 			rp := RowPair{r1: r1, r2: r2}
 			ok, err := s.filterPair(rp, true)
 			if err != nil {
-				return nil, err
+				return err
 			}
 			if ok {
-				ret = append(ret, rp)
+				p, err := s.applyPearson(rp)
+				if err != nil {
+					return err
+				}
+				if p < 0.0 {
+					continue
+				}
+				ret[rp] = p
+				if len(ret) >= 1000 {
+					s.resultChannel <- &CorrjoinResult{CorrelatedPairs: ret,
+						StrideCounter: s.strideCounter}
+					ret = map[RowPair]float64{}
+				}
 			}
 		}
 	}
@@ -277,8 +320,12 @@ func (s *BucketingScheme) candidatesForBucket(bucket *Bucket) ([]RowPair, error)
 		if exists {
 			for _, r1 := range bucket.members {
 				for _, r2 := range neighbour.members {
+					ctr++
+					if ctr%100000 == 0 {
+						reportMemory(fmt.Sprintf("after %d comparisons\n", ctr))
+					}
 					if r1 == r2 {
-						return nil, fmt.Errorf("element %d is in buckets %s and %s", r1,
+						return fmt.Errorf("element %d is in buckets %s and %s", r1,
 							BucketName(bucket.coordinates), name)
 					}
 					rp := RowPair{r1: r1, r2: r2}
@@ -287,16 +334,32 @@ func (s *BucketingScheme) candidatesForBucket(bucket *Bucket) ([]RowPair, error)
 					}
 					ok, err := s.filterPair(rp, false)
 					if err != nil {
-						return nil, err
+						return err
 					}
 					if ok {
-						ret = append(ret, rp)
+						p, err := s.applyPearson(rp)
+						if err != nil {
+							return err
+						}
+						if p < 0.0 {
+							continue
+						}
+						ret[rp] = p
+						if len(ret) >= 1000 {
+							s.resultChannel <- &CorrjoinResult{
+								CorrelatedPairs: ret,
+								StrideCounter:   s.strideCounter}
+							ret = make(map[RowPair]float64)
+						}
 					}
 				}
 			}
 		}
 	}
-	return ret, nil
+	if len(ret) > 0 {
+		s.resultChannel <- &CorrjoinResult{CorrelatedPairs: ret, StrideCounter: s.strideCounter}
+	}
+	return nil
 }
 
 func (s *BucketingScheme) ignoreConstantRows(pair RowPair) (bool, error) {
@@ -310,10 +373,6 @@ func (s *BucketingScheme) ignoreConstantRows(pair RowPair) (bool, error) {
 }
 
 func (s *BucketingScheme) filterPair(pair RowPair, sameBucket bool) (bool, error) {
-	_, exists := s.scores[pair]
-	if exists {
-		return false, nil
-	}
 	ignore, err := s.ignoreConstantRows(pair)
 	if err != nil {
 		return false, err
@@ -332,7 +391,6 @@ func (s *BucketingScheme) filterPair(pair RowPair, sameBucket bool) (bool, error
 		if err != nil {
 			return false, err
 		}
-		s.scores[pair] = distance
 		if distance > s.epsilon1 {
 			s.r1FilterCount++
 			return false, nil
