@@ -7,6 +7,7 @@ import (
 	"github.com/gorilla/mux"
 	corrjoin "github.com/kpaschen/corrjoin/lib"
 	"github.com/kpaschen/corrjoin/lib/buckets"
+	"github.com/kpaschen/corrjoin/lib/reporter"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/prometheus/common/model"
@@ -136,20 +137,6 @@ func (t *tsProcessor) receivePrometheusData(w http.ResponseWriter, r *http.Reque
 	w.WriteHeader(http.StatusOK)
 }
 
-func reportCorrelation(tsids []string, result *buckets.CorrjoinResult) {
-	log.Printf("received %d correlated pairs\n", len(result.CorrelatedPairs))
-	for pair, pearson := range result.CorrelatedPairs {
-		rowIds := pair.RowIds()
-		if rowIds[0] > len(tsids) || rowIds[1] > len(tsids) {
-			log.Printf("nameless rows %d, %d reported as correlated", rowIds[0], rowIds[1])
-			continue
-		}
-		_ = pearson
-
-		// TODO: also write to logfile
-		// log.Printf("correlated r1: %s\n,r2: %s,pearson: %f\n", tsids[rowIds[0]], tsids[rowIds[1]], pearson)
-	}
-}
 
 func main() {
 	var metricsAddr string
@@ -220,6 +207,7 @@ func main() {
 	}
 
 	strideStartTimes := make(map[int]time.Time)
+	correlationReporter := reporter.NewReporter()
 
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, os.Interrupt)
@@ -284,8 +272,11 @@ func main() {
 						correlationDuration.Set(float64(elapsed.Milliseconds()))
 						log.Printf("correlation batch processed in %d milliseconds\n", elapsed.Milliseconds())
 					}
+					correlationReporter.PrintReport(processor.accumulator.Tsids)
 				}
-				reportCorrelation(processor.accumulator.Tsids, correlationResult)
+				for pair, pearson := range correlationResult.CorrelatedPairs {
+					correlationReporter.AddCorrelatedPair(pair, pearson)
+				}
 			}
 		}
 	}()
