@@ -7,11 +7,6 @@ import (
 	"time"
 )
 
-const (
-	// Default is one sample every 5s
-	SAMPLE_TIME = 5.0
-)
-
 type Observation struct {
 	MetricName string
 	Value      float64
@@ -63,15 +58,16 @@ func maxTime(startTime time.Time, strideDuration time.Duration) time.Time {
 	return t1.Add(-1 * time.Second)
 }
 
-func NewTimeseriesAccumulator(stride int, startTime time.Time, bc chan<- *ObservationResult) *TimeseriesAccumulator {
-	strideDuration, _ := time.ParseDuration(fmt.Sprintf("%ds", stride*SAMPLE_TIME))
+func NewTimeseriesAccumulator(stride int, startTime time.Time, sampleInterval int,
+	bc chan<- *ObservationResult) *TimeseriesAccumulator {
+	strideDuration, _ := time.ParseDuration(fmt.Sprintf("%ds", stride*sampleInterval))
 	return &TimeseriesAccumulator{
 		stride:               stride,
 		rowmap:               make(map[string]int),
 		Tsids:                make([]string, 0, 5000), // TODO: initialize capacity based on a config value.
 		buffers:              make(map[int][]float64),
 		maxRow:               0,
-		sampleTime:           int(SAMPLE_TIME),
+		sampleTime:           sampleInterval,
 		currentStrideStartTs: startTime,
 		currentStrideMaxTs:   maxTime(startTime, strideDuration),
 		strideDuration:       strideDuration,

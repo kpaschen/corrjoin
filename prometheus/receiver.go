@@ -191,7 +191,7 @@ func main() {
 	}
 
 	processor := &tsProcessor{
-		accumulator:      corrjoin.NewTimeseriesAccumulator(stride, time.Now().UTC(), bufferChannel),
+		accumulator:      corrjoin.NewTimeseriesAccumulator(stride, time.Now().UTC(), config.SampleInterval, bufferChannel),
 		settings:         config,
 		window:           corrjoin.NewTimeseriesWindow(*config),
 		observationQueue: observationQueue,

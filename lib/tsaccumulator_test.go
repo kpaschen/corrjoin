@@ -10,7 +10,7 @@ func TestComputeSlotIndex(t *testing.T) {
 	now := time.Now()
 	replies := make(chan *ObservationResult, 1)
 	defer close(replies)
-	acc := NewTimeseriesAccumulator(6, now, replies)
+	acc := NewTimeseriesAccumulator(6, now, 5, replies)
 
 	s0, err := acc.computeSlotIndex(now)
 	if err != nil {
@@ -36,7 +36,7 @@ func TestAddObservation(t *testing.T) {
 	now := time.Now()
 	replies := make(chan *ObservationResult, 1)
 	defer close(replies)
-	acc := NewTimeseriesAccumulator(6, now, replies)
+	acc := NewTimeseriesAccumulator(6, now, 5, replies)
 	acc.AddObservation(&Observation{
 		MetricName: "ts1",
 		Value:      0.1,
@@ -78,7 +78,7 @@ func TestAddObservation_newStride(t *testing.T) {
 	now := time.Now()
 	replies := make(chan *ObservationResult, 1)
 	defer close(replies)
-	acc := NewTimeseriesAccumulator(2, now, replies)
+	acc := NewTimeseriesAccumulator(2, now, 5, replies)
 	acc.AddObservation(&Observation{
 		MetricName: "ts1",
 		Value:      0.1,
