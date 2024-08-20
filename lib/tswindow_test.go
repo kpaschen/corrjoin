@@ -16,9 +16,9 @@ var (
 
 func TestNormalizeWindow(t *testing.T) {
 	config.WindowSize = 3
+	config.MaxRowsForSvd = 2
 	tswindow := &TimeseriesWindow{
-		settings:      config,
-		maxRowsForSvd: 2,
+		settings: config,
 	}
 	bufferWindow := [][]float64{
 		[]float64{0.1, 0.2, 0.3},
@@ -160,8 +160,7 @@ func TestSVD(t *testing.T) {
 	config.SvdDimensions = 3
 	config.SvdOutputDimensions = 2
 	tswindow := &TimeseriesWindow{
-		settings:      config,
-		maxRowsForSvd: 3,
+		settings: config,
 	}
 	bufferWindow := [][]float64{
 		[]float64{3.0, 2.0, 2.0},

@@ -33,15 +33,14 @@ type TimeseriesWindow struct {
 
 	postSVD [][]float64
 
-	settings      settings.CorrjoinSettings
-	maxRowsForSvd int
+	settings settings.CorrjoinSettings
 
 	windowSize    int
 	StrideCounter int
 }
 
 func NewTimeseriesWindow(settings settings.CorrjoinSettings) *TimeseriesWindow {
-	return &TimeseriesWindow{settings: settings, maxRowsForSvd: 10000, StrideCounter: 0}
+	return &TimeseriesWindow{settings: settings, StrideCounter: 0}
 }
 
 // shift _buffer_ into _w_ from the right, displacing the first buffer.width columns
@@ -339,23 +338,23 @@ func (w *TimeseriesWindow) sVD() (*TimeseriesWindow, error) {
 	svd := &svd.TruncatedSVD{K: w.settings.SvdOutputDimensions}
 
 	fullData := make([]float64, 0, rowCount*columnCount)
-	svdData := make([]float64, 0, w.maxRowsForSvd*columnCount)
+	svdData := make([]float64, 0, w.settings.MaxRowsForSvd*columnCount)
 	// I ran into failures (with no error messages) for svd on large
 	// inputs (over 40k rows with 600 columns). It looks like some implementations
 	// struggle at that size.
 	// The following samples the data so we stay below maxRowsForSvd rows.
 	svdRowCount := 0
 	var modulus int
-	if w.maxRowsForSvd == 0 || w.maxRowsForSvd >= rowCount {
+	if w.settings.MaxRowsForSvd == 0 || w.settings.MaxRowsForSvd >= rowCount {
 		log.Printf("will attempt to compute svd on full %d rows", rowCount)
 		modulus = 1
 	} else {
-		log.Printf("reducing matrix from %d to %d rows for svd", rowCount, w.maxRowsForSvd)
-		modulus = rowCount / w.maxRowsForSvd
+		log.Printf("reducing matrix from %d to %d rows for svd", rowCount, w.settings.MaxRowsForSvd)
+		modulus = rowCount / w.settings.MaxRowsForSvd
 	}
 	for i, r := range w.postPAA {
 		fullData = append(fullData, r...)
-		if svdRowCount < w.maxRowsForSvd && (len(w.constantRows) <= i || !w.constantRows[i]) {
+		if svdRowCount < w.settings.MaxRowsForSvd && (len(w.constantRows) <= i || !w.constantRows[i]) {
 			if i%modulus == 0 {
 				svdData = append(svdData, r...)
 				svdRowCount++
