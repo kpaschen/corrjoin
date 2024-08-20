@@ -33,14 +33,16 @@ func NewReporter() *Reporter {
 }
 
 func (r *Reporter) PrintReport(tsids []string) {
-	log.Printf("timeseries correlation report\n")	
+	log.Printf("timeseries correlation report\n")
 	for _, c := range r.correlations {
 		log.Printf("correlated set with %d members\n", len(c.members))
-		for i, m := range c.members {
-			log.Printf("%d: %s\n", i, tsids[m])
-		}
-		for pair, score := range c.pairs {
-			log.Printf("%+v: %f\n", pair, score)
+		if len(c.members) < 100 {
+			for i, m := range c.members {
+				log.Printf("%d: %s\n", i, tsids[m])
+			}
+			for pair, score := range c.pairs {
+				log.Printf("%+v: %f\n", pair, score)
+			}
 		}
 	}
 	r.correlations = make([]*CorrelatedSet, 0, 10000)

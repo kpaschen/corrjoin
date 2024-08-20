@@ -107,18 +107,22 @@ func (a *TimeseriesAccumulator) AddObservation(observation *Observation) {
 	slot, err := a.computeSlotIndex(observation.Timestamp)
 	if err != nil {
 		a.bufferChannel <- &ObservationResult{Buffers: nil, Err: err}
+		return
 	}
 	if slot < 0 {
-		log.Printf("publish %d rows to channel\n", len(a.buffers))
-		// publish buffer data to channel
-
-		a.bufferChannel <- a.extractMatrixData()
 		a.currentStrideStartTs = observation.Timestamp
 		a.currentStrideMaxTs = maxTime(observation.Timestamp, a.strideDuration)
 		slot, err = a.computeSlotIndex(observation.Timestamp)
+		if err != nil {
+			a.bufferChannel <- &ObservationResult{Buffers: nil, Err: err}
+			return
+		}
 		if slot < 0 {
 			panic("got negative timestamp after resetting buffers")
 		}
+
+		log.Printf("publish %d rows to channel\n", len(a.buffers))
+		a.bufferChannel <- a.extractMatrixData()
 	}
 
 	rowid, ok := a.rowmap[observation.MetricName]

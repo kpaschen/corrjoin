@@ -271,17 +271,14 @@ func (s *BucketingScheme) CorrelationCandidates() error {
 
 // candidatesForBucket processes rowPairs for a Bucket and its neighbours.
 func (s *BucketingScheme) candidatesForBucket(bucket *Bucket) error {
-	log.Printf("starting on bucket %s with %d members\n", BucketName(bucket.coordinates),
-		len(bucket.members))
-	ctr := 0
+	reportMemory(fmt.Sprintf("starting on bucket %s with %d members\n",
+		BucketName(bucket.coordinates), len(bucket.members)))
 	ret := map[RowPair]float64{}
+	comparisons := 0
+	results := 0
 	for i := 0; i < len(bucket.members); i++ {
 		r1 := bucket.members[i]
 		for j := i + 1; j < len(bucket.members); j++ {
-			ctr++
-			if ctr%100000 == 0 {
-				reportMemory(fmt.Sprintf("after %d comparisons\n", ctr))
-			}
 			r2 := bucket.members[j]
 			if r1 == r2 {
 				return fmt.Errorf("duplicate entry %d in bucket %s", r1,
@@ -300,10 +297,12 @@ func (s *BucketingScheme) candidatesForBucket(bucket *Bucket) error {
 				if err != nil {
 					return err
 				}
+				comparisons++
 				if p < 0.0 {
 					continue
 				}
 				ret[rp] = p
+				results++
 				if len(ret) >= 1000 {
 					s.resultChannel <- &CorrjoinResult{CorrelatedPairs: ret,
 						StrideCounter: s.strideCounter}
@@ -320,10 +319,6 @@ func (s *BucketingScheme) candidatesForBucket(bucket *Bucket) error {
 		if exists {
 			for _, r1 := range bucket.members {
 				for _, r2 := range neighbour.members {
-					ctr++
-					if ctr%100000 == 0 {
-						reportMemory(fmt.Sprintf("after %d comparisons\n", ctr))
-					}
 					if r1 == r2 {
 						return fmt.Errorf("element %d is in buckets %s and %s", r1,
 							BucketName(bucket.coordinates), name)
@@ -337,6 +332,7 @@ func (s *BucketingScheme) candidatesForBucket(bucket *Bucket) error {
 						return err
 					}
 					if ok {
+						comparisons++
 						p, err := s.applyPearson(rp)
 						if err != nil {
 							return err
@@ -344,6 +340,7 @@ func (s *BucketingScheme) candidatesForBucket(bucket *Bucket) error {
 						if p < 0.0 {
 							continue
 						}
+						results++
 						ret[rp] = p
 						if len(ret) >= 1000 {
 							s.resultChannel <- &CorrjoinResult{
@@ -359,6 +356,8 @@ func (s *BucketingScheme) candidatesForBucket(bucket *Bucket) error {
 	if len(ret) > 0 {
 		s.resultChannel <- &CorrjoinResult{CorrelatedPairs: ret, StrideCounter: s.strideCounter}
 	}
+	reportMemory(fmt.Sprintf("finished bucket %s after %d comparisons and %d results\n",
+		BucketName(bucket.coordinates), comparisons, results))
 	return nil
 }
 

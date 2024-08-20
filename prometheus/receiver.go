@@ -137,7 +137,6 @@ func (t *tsProcessor) receivePrometheusData(w http.ResponseWriter, r *http.Reque
 	w.WriteHeader(http.StatusOK)
 }
 
-
 func main() {
 	var metricsAddr string
 	var listenAddr string
@@ -242,8 +241,10 @@ func main() {
 					requestedCorrelationBatches.Inc()
 					requestStart := time.Now()
 					strideStartTimes[processor.window.StrideCounter] = requestStart
+					// TODO: this has to return quickly.
 					err := processor.window.ShiftBuffer(observationResult.Buffers, *processor.settings, resultsChannel)
 					// TODO: check for error type.
+					// If window is busy, hold the observationResult
 					if err != nil {
 						log.Printf("failed to process window: %v", err)
 					}
@@ -261,7 +262,7 @@ func main() {
 			case correlationResult := <-resultsChannel:
 				if len(correlationResult.CorrelatedPairs) == 0 {
 					log.Printf("empty correlation result, done with stride %d\n",
-					correlationResult.StrideCounter)
+						correlationResult.StrideCounter)
 					requestEnd := time.Now()
 					requestStart, ok := strideStartTimes[correlationResult.StrideCounter]
 					if !ok {
@@ -274,9 +275,11 @@ func main() {
 					}
 					correlationReporter.PrintReport(processor.accumulator.Tsids)
 				}
-				for pair, pearson := range correlationResult.CorrelatedPairs {
-					correlationReporter.AddCorrelatedPair(pair, pearson)
-				}
+				/*
+					for pair, pearson := range correlationResult.CorrelatedPairs {
+						correlationReporter.AddCorrelatedPair(pair, pearson)
+					}
+				*/
 			}
 		}
 	}()
