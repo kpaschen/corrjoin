@@ -5,10 +5,10 @@ import (
 	"github.com/kpaschen/corrjoin/lib/buckets"
 	"github.com/kpaschen/corrjoin/lib/correlation"
 	"github.com/kpaschen/corrjoin/lib/paa"
+	"github.com/kpaschen/corrjoin/lib/settings"
 	"github.com/kpaschen/corrjoin/lib/svd"
 	"gonum.org/v1/gonum/mat"
 	"log"
-	"math"
 	"runtime"
 	"slices"
 )
@@ -33,20 +33,20 @@ type TimeseriesWindow struct {
 
 	postSVD [][]float64
 
+	settings      settings.CorrjoinSettings
 	maxRowsForSvd int
 
 	windowSize    int
 	StrideCounter int
 }
 
-func NewTimeseriesWindow(windowSize int) *TimeseriesWindow {
-	return &TimeseriesWindow{windowSize: windowSize, maxRowsForSvd: 10000, StrideCounter: 0}
+func NewTimeseriesWindow(settings settings.CorrjoinSettings) *TimeseriesWindow {
+	return &TimeseriesWindow{settings: settings, maxRowsForSvd: 10000, StrideCounter: 0}
 }
 
 // shift _buffer_ into _w_ from the right, displacing the first buffer.width columns
 // of w.
-func (w *TimeseriesWindow) ShiftBuffer(buffer [][]float64, settings CorrjoinSettings,
-	results chan<- *buckets.CorrjoinResult) error {
+func (w *TimeseriesWindow) ShiftBuffer(buffer [][]float64, results chan<- *buckets.CorrjoinResult) error {
 
 	// Weird but ok?
 	if len(buffer) == 0 {
@@ -68,7 +68,7 @@ func (w *TimeseriesWindow) ShiftBuffer(buffer [][]float64, settings CorrjoinSett
 	// This is a new ts window receiving its first stride.
 	if currentRowCount == 0 {
 		// Stride should really always be < windowsize, but check here to be sure.
-		if newColumnCount < w.windowSize {
+		if newColumnCount < w.settings.WindowSize {
 			w.buffers = buffer
 			return nil
 		} else {
@@ -78,7 +78,7 @@ func (w *TimeseriesWindow) ShiftBuffer(buffer [][]float64, settings CorrjoinSett
 
 	currentColumnCount := len(w.buffers[0])
 
-	sliceLengthToDelete := currentColumnCount + newColumnCount - w.windowSize
+	sliceLengthToDelete := currentColumnCount + newColumnCount - w.settings.WindowSize
 	if sliceLengthToDelete < 0 {
 		sliceLengthToDelete = 0
 	}
@@ -103,17 +103,17 @@ func (w *TimeseriesWindow) ShiftBuffer(buffer [][]float64, settings CorrjoinSett
 
 	var err error
 	if sliceLengthToDelete > 0 {
-		log.Printf("starting a run of %v on %d rows\n", settings.Algorithm, newRowCount)
-		switch settings.Algorithm {
-		case ALGO_FULL_PEARSON:
-			err = w.fullPearson(settings, results)
-		case ALGO_PAA_ONLY:
-			err = w.pAAOnly(settings, results)
-		case ALGO_PAA_SVD:
-			err = w.processBuffer(settings, results)
-		case ALGO_NONE: // No-op
+		log.Printf("starting a run of %v on %d rows\n", w.settings.Algorithm, newRowCount)
+		switch w.settings.Algorithm {
+		case settings.ALGO_FULL_PEARSON:
+			err = w.fullPearson(results)
+		case settings.ALGO_PAA_ONLY:
+			err = w.pAAOnly(results)
+		case settings.ALGO_PAA_SVD:
+			err = w.processBuffer(results)
+		case settings.ALGO_NONE: // No-op
 		default:
-			err = fmt.Errorf("unsupported algorithm choice %s", settings.Algorithm)
+			err = fmt.Errorf("unsupported algorithm choice %s", w.settings.Algorithm)
 		}
 		if err != nil {
 			return err
@@ -153,7 +153,7 @@ func (w *TimeseriesWindow) normalizeWindow() *TimeseriesWindow {
 }
 
 // This could be computed incrementally after shiftBuffer.
-func (w *TimeseriesWindow) pAA(targetColumnCount int) *TimeseriesWindow {
+func (w *TimeseriesWindow) pAA() *TimeseriesWindow {
 	log.Printf("start paa\n")
 	if len(w.postPAA) < len(w.buffers) {
 		w.postPAA = slices.Grow(w.postPAA, len(w.buffers)-len(w.postPAA))
@@ -164,16 +164,16 @@ func (w *TimeseriesWindow) pAA(targetColumnCount int) *TimeseriesWindow {
 	// TODO: skip constantRows during PAA
 	for i, b := range w.normalized {
 		if i >= len(w.postPAA) {
-			w.postPAA = append(w.postPAA, paa.PAA(b, targetColumnCount))
+			w.postPAA = append(w.postPAA, paa.PAA(b, w.settings.SvdDimensions))
 		} else {
-			w.postPAA[i] = paa.PAA(b, targetColumnCount)
+			w.postPAA[i] = paa.PAA(b, w.settings.SvdDimensions)
 		}
 	}
 	log.Printf("done with PAA\n")
 	return w
 }
 
-func (w *TimeseriesWindow) allPairs(correlationThreshold float64, results chan<- *buckets.CorrjoinResult) error {
+func (w *TimeseriesWindow) allPairs(results chan<- *buckets.CorrjoinResult) error {
 	log.Println("start allPairs")
 
 	ret := map[buckets.RowPair]float64{}
@@ -193,7 +193,7 @@ func (w *TimeseriesWindow) allPairs(correlationThreshold float64, results chan<-
 				return err
 			}
 			ctr++
-			if pearson >= correlationThreshold {
+			if pearson >= w.settings.CorrelationThreshold {
 				pair := buckets.NewRowPair(i, j)
 				ret[*pair] = pearson
 				if len(ret) >= 1000 {
@@ -218,21 +218,18 @@ func (w *TimeseriesWindow) allPairs(correlationThreshold float64, results chan<-
 	return nil
 }
 
-func (w *TimeseriesWindow) pAAPairs(paa int, correlationThreshold float64, results chan<- *buckets.CorrjoinResult) error {
+func (w *TimeseriesWindow) pAAPairs(results chan<- *buckets.CorrjoinResult) error {
 	log.Println("start paaPairs")
 	ret := map[buckets.RowPair]float64{}
 	w.normalizeWindow()
-	w.pAA(paa)
+	w.pAA()
 	paaFilter := 0
 	fp := 0
 	fn := 0
 
 	r := len(w.postPAA)
-	c := len(w.postPAA[0])
-	originalColumns := len(w.buffers[0])
 
-	epsilon := math.Sqrt(float64(2*c) * (1.0 - correlationThreshold) / float64(originalColumns))
-	log.Printf("epsilon is %f\n", epsilon)
+	log.Printf("epsilon is %f\n", w.settings.Epsilon1)
 
 	// The smallest fp is the one closest to the tp line
 	smallestFp := float64(10.0)
@@ -251,7 +248,7 @@ func (w *TimeseriesWindow) pAAPairs(paa int, correlationThreshold float64, resul
 			if err != nil {
 				return err
 			}
-			if distance > epsilon {
+			if distance > w.settings.Epsilon1 {
 				paaFilter++
 			}
 			s2 := w.normalized[j]
@@ -264,12 +261,13 @@ func (w *TimeseriesWindow) pAAPairs(paa int, correlationThreshold float64, resul
 			// pearson > T and distance > epsilon: false negative
 			// pearson <= T and distance <= epsilon: false positive
 			// pearson <= T and distance > epsilon: true negative
-			if pearson >= correlationThreshold {
+			if pearson >= w.settings.CorrelationThreshold {
 				pair := buckets.NewRowPair(i, j)
 				ret[*pair] = pearson
 
-				if distance > epsilon { // false negative
-					log.Printf("false negative: euclidean distance between rows %d and %d is %f > %f but correlation coefficient is %f\n", i, j, distance, epsilon, pearson)
+				if distance > w.settings.Epsilon1 { // false negative
+					log.Printf("false negative: euclidean distance between rows %d and %d is %f > %f but correlation coefficient is %f\n",
+						i, j, distance, w.settings.Epsilon1, pearson)
 					fn++
 				} else { // true positive
 					if distance > largestTp {
@@ -283,7 +281,7 @@ func (w *TimeseriesWindow) pAAPairs(paa int, correlationThreshold float64, resul
 					ret = make(map[buckets.RowPair]float64)
 				}
 			} else {
-				if distance <= epsilon {
+				if distance <= w.settings.Epsilon1 {
 					if distance < smallestFp {
 						smallestFp = distance
 					}
@@ -307,15 +305,14 @@ func (w *TimeseriesWindow) pAAPairs(paa int, correlationThreshold float64, resul
 	return nil
 }
 
-func (w *TimeseriesWindow) correlationPairs(ks int, ke int, correlationThreshold float64,
-	results chan<- *buckets.CorrjoinResult) error {
+func (w *TimeseriesWindow) correlationPairs(results chan<- *buckets.CorrjoinResult) error {
 	r := len(w.postSVD)
 	if r == 0 {
 		return fmt.Errorf("you must run SVD before you can get correlation pairs")
 	}
 
 	scheme := buckets.NewBucketingScheme(w.normalized, w.postSVD, w.constantRows,
-		ks, ke, correlationThreshold, w.StrideCounter, results)
+		w.settings, w.StrideCounter, results)
 	reportMemory("created scheme")
 	err := scheme.Initialize()
 	reportMemory("initialized scheme")
@@ -331,7 +328,7 @@ func (w *TimeseriesWindow) correlationPairs(ks int, ke int, correlationThreshold
 	return nil
 }
 
-func (w *TimeseriesWindow) sVD(k int) (*TimeseriesWindow, error) {
+func (w *TimeseriesWindow) sVD() (*TimeseriesWindow, error) {
 	log.Println("start svd")
 	rowCount := len(w.postPAA)
 	if rowCount == 0 {
@@ -339,7 +336,7 @@ func (w *TimeseriesWindow) sVD(k int) (*TimeseriesWindow, error) {
 	}
 	columnCount := len(w.postPAA[0])
 
-	svd := &svd.TruncatedSVD{K: k}
+	svd := &svd.TruncatedSVD{K: w.settings.SvdOutputDimensions}
 
 	fullData := make([]float64, 0, rowCount*columnCount)
 	svdData := make([]float64, 0, w.maxRowsForSvd*columnCount)
@@ -388,12 +385,12 @@ func (w *TimeseriesWindow) sVD(k int) (*TimeseriesWindow, error) {
 	return w, nil
 }
 
-func (w *TimeseriesWindow) fullPearson(settings CorrjoinSettings, results chan<- *buckets.CorrjoinResult) error {
+func (w *TimeseriesWindow) fullPearson(results chan<- *buckets.CorrjoinResult) error {
 	r := len(w.buffers)
 	if r == 0 {
 		return fmt.Errorf("no data to run FullPearson on")
 	}
-	err := w.allPairs(settings.CorrelationThreshold, results)
+	err := w.allPairs(results)
 	if err != nil {
 		return err
 	}
@@ -401,13 +398,13 @@ func (w *TimeseriesWindow) fullPearson(settings CorrjoinSettings, results chan<-
 	return nil
 }
 
-func (w *TimeseriesWindow) pAAOnly(settings CorrjoinSettings, results chan<- *buckets.CorrjoinResult) error {
+func (w *TimeseriesWindow) pAAOnly(results chan<- *buckets.CorrjoinResult) error {
 	r := len(w.buffers)
 	if r == 0 {
 		return fmt.Errorf("no data to run PAA on")
 	}
 
-	err := w.pAAPairs(settings.SvdDimensions, settings.CorrelationThreshold, results)
+	err := w.pAAPairs(results)
 	if err != nil {
 		return err
 	}
@@ -436,7 +433,7 @@ func reportMemory(message string) {
 	printMemUsage()
 }
 
-func (w *TimeseriesWindow) processBuffer(settings CorrjoinSettings, results chan<- *buckets.CorrjoinResult) error {
+func (w *TimeseriesWindow) processBuffer(results chan<- *buckets.CorrjoinResult) error {
 	reportMemory("start processBuffers")
 	r := len(w.buffers)
 	if r == 0 {
@@ -446,19 +443,18 @@ func (w *TimeseriesWindow) processBuffer(settings CorrjoinSettings, results chan
 	reportMemory("start normalizeWindow")
 	w.normalizeWindow()
 	reportMemory("start paa")
-	w.pAA(settings.SvdDimensions)
+	w.pAA()
 
 	// Apply SVD
 	reportMemory("start svd")
-	_, err := w.sVD(settings.SvdOutputDimensions)
+	_, err := w.sVD()
 	if err != nil {
 		log.Printf("svd failed for input %+v\n", w.postPAA)
 		return err
 	}
 	// CorrelationBuckets outputs a set of row index pairs.
 	reportMemory("start correlationPairs")
-	err = w.correlationPairs(settings.SvdDimensions, settings.EuclidDimensions,
-		settings.CorrelationThreshold, results)
+	err = w.correlationPairs(results)
 	if err != nil {
 		log.Printf("failed to find correlation pairs: %v", err)
 		return err

@@ -1,6 +1,7 @@
 package buckets
 
 import (
+	"github.com/kpaschen/corrjoin/lib/settings"
 	"testing"
 )
 
@@ -16,7 +17,14 @@ func setupBucketingScheme() (*BucketingScheme, chan *CorrjoinResult) {
 		[]float64{2.1, 2.2},
 	}
 	replies := make(chan *CorrjoinResult, 1)
-	return NewBucketingScheme(originalMatrix, svdOutputMatrix, []bool{}, 3, 2, 0.9, 0, replies), replies
+	settings := settings.CorrjoinSettings{
+		SvdDimensions:        3,
+		EuclidDimensions:     2,
+		CorrelationThreshold: 0.9,
+		WindowSize:           3,
+		SvdOutputDimensions:  2,
+	}
+	return NewBucketingScheme(originalMatrix, svdOutputMatrix, []bool{}, settings.ComputeSettingsFields(), 0, replies), replies
 }
 
 func TestBucketIndex(t *testing.T) {

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/kpaschen/corrjoin/lib"
 	"github.com/kpaschen/corrjoin/lib/buckets"
+	"github.com/kpaschen/corrjoin/lib/settings"
 	"log"
 	"os"
 	"runtime/pprof"
@@ -47,21 +48,21 @@ func main() {
 	reader := bufio.NewReader(file)
 	var data [][]float64
 
-	settings := lib.CorrjoinSettings{
+	config := settings.CorrjoinSettings{
 		SvdOutputDimensions:  *svdDimensions,
 		SvdDimensions:        *ks,
 		EuclidDimensions:     *ke,
 		CorrelationThreshold: float64(*correlationThreshold) / 100.0,
 		WindowSize:           *windowSize,
-		Algorithm:            lib.ALGO_PAA_SVD,
+		Algorithm:            settings.ALGO_PAA_SVD,
 	}
 	if *full {
-		settings.Algorithm = lib.ALGO_FULL_PEARSON
+		config.Algorithm = settings.ALGO_FULL_PEARSON
 	}
 
 	shiftCount := 0
 
-	window := lib.NewTimeseriesWindow(*windowSize)
+	window := lib.NewTimeseriesWindow(config)
 
 	results := make(chan *buckets.CorrjoinResult, 1)
 	defer close(results)
@@ -128,7 +129,7 @@ func main() {
 			// This triggers computation once the window is full.
 			// You can capture and print the results here but it'll make the system appear slow, so I don't
 			// do it by default.
-			err = window.ShiftBuffer(data, settings, results)
+			err = window.ShiftBuffer(data, results)
 			if err != nil {
 				log.Printf("caught error: %v\n", err)
 				break

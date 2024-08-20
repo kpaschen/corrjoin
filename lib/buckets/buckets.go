@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/kpaschen/corrjoin/lib/correlation"
 	"github.com/kpaschen/corrjoin/lib/paa"
+	"github.com/kpaschen/corrjoin/lib/settings"
 	"log"
 	"math"
 	"runtime"
@@ -77,26 +78,7 @@ type BucketingScheme struct {
 	// As an optimization, can skip that row from processing.
 	constantRows []bool
 
-	// the number of columns that was used for the first PAA step
-	// This equals the number of columns in the svd input matrix
-	ks int
-	// the number of columns to use for the second PAA step
-	ke int
-	// The correlation Threshold (T)
-	correlationThreshold float64
-
-	// Parameters computed from the input information
-	// ----------------------------------------------
-	// The number of levels
-	// should be the same as the number of columns in svdOutputMatrix
-	dimensions int
-
-	// thresholds for the two filtering steps
-	// epsilon1 = sqrt(2 ks (1 - correlationThreshold) / n)
-	// where n = number of columns in originalMatrix
-	epsilon1 float64
-	// epsilon2 = sqrt(2 ke (1 - correlationThreshold) / n)
-	epsilon2 float64 // this is for the euclidean distance filter
+	settings settings.CorrjoinSettings
 
 	// intermediate data storage
 	// ---------------------------
@@ -119,44 +101,26 @@ type BucketingScheme struct {
 // Create a new bucketing scheme.
 func NewBucketingScheme(originalMatrix [][]float64,
 	svdOutputMatrix [][]float64,
-	constantRows []bool, ks int, ke int, correlationThreshold float64,
+	constantRows []bool, settings settings.CorrjoinSettings,
 	strideCounter int,
 	resultChannel chan<- *CorrjoinResult) *BucketingScheme {
 
-	originalColumnCount := len(originalMatrix[0])
-	postSvdColumnCount := len(svdOutputMatrix[0])
-
-	log.Printf("using n = %d and svd output columns %d\n", originalColumnCount, postSvdColumnCount)
-
-	// epsilon1 = sqrt(2 ks (1 - correlationThreshold) / n)
-	epsilon1 := math.Sqrt(float64(2*ks) * (1.0 - correlationThreshold) / float64(originalColumnCount))
-
-	// epsilon2 = sqrt(2 ke (1 - correlationThreshold) / n)
-	epsilon2 := math.Sqrt(float64(2*ke) * (1.0 - correlationThreshold) / float64(originalColumnCount))
-
-	log.Printf("epsilon1 %f epsilon2 %f, T %f\n", epsilon1, epsilon2, correlationThreshold)
-
 	return &BucketingScheme{
-		originalMatrix:       originalMatrix,
-		svdOutputMatrix:      svdOutputMatrix,
-		constantRows:         constantRows,
-		ke:                   ke,
-		ks:                   ks,
-		dimensions:           postSvdColumnCount,
-		correlationThreshold: correlationThreshold,
-		epsilon1:             epsilon1,
-		epsilon2:             epsilon2,
-		paa2:                 map[int][]float64{},
-		buckets:              map[string]*Bucket{},
-		strideCounter:        strideCounter,
-		resultChannel:        resultChannel,
+		originalMatrix:  originalMatrix,
+		svdOutputMatrix: svdOutputMatrix,
+		constantRows:    constantRows,
+		settings:        settings,
+		paa2:            map[int][]float64{},
+		buckets:         map[string]*Bucket{},
+		strideCounter:   strideCounter,
+		resultChannel:   resultChannel,
 	}
 }
 
 // BucketIndex returns the integer index of the bucket that value
 // falls into.
 func (s *BucketingScheme) BucketIndex(value float64) int {
-	return int(math.Floor(value / float64(s.epsilon1)))
+	return int(math.Floor(value / float64(s.settings.Epsilon1)))
 }
 
 func (s *BucketingScheme) Stats() [7]int {
@@ -171,21 +135,12 @@ func (s *BucketingScheme) Stats() [7]int {
 func (s *BucketingScheme) Initialize() error {
 	rowCount := len(s.svdOutputMatrix)
 	columnCount := len(s.svdOutputMatrix[0])
-	if columnCount != s.dimensions {
+	if columnCount != s.settings.SvdOutputDimensions {
 		return fmt.Errorf("svd output matrix needs to be length %d but is length %d",
-			s.dimensions, columnCount)
+			s.settings.SvdOutputDimensions, columnCount)
 	}
 	// When svd works perfectly, this should be something like 2.0 / epsilon1,
 	// but it is usually 3 - 7.
-	maxValuesPerDimension := 10.0
-	log.Printf("expect %f values per dimension\n", maxValuesPerDimension)
-	maxBucketCount := math.Pow(maxValuesPerDimension, float64(columnCount))
-	averageEntriesPerBucket := int(float64(rowCount) / maxBucketCount)
-	if averageEntriesPerBucket < 1 {
-		averageEntriesPerBucket = 1
-	}
-	log.Printf("there are at most %d buckets, expect %d entries per bucket on average",
-		int(maxBucketCount), averageEntriesPerBucket)
 	for i := 0; i < rowCount; i++ {
 		if len(s.constantRows) > 0 && s.constantRows[i] {
 			continue
@@ -202,7 +157,7 @@ func (s *BucketingScheme) Initialize() error {
 		} else {
 			s.buckets[name] = &Bucket{
 				coordinates: coordinates,
-				members:     make([]int, 1, averageEntriesPerBucket),
+				members:     make([]int, 1, 1000),
 			}
 			s.buckets[name].members[0] = i
 		}
@@ -224,7 +179,7 @@ func (s *BucketingScheme) applyPearson(c RowPair) (float64, error) {
 	if err != nil {
 		return -1.0, err
 	}
-	if pearson >= s.correlationThreshold {
+	if pearson >= s.settings.CorrelationThreshold {
 		return pearson, nil
 	}
 	s.pearsonFilterCount++
@@ -390,24 +345,24 @@ func (s *BucketingScheme) filterPair(pair RowPair, sameBucket bool) (bool, error
 		if err != nil {
 			return false, err
 		}
-		if distance > s.epsilon1 {
+		if distance > s.settings.Epsilon1 {
 			s.r1FilterCount++
 			return false, nil
 		}
 	}
-	// Next filtering step needs to apply PAA (with s.ke target dimensions)
+	// Next filtering step needs to apply PAA
 	// to s.originalMatrix[firstElement] and secondElement and compare
 	// their euclidean distances to s.epsilon2
 	paaVec1, exists := s.paa2[pair.r1]
 	if !exists {
 		input := s.originalMatrix[pair.r1]
-		paaVec1 = paa.PAA(input, s.ke)
+		paaVec1 = paa.PAA(input, s.settings.EuclidDimensions)
 		s.paa2[pair.r1] = paaVec1
 	}
 	paaVec2, exists := s.paa2[pair.r2]
 	if !exists {
 		input := s.originalMatrix[pair.r2]
-		paaVec2 = paa.PAA(input, s.ke)
+		paaVec2 = paa.PAA(input, s.settings.EuclidDimensions)
 		s.paa2[pair.r2] = paaVec2
 	}
 	s.r2ProcessedCount++
@@ -415,7 +370,7 @@ func (s *BucketingScheme) filterPair(pair RowPair, sameBucket bool) (bool, error
 	if err != nil {
 		return false, err
 	}
-	if distance > s.epsilon2 {
+	if distance > s.settings.Epsilon2 {
 		s.r2FilterCount++
 		return false, nil
 	}

@@ -8,6 +8,7 @@ import (
 	corrjoin "github.com/kpaschen/corrjoin/lib"
 	"github.com/kpaschen/corrjoin/lib/buckets"
 	"github.com/kpaschen/corrjoin/lib/reporter"
+	"github.com/kpaschen/corrjoin/lib/settings"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/prometheus/common/model"
@@ -66,7 +67,7 @@ func init() {
 
 type tsProcessor struct {
 	accumulator      *corrjoin.TimeseriesAccumulator
-	settings         *corrjoin.CorrjoinSettings
+	settings         *settings.CorrjoinSettings
 	window           *corrjoin.TimeseriesWindow
 	observationQueue chan (*corrjoin.Observation)
 }
@@ -180,17 +181,19 @@ func main() {
 	resultsChannel := make(chan *buckets.CorrjoinResult, 1)
 	defer close(resultsChannel)
 
+	config := &settings.CorrjoinSettings{
+		SvdDimensions:        ks,
+		SvdOutputDimensions:  svdDimensions,
+		EuclidDimensions:     ke,
+		CorrelationThreshold: float64(float64(correlationThreshold) / 100.0),
+		WindowSize:           windowSize,
+		Algorithm:            algorithm,
+	}
+
 	processor := &tsProcessor{
-		accumulator: corrjoin.NewTimeseriesAccumulator(stride, time.Now().UTC(), bufferChannel),
-		settings: &corrjoin.CorrjoinSettings{
-			SvdDimensions:        ks,
-			SvdOutputDimensions:  svdDimensions,
-			EuclidDimensions:     ke,
-			CorrelationThreshold: float64(float64(correlationThreshold) / 100.0),
-			WindowSize:           windowSize,
-			Algorithm:            algorithm,
-		},
-		window:           corrjoin.NewTimeseriesWindow(windowSize),
+		accumulator:      corrjoin.NewTimeseriesAccumulator(stride, time.Now().UTC(), bufferChannel),
+		settings:         config,
+		window:           corrjoin.NewTimeseriesWindow(*config),
 		observationQueue: observationQueue,
 	}
 
@@ -242,7 +245,7 @@ func main() {
 					requestStart := time.Now()
 					strideStartTimes[processor.window.StrideCounter] = requestStart
 					// TODO: this has to return quickly.
-					err := processor.window.ShiftBuffer(observationResult.Buffers, *processor.settings, resultsChannel)
+					err := processor.window.ShiftBuffer(observationResult.Buffers, resultsChannel)
 					// TODO: check for error type.
 					// If window is busy, hold the observationResult
 					if err != nil {

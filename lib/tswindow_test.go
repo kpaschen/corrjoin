@@ -3,19 +3,21 @@ package lib
 import (
 	"fmt"
 	"github.com/kpaschen/corrjoin/lib/buckets"
+	"github.com/kpaschen/corrjoin/lib/settings"
 	"math"
 	"testing"
 )
 
 var (
-	settings = CorrjoinSettings{
-		Algorithm: ALGO_NONE,
+	config = settings.CorrjoinSettings{
+		Algorithm: settings.ALGO_NONE,
 	}
 )
 
 func TestNormalizeWindow(t *testing.T) {
+	config.WindowSize = 3
 	tswindow := &TimeseriesWindow{
-		windowSize:    3,
+		settings:      config,
 		maxRowsForSvd: 2,
 	}
 	bufferWindow := [][]float64{
@@ -26,7 +28,7 @@ func TestNormalizeWindow(t *testing.T) {
 
 	results := make(chan *buckets.CorrjoinResult, 1)
 	defer close(results)
-	tswindow.ShiftBuffer(bufferWindow, settings, results)
+	tswindow.ShiftBuffer(bufferWindow, results)
 	tswindow.normalizeWindow()
 
 	for _, b := range tswindow.normalized {
@@ -64,8 +66,9 @@ func matrixEqual(a [][]float64, b [][]float64, epsilon float64) bool {
 }
 
 func TestShiftBuffer(t *testing.T) {
+	config.WindowSize = 3
 	tswindow := &TimeseriesWindow{
-		windowSize: 3,
+		settings: config,
 	}
 	bufferWindow := [][]float64{
 		[]float64{0.1, 0.2, 0.3},
@@ -74,7 +77,7 @@ func TestShiftBuffer(t *testing.T) {
 	}
 
 	results := make(chan *buckets.CorrjoinResult, 1)
-	err := tswindow.ShiftBuffer(bufferWindow, settings, results)
+	err := tswindow.ShiftBuffer(bufferWindow, results)
 
 	if err != nil {
 		t.Errorf("unexpected error %v shifting buffer into time series window", err)
@@ -87,7 +90,7 @@ func TestShiftBuffer(t *testing.T) {
 	wrongSizeBuffer := [][]float64{
 		[]float64{0.4, 0.5},
 	}
-	err = tswindow.ShiftBuffer(wrongSizeBuffer, settings, results)
+	err = tswindow.ShiftBuffer(wrongSizeBuffer, results)
 	if err == nil {
 		t.Errorf("expected error for mismatched buffer shift")
 	}
@@ -97,7 +100,7 @@ func TestShiftBuffer(t *testing.T) {
 		[]float64{1.4},
 		[]float64{2.4},
 	}
-	err = tswindow.ShiftBuffer(strideBuffer, settings, results)
+	err = tswindow.ShiftBuffer(strideBuffer, results)
 	if err != nil {
 		t.Errorf("unexpected error %v shifting buffer into ts window", err)
 	}
@@ -114,8 +117,10 @@ func TestShiftBuffer(t *testing.T) {
 }
 
 func TestPAA(t *testing.T) {
+	config.WindowSize = 4
+	config.SvdDimensions = 2
 	tswindow := &TimeseriesWindow{
-		windowSize: 4,
+		settings: config,
 	}
 	bufferWindow := [][]float64{
 		[]float64{0.1, 0.2, 0.3, 0.4},
@@ -124,12 +129,12 @@ func TestPAA(t *testing.T) {
 	}
 
 	results := make(chan *buckets.CorrjoinResult, 1)
-	tswindow.ShiftBuffer(bufferWindow, settings, results)
+	tswindow.ShiftBuffer(bufferWindow, results)
 
 	// Cheat a little just to make the values easier to check.
 	tswindow.normalized = tswindow.buffers
 
-	tswindow.pAA(2)
+	tswindow.pAA()
 	if len(tswindow.postPAA) != 3 {
 		t.Errorf("expected post-PAA matrix to have three rows but it has %d", len(tswindow.postPAA))
 	}
@@ -151,8 +156,11 @@ func TestSVD(t *testing.T) {
 	// Input matrix A has 2 rows, 3 columns
 	// U should be 2x2, V should be 3x3
 	// But we compute ThinV, so V is only 3x2 because there's just 2 nonzero eigenvalues.
+	config.WindowSize = 3
+	config.SvdDimensions = 3
+	config.SvdOutputDimensions = 2
 	tswindow := &TimeseriesWindow{
-		windowSize:    3,
+		settings:      config,
 		maxRowsForSvd: 3,
 	}
 	bufferWindow := [][]float64{
@@ -161,10 +169,10 @@ func TestSVD(t *testing.T) {
 	}
 
 	results := make(chan *buckets.CorrjoinResult, 1)
-	tswindow.ShiftBuffer(bufferWindow, settings, results)
+	tswindow.ShiftBuffer(bufferWindow, results)
 	tswindow.postPAA = bufferWindow
 
-	svd, err := tswindow.sVD(2)
+	svd, err := tswindow.sVD()
 	if svd == nil {
 		t.Errorf("svd is not supposed to fail")
 	}
@@ -196,9 +204,14 @@ func TestCorrelationPairs(t *testing.T) {
 		[]float64{1.1, 1.2, 1.3, 1.4},
 		[]float64{2.3, -8.2, 1.3, 0.4},
 	}
+	config.WindowSize = 4
+	config.SvdDimensions = 4
+	config.SvdOutputDimensions = 4
+	config.EuclidDimensions = 3
+	config.CorrelationThreshold = 0.9
 	tswindow := &TimeseriesWindow{
-		buffers:    initialTsData,
-		windowSize: 4,
+		settings: config,
+		buffers:  initialTsData,
 	}
 	tswindow.normalizeWindow()
 	tswindow.postSVD = tswindow.normalized
@@ -217,7 +230,7 @@ func TestCorrelationPairs(t *testing.T) {
 		}
 	}()
 
-	err := tswindow.correlationPairs(4, 3, 0.9, results)
+	err := tswindow.correlationPairs(results)
 	if err != nil {
 		t.Errorf("unexpected error in correlationpairs: %v", err)
 	}
