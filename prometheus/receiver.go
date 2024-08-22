@@ -191,6 +191,7 @@ func main() {
 		WindowSize:           windowSize,
 		Algorithm:            algorithm,
 	}
+	corrjoinConfig = corrjoinConfig.ComputeSettingsFields()
 
 	var comparer comparisons.Engine
 	if compareEngine == "inprocess" {

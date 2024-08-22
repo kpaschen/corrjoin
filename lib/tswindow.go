@@ -45,41 +45,34 @@ func NewTimeseriesWindow(settings settings.CorrjoinSettings, comparer comparison
 	return &TimeseriesWindow{settings: settings, StrideCounter: 0, comparer: comparer}
 }
 
-// shift _buffer_ into _w_ from the right, displacing the first buffer.width columns
-// of w.
-func (w *TimeseriesWindow) ShiftBuffer(buffer [][]float64, results chan<- *comparisons.CorrjoinResult) error {
-
+func (w *TimeseriesWindow) shiftBufferIntoWindow(buffer [][]float64) (bool, error) {
 	// Weird but ok?
 	if len(buffer) == 0 {
-		return nil
+		return false, nil
 	}
-
-	// TODO: make an error type so I can signal whether the window
-	// is busy vs. a different kind of error.
-	// Then the caller can decide what to do.
-
 	currentRowCount := len(w.buffers)
 	newColumnCount := len(buffer[0])
 	newRowCount := len(buffer)
 
 	if newRowCount < currentRowCount {
-		return fmt.Errorf("new buffer has wrong row count (%d, needed %d)", newRowCount, currentRowCount)
+		return false, fmt.Errorf(
+			"new buffer has wrong row count (%d, needed %d)", newRowCount, currentRowCount)
 	}
 
 	// This is a new ts window receiving its first stride.
 	if currentRowCount == 0 {
 		// Stride should really always be < windowsize, but check here to be sure.
-		if newColumnCount < w.settings.WindowSize {
+		if newColumnCount <= w.settings.WindowSize {
 			w.buffers = buffer
-			return nil
+			return newColumnCount == w.settings.WindowSize, nil
 		} else {
-			w.buffers = make([][]float64, newRowCount)
+			return false, fmt.Errorf("received buffer with width %d greater than window size %d",
+				newColumnCount, w.settings.WindowSize)
 		}
 	}
 
-	currentColumnCount := len(w.buffers[0])
-
-	sliceLengthToDelete := currentColumnCount + newColumnCount - w.settings.WindowSize
+	oldColumnCount := len(w.buffers[0])
+	sliceLengthToDelete := oldColumnCount + newColumnCount - w.settings.WindowSize
 	if sliceLengthToDelete < 0 {
 		sliceLengthToDelete = 0
 	}
@@ -94,37 +87,60 @@ func (w *TimeseriesWindow) ShiftBuffer(buffer [][]float64, results chan<- *compa
 	currentRowCount = len(w.buffers)
 	if newRowCount > currentRowCount {
 		for i := currentRowCount; i < newRowCount; i++ {
-			row := make([]float64, currentColumnCount-sliceLengthToDelete, currentColumnCount-sliceLengthToDelete)
+			row := make([]float64, w.settings.WindowSize-newColumnCount, w.settings.WindowSize)
 			row = append(row, buffer[i]...)
 			w.buffers = append(w.buffers, row)
 		}
 	}
+	return sliceLengthToDelete > 0, nil
+}
 
-	var err error
-	w.StrideCounter++
+// shift _buffer_ into _w_ from the right, displacing the first buffer.width columns
+// of w.
+func (w *TimeseriesWindow) ShiftBuffer(buffer [][]float64, results chan<- *comparisons.CorrjoinResult) error {
 
-	if sliceLengthToDelete > 0 {
-		log.Printf("starting a run of %v on %d rows\n", w.settings.Algorithm, newRowCount)
-		switch w.settings.Algorithm {
-		case settings.ALGO_FULL_PEARSON:
-			err = w.fullPearson(results)
-		case settings.ALGO_PAA_ONLY:
-			err = w.pAAOnly(results)
-		case settings.ALGO_PAA_SVD:
-			err = w.processBuffer(results)
-		case settings.ALGO_NONE: // No-op
-		default:
-			err = fmt.Errorf("unsupported algorithm choice %s", w.settings.Algorithm)
-		}
-		if err != nil {
-			return err
-		}
+	// TODO: make an error type so I can signal whether the window
+	// is busy vs. a different kind of error.
+	// Then the caller can decide what to do.
+
+	newStride, err := w.shiftBufferIntoWindow(buffer)
+	if err != nil {
+		return err
+	}
+	if !newStride {
+		return nil
 	}
 
+	w.StrideCounter++
+
+	w.normalizeWindow()
+	log.Printf("starting a run of %v on %d rows\n", w.settings.Algorithm, len(w.normalized))
+	err = w.comparer.StartStride(w.normalized, w.constantRows, w.StrideCounter)
+	if err != nil {
+		// This could get a 'repeated start stride'
+		log.Printf("failed to start stride %d: %v", w.StrideCounter, err)
+	}
+
+	switch w.settings.Algorithm {
+	case settings.ALGO_FULL_PEARSON:
+		err = w.fullPearson()
+	case settings.ALGO_PAA_ONLY:
+		err = w.pAAOnly()
+	case settings.ALGO_PAA_SVD:
+		err = w.processBuffer()
+	case settings.ALGO_NONE: // No-op
+	default:
+		err = fmt.Errorf("unsupported algorithm choice %s", w.settings.Algorithm)
+	}
+	if err != nil {
+		return err
+	}
+
+	w.comparer.StopStride(w.StrideCounter)
 	return nil
 }
 
-// This could be computed incrementally after shiftBuffer.
+// This could be computed incrementally.
 func (w *TimeseriesWindow) normalizeWindow() *TimeseriesWindow {
 	log.Printf("start normalizing window\n")
 	if len(w.normalized) < len(w.buffers) {
@@ -150,22 +166,14 @@ func (w *TimeseriesWindow) normalizeWindow() *TimeseriesWindow {
 		}
 	}
 	log.Printf("done normalizing window. found %d constant rows\n", constantRowCounter)
-	err := w.comparer.StartStride(w.normalized, w.constantRows, w.StrideCounter)
-	if err != nil {
-		// This could get a 'repeated start stride'
-		log.Printf("failed to start stride %d: %v", w.StrideCounter, err)
-	}
 	return w
 }
 
 // This could be computed incrementally after shiftBuffer.
 func (w *TimeseriesWindow) pAA() *TimeseriesWindow {
 	log.Printf("start paa\n")
-	if len(w.postPAA) < len(w.buffers) {
-		w.postPAA = slices.Grow(w.postPAA, len(w.buffers)-len(w.postPAA))
-	}
-	if len(w.normalized) < len(w.buffers) {
-		w.normalizeWindow()
+	if len(w.postPAA) < len(w.normalized) {
+		w.postPAA = slices.Grow(w.postPAA, len(w.normalized)-len(w.postPAA))
 	}
 	// TODO: skip constantRows during PAA
 	for i, b := range w.normalized {
@@ -179,139 +187,7 @@ func (w *TimeseriesWindow) pAA() *TimeseriesWindow {
 	return w
 }
 
-func (w *TimeseriesWindow) allPairs(results chan<- *comparisons.CorrjoinResult) error {
-	log.Println("start allPairs")
-
-	ret := map[comparisons.RowPair]float64{}
-	pearsonFilter := 0
-
-	w.normalizeWindow()
-
-	ctr := 0
-	found := 0
-	rc := len(w.normalized)
-	for i := 0; i < rc; i++ {
-		r1 := w.normalized[i]
-		for j := i + 1; j < rc; j++ {
-			r2 := w.normalized[j]
-			pearson, err := correlation.PearsonCorrelation(r1, r2)
-			if err != nil {
-				return err
-			}
-			ctr++
-			if pearson >= w.settings.CorrelationThreshold {
-				pair := comparisons.NewRowPair(i, j)
-				ret[*pair] = pearson
-				if len(ret) >= 1000 {
-					found += len(ret)
-					results <- &comparisons.CorrjoinResult{CorrelatedPairs: ret,
-						StrideCounter: w.StrideCounter}
-					ret = make(map[comparisons.RowPair](float64))
-				}
-			} else {
-				pearsonFilter++
-			}
-		}
-	}
-	if len(ret) > 0 {
-		found += len(ret)
-		results <- &comparisons.CorrjoinResult{CorrelatedPairs: ret,
-			StrideCounter: w.StrideCounter}
-	}
-
-	log.Printf("full pairs for stride %d: rejected %d out of %d pairs using pearson threshold, found %d\n",
-		w.StrideCounter, pearsonFilter, ctr, found)
-	return nil
-}
-
-func (w *TimeseriesWindow) pAAPairs(results chan<- *comparisons.CorrjoinResult) error {
-	log.Println("start paaPairs")
-	ret := map[comparisons.RowPair]float64{}
-	w.normalizeWindow()
-	w.pAA()
-	paaFilter := 0
-	fp := 0
-	fn := 0
-
-	r := len(w.postPAA)
-
-	log.Printf("epsilon is %f\n", w.settings.Epsilon1)
-
-	// The smallest fp is the one closest to the tp line
-	smallestFp := float64(10.0)
-	// The largest tp is closest to the tp line on the other side
-	largestTp := float64(0.0)
-
-	counter := 0
-
-	lineCount := r
-	for i := 0; i < r; i++ {
-		r1 := w.postPAA[i]
-		s1 := w.normalized[i]
-		for j := i + 1; j < lineCount; j++ {
-			r2 := w.postPAA[j]
-			distance, err := correlation.EuclideanDistance(r1, r2)
-			if err != nil {
-				return err
-			}
-			if distance > w.settings.Epsilon1 {
-				paaFilter++
-			}
-			s2 := w.normalized[j]
-			pearson, err := correlation.PearsonCorrelation(s1, s2)
-			if err != nil {
-				return err
-			}
-
-			// pearson > T and distance <= epsilon: true positive
-			// pearson > T and distance > epsilon: false negative
-			// pearson <= T and distance <= epsilon: false positive
-			// pearson <= T and distance > epsilon: true negative
-			if pearson >= w.settings.CorrelationThreshold {
-				pair := comparisons.NewRowPair(i, j)
-				ret[*pair] = pearson
-
-				if distance > w.settings.Epsilon1 { // false negative
-					log.Printf("false negative: euclidean distance between rows %d and %d is %f > %f but correlation coefficient is %f\n",
-						i, j, distance, w.settings.Epsilon1, pearson)
-					fn++
-				} else { // true positive
-					if distance > largestTp {
-						largestTp = distance
-					}
-				}
-				if len(ret) >= 1000 {
-					counter += len(ret)
-					results <- &comparisons.CorrjoinResult{CorrelatedPairs: ret,
-						StrideCounter: w.StrideCounter}
-					ret = make(map[comparisons.RowPair]float64)
-				}
-			} else {
-				if distance <= w.settings.Epsilon1 {
-					if distance < smallestFp {
-						smallestFp = distance
-					}
-					fp++
-				}
-			}
-		}
-	}
-	if len(ret) > 0 {
-		counter += len(ret)
-		results <- &comparisons.CorrjoinResult{CorrelatedPairs: ret,
-			StrideCounter: w.StrideCounter}
-	}
-	log.Printf("stride %d: rejected %d pairs using paa filter, returning %d\n",
-		w.StrideCounter, paaFilter, counter)
-	// False negative means paa would have rejected a correlated pair, those
-	// are the bad ones.
-	// A high false positive count just means the filter is ineffective.
-	log.Printf("false positive count: %d, false negatives: %d\n", fp, fn)
-	log.Printf("largest tp: %f, smallest fp: %f\n", largestTp, smallestFp)
-	return nil
-}
-
-func (w *TimeseriesWindow) correlationPairs(results chan<- *comparisons.CorrjoinResult) error {
+func (w *TimeseriesWindow) correlationPairs() error {
 	r := len(w.postSVD)
 	if r == 0 {
 		return fmt.Errorf("you must run SVD before you can get correlation pairs")
@@ -391,42 +267,60 @@ func (w *TimeseriesWindow) sVD() (*TimeseriesWindow, error) {
 	return w, nil
 }
 
-func (w *TimeseriesWindow) fullPearson(results chan<- *comparisons.CorrjoinResult) error {
+func (w *TimeseriesWindow) fullPearson() error {
 	r := len(w.buffers)
 	if r == 0 {
 		return fmt.Errorf("no data to run FullPearson on")
 	}
-	err := w.allPairs(results)
-	if err != nil {
-		return err
+	rc := len(w.normalized)
+	for i := 0; i < rc; i++ {
+		for j := i + 1; j < rc; j++ {
+			err := w.comparer.Compare(i, j)
+			if err != nil {
+				return err
+			}
+		}
 	}
 
 	return nil
 }
 
-func (w *TimeseriesWindow) pAAOnly(results chan<- *comparisons.CorrjoinResult) error {
+func (w *TimeseriesWindow) pAAOnly() error {
 	r := len(w.buffers)
 	if r == 0 {
 		return fmt.Errorf("no data to run PAA on")
 	}
 
-	err := w.pAAPairs(results)
-	if err != nil {
-		return err
-	}
+	w.pAA()
+	r = len(w.postPAA)
+	for i := 0; i < r; i++ {
+		r1 := w.postPAA[i]
+		for j := i + 1; j < r; j++ {
+			r2 := w.postPAA[j]
+			distance, err := correlation.EuclideanDistance(r1, r2)
+			if err != nil {
+				return err
+			}
+			if distance > w.settings.Epsilon1 {
+				continue
+			}
+			err = w.comparer.Compare(i, j)
+			if err != nil {
+				return err
+			}
 
+		}
+	}
 	return nil
 }
 
-func (w *TimeseriesWindow) processBuffer(results chan<- *comparisons.CorrjoinResult) error {
+func (w *TimeseriesWindow) processBuffer() error {
 	utils.ReportMemory("start processBuffers")
 	r := len(w.buffers)
 	if r == 0 {
 		return fmt.Errorf("no data to process")
 	}
 
-	utils.ReportMemory("start normalizeWindow")
-	w.normalizeWindow()
 	utils.ReportMemory("start paa")
 	w.pAA()
 
@@ -439,7 +333,7 @@ func (w *TimeseriesWindow) processBuffer(results chan<- *comparisons.CorrjoinRes
 	}
 	// CorrelationBuckets outputs a set of row index pairs.
 	utils.ReportMemory("start correlationPairs")
-	err = w.correlationPairs(results)
+	err = w.correlationPairs()
 	if err != nil {
 		log.Printf("failed to find correlation pairs: %v", err)
 		return err

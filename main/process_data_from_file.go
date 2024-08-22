@@ -59,7 +59,8 @@ func main() {
 	if *full {
 		config.Algorithm = settings.ALGO_FULL_PEARSON
 	}
-	config.ComputeSettingsFields()
+	config = config.ComputeSettingsFields()
+	log.Printf("config is %+v\n", config)
 
 	shiftCount := 0
 	results := make(chan *comparisons.CorrjoinResult, 1)

@@ -31,7 +31,10 @@ func TestNormalizeWindow(t *testing.T) {
 		[]float64{2.1, 2.2, 2.3},
 	}
 
-	tswindow.ShiftBuffer(bufferWindow, results)
+	err := tswindow.ShiftBuffer(bufferWindow, results)
+	if err != nil {
+		t.Errorf("unexpected: %v", err)
+	}
 	tswindow.normalizeWindow()
 
 	for _, b := range tswindow.normalized {
@@ -47,7 +50,8 @@ func TestNormalizeWindow(t *testing.T) {
 	}
 
 	if !matrixEqual(tswindow.buffers, bufferWindow, 0.001) {
-		t.Errorf("normalization should have left the raw data alone")
+		t.Errorf("normalization should have left the raw data alone but bufferWindow is %v and buffers are %v",
+			bufferWindow, tswindow.buffers)
 	}
 }
 
@@ -138,14 +142,15 @@ func TestPAA(t *testing.T) {
 		[]float64{2.1, 2.2, 2.3, 2.4},
 	}
 
-	tswindow.ShiftBuffer(bufferWindow, results)
+	// tswindow.ShiftBuffer(bufferWindow, results)
 
+	tswindow.buffers = bufferWindow
 	// Cheat a little just to make the values easier to check.
 	tswindow.normalized = tswindow.buffers
 
 	tswindow.pAA()
 	if len(tswindow.postPAA) != 3 {
-		t.Errorf("expected post-PAA matrix to have three rows but it has %d", len(tswindow.postPAA))
+		t.Fatalf("expected post-PAA matrix to have three rows but it has %d", len(tswindow.postPAA))
 	}
 	if len(tswindow.postPAA[0]) != 2 {
 		t.Errorf("expected post-PAA matrix to have two columns but it has %d", len(tswindow.postPAA[0]))
@@ -231,6 +236,7 @@ func TestCorrelationPairs(t *testing.T) {
 	}
 	tswindow.normalizeWindow()
 	tswindow.postSVD = tswindow.normalized
+	comparer.StartStride(tswindow.normalized, tswindow.constantRows, tswindow.StrideCounter)
 	found := false
 	go func() {
 		for true {
@@ -244,7 +250,7 @@ func TestCorrelationPairs(t *testing.T) {
 		}
 	}()
 
-	err := tswindow.correlationPairs(results)
+	err := tswindow.correlationPairs()
 	if err != nil {
 		t.Errorf("unexpected error in correlationpairs: %v", err)
 	}

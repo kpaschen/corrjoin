@@ -123,9 +123,6 @@ func (s *BucketingScheme) CorrelationCandidates() error {
 			return err
 		}
 	}
-	if err := s.comparer.StopStride(s.strideCounter); err != nil {
-		return err
-	}
 	return nil
 }
 
@@ -207,5 +204,7 @@ func neighbourCoordinates(input []int) [][]int {
 		}
 		ret = append(ret, newInputs...)
 	}
+	log.Printf("neighbourCoordinates for %d inputs returning %d neighbours\n",
+		len(input), len(ret))
 	return ret
 }
