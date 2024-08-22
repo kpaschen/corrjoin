@@ -2,7 +2,7 @@ package reporter
 
 import (
 	"fmt"
-	"github.com/kpaschen/corrjoin/lib/buckets"
+	"github.com/kpaschen/corrjoin/lib/comparisons"
 	"testing"
 )
 
@@ -18,7 +18,7 @@ func TestAddCorrelatedPair(t *testing.T) {
 	rep := NewReporter()
 
 	// Add a new pair
-	b := buckets.NewRowPair(1, 2)
+	b := comparisons.NewRowPair(1, 2)
 	err := rep.AddCorrelatedPair(*b, 0.1)
 	if err != nil {
 		t.Errorf("failed to add correlated pair: %v", err)
@@ -29,7 +29,7 @@ func TestAddCorrelatedPair(t *testing.T) {
 	printCorrelations(*rep)
 
 	// Add a second new pair
-	b = buckets.NewRowPair(3, 4)
+	b = comparisons.NewRowPair(3, 4)
 	err = rep.AddCorrelatedPair(*b, 0.2)
 	if err != nil {
 		t.Errorf("failed to add correlated pair: %v", err)
@@ -40,7 +40,7 @@ func TestAddCorrelatedPair(t *testing.T) {
 	printCorrelations(*rep)
 
 	// Add a pair with overlap.
-	b = buckets.NewRowPair(3, 5)
+	b = comparisons.NewRowPair(3, 5)
 	err = rep.AddCorrelatedPair(*b, 0.3)
 	if err != nil {
 		t.Errorf("failed to add correlated pair: %v", err)
@@ -51,7 +51,7 @@ func TestAddCorrelatedPair(t *testing.T) {
 	printCorrelations(*rep)
 
 	// Add a redundant pair
-	b = buckets.NewRowPair(4, 5)
+	b = comparisons.NewRowPair(4, 5)
 	err = rep.AddCorrelatedPair(*b, 0.4)
 	if err != nil {
 		t.Errorf("failed to add correlated pair: %v", err)
@@ -62,7 +62,7 @@ func TestAddCorrelatedPair(t *testing.T) {
 	printCorrelations(*rep)
 
 	// Add a pair that forces a merge
-	b = buckets.NewRowPair(2, 5)
+	b = comparisons.NewRowPair(2, 5)
 	err = rep.AddCorrelatedPair(*b, 0.5)
 	if err != nil {
 		t.Errorf("failed to add correlated pair: %v", err)
@@ -76,7 +76,7 @@ func TestAddCorrelatedPair(t *testing.T) {
 	printCorrelations(*rep)
 
 	// Add another pair after merging.
-	b = buckets.NewRowPair(6, 7)
+	b = comparisons.NewRowPair(6, 7)
 	err = rep.AddCorrelatedPair(*b, 0.6)
 	if err != nil {
 		t.Errorf("failed to add correlated pair: %v", err)

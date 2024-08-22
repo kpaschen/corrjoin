@@ -3,13 +3,14 @@ package lib
 import (
 	"fmt"
 	"github.com/kpaschen/corrjoin/lib/buckets"
+	"github.com/kpaschen/corrjoin/lib/comparisons"
 	"github.com/kpaschen/corrjoin/lib/correlation"
 	"github.com/kpaschen/corrjoin/lib/paa"
 	"github.com/kpaschen/corrjoin/lib/settings"
 	"github.com/kpaschen/corrjoin/lib/svd"
+	"github.com/kpaschen/corrjoin/lib/utils"
 	"gonum.org/v1/gonum/mat"
 	"log"
-	"runtime"
 	"slices"
 )
 
@@ -45,7 +46,7 @@ func NewTimeseriesWindow(settings settings.CorrjoinSettings) *TimeseriesWindow {
 
 // shift _buffer_ into _w_ from the right, displacing the first buffer.width columns
 // of w.
-func (w *TimeseriesWindow) ShiftBuffer(buffer [][]float64, results chan<- *buckets.CorrjoinResult) error {
+func (w *TimeseriesWindow) ShiftBuffer(buffer [][]float64, results chan<- *comparisons.CorrjoinResult) error {
 
 	// Weird but ok?
 	if len(buffer) == 0 {
@@ -172,10 +173,10 @@ func (w *TimeseriesWindow) pAA() *TimeseriesWindow {
 	return w
 }
 
-func (w *TimeseriesWindow) allPairs(results chan<- *buckets.CorrjoinResult) error {
+func (w *TimeseriesWindow) allPairs(results chan<- *comparisons.CorrjoinResult) error {
 	log.Println("start allPairs")
 
-	ret := map[buckets.RowPair]float64{}
+	ret := map[comparisons.RowPair]float64{}
 	pearsonFilter := 0
 
 	w.normalizeWindow()
@@ -193,13 +194,13 @@ func (w *TimeseriesWindow) allPairs(results chan<- *buckets.CorrjoinResult) erro
 			}
 			ctr++
 			if pearson >= w.settings.CorrelationThreshold {
-				pair := buckets.NewRowPair(i, j)
+				pair := comparisons.NewRowPair(i, j)
 				ret[*pair] = pearson
 				if len(ret) >= 1000 {
 					found += len(ret)
-					results <- &buckets.CorrjoinResult{CorrelatedPairs: ret,
+					results <- &comparisons.CorrjoinResult{CorrelatedPairs: ret,
 						StrideCounter: w.StrideCounter}
-					ret = make(map[buckets.RowPair](float64))
+					ret = make(map[comparisons.RowPair](float64))
 				}
 			} else {
 				pearsonFilter++
@@ -208,7 +209,7 @@ func (w *TimeseriesWindow) allPairs(results chan<- *buckets.CorrjoinResult) erro
 	}
 	if len(ret) > 0 {
 		found += len(ret)
-		results <- &buckets.CorrjoinResult{CorrelatedPairs: ret,
+		results <- &comparisons.CorrjoinResult{CorrelatedPairs: ret,
 			StrideCounter: w.StrideCounter}
 	}
 
@@ -217,9 +218,9 @@ func (w *TimeseriesWindow) allPairs(results chan<- *buckets.CorrjoinResult) erro
 	return nil
 }
 
-func (w *TimeseriesWindow) pAAPairs(results chan<- *buckets.CorrjoinResult) error {
+func (w *TimeseriesWindow) pAAPairs(results chan<- *comparisons.CorrjoinResult) error {
 	log.Println("start paaPairs")
-	ret := map[buckets.RowPair]float64{}
+	ret := map[comparisons.RowPair]float64{}
 	w.normalizeWindow()
 	w.pAA()
 	paaFilter := 0
@@ -261,7 +262,7 @@ func (w *TimeseriesWindow) pAAPairs(results chan<- *buckets.CorrjoinResult) erro
 			// pearson <= T and distance <= epsilon: false positive
 			// pearson <= T and distance > epsilon: true negative
 			if pearson >= w.settings.CorrelationThreshold {
-				pair := buckets.NewRowPair(i, j)
+				pair := comparisons.NewRowPair(i, j)
 				ret[*pair] = pearson
 
 				if distance > w.settings.Epsilon1 { // false negative
@@ -275,9 +276,9 @@ func (w *TimeseriesWindow) pAAPairs(results chan<- *buckets.CorrjoinResult) erro
 				}
 				if len(ret) >= 1000 {
 					counter += len(ret)
-					results <- &buckets.CorrjoinResult{CorrelatedPairs: ret,
+					results <- &comparisons.CorrjoinResult{CorrelatedPairs: ret,
 						StrideCounter: w.StrideCounter}
-					ret = make(map[buckets.RowPair]float64)
+					ret = make(map[comparisons.RowPair]float64)
 				}
 			} else {
 				if distance <= w.settings.Epsilon1 {
@@ -291,7 +292,7 @@ func (w *TimeseriesWindow) pAAPairs(results chan<- *buckets.CorrjoinResult) erro
 	}
 	if len(ret) > 0 {
 		counter += len(ret)
-		results <- &buckets.CorrjoinResult{CorrelatedPairs: ret,
+		results <- &comparisons.CorrjoinResult{CorrelatedPairs: ret,
 			StrideCounter: w.StrideCounter}
 	}
 	log.Printf("stride %d: rejected %d pairs using paa filter, returning %d\n",
@@ -304,22 +305,24 @@ func (w *TimeseriesWindow) pAAPairs(results chan<- *buckets.CorrjoinResult) erro
 	return nil
 }
 
-func (w *TimeseriesWindow) correlationPairs(results chan<- *buckets.CorrjoinResult) error {
+func (w *TimeseriesWindow) correlationPairs(results chan<- *comparisons.CorrjoinResult) error {
 	r := len(w.postSVD)
 	if r == 0 {
 		return fmt.Errorf("you must run SVD before you can get correlation pairs")
 	}
 
+	comparer := &comparisons.InProcessComparer{}
+	comparer.Initialize(w.settings, &w.normalized, results)
 	scheme := buckets.NewBucketingScheme(w.normalized, w.postSVD, w.constantRows,
-		w.settings, w.StrideCounter, results)
-	reportMemory("created scheme")
+		w.settings, w.StrideCounter, comparer)
+	utils.ReportMemory("created scheme")
 	err := scheme.Initialize()
-	reportMemory("initialized scheme")
+	utils.ReportMemory("initialized scheme")
 	if err != nil {
 		return err
 	}
 	err = scheme.CorrelationCandidates()
-	reportMemory("asked for candidates")
+	utils.ReportMemory("asked for candidates")
 	if err != nil {
 		return err
 	}
@@ -384,7 +387,7 @@ func (w *TimeseriesWindow) sVD() (*TimeseriesWindow, error) {
 	return w, nil
 }
 
-func (w *TimeseriesWindow) fullPearson(results chan<- *buckets.CorrjoinResult) error {
+func (w *TimeseriesWindow) fullPearson(results chan<- *comparisons.CorrjoinResult) error {
 	r := len(w.buffers)
 	if r == 0 {
 		return fmt.Errorf("no data to run FullPearson on")
@@ -397,7 +400,7 @@ func (w *TimeseriesWindow) fullPearson(results chan<- *buckets.CorrjoinResult) e
 	return nil
 }
 
-func (w *TimeseriesWindow) pAAOnly(results chan<- *buckets.CorrjoinResult) error {
+func (w *TimeseriesWindow) pAAOnly(results chan<- *comparisons.CorrjoinResult) error {
 	r := len(w.buffers)
 	if r == 0 {
 		return fmt.Errorf("no data to run PAA on")
@@ -411,54 +414,33 @@ func (w *TimeseriesWindow) pAAOnly(results chan<- *buckets.CorrjoinResult) error
 	return nil
 }
 
-// printMemUsage outputs the current, total and OS memory being used. As well as the number
-// of garage collection cycles completed.
-func printMemUsage() {
-	var m runtime.MemStats
-	runtime.ReadMemStats(&m)
-	// For info on each, see: https://golang.org/pkg/runtime/#MemStats
-	log.Printf("Alloc = %v MiB", bToMb(m.Alloc))
-	log.Printf("\tTotalAlloc = %v MiB", bToMb(m.TotalAlloc))
-	log.Printf("\tSys = %v MiB", bToMb(m.Sys))
-	log.Printf("\tNumGC = %v\n", m.NumGC)
-}
-
-func bToMb(b uint64) uint64 {
-	return b / 1024 / 1024
-}
-
-func reportMemory(message string) {
-	log.Println(message)
-	printMemUsage()
-}
-
-func (w *TimeseriesWindow) processBuffer(results chan<- *buckets.CorrjoinResult) error {
-	reportMemory("start processBuffers")
+func (w *TimeseriesWindow) processBuffer(results chan<- *comparisons.CorrjoinResult) error {
+	utils.ReportMemory("start processBuffers")
 	r := len(w.buffers)
 	if r == 0 {
 		return fmt.Errorf("no data to process")
 	}
 
-	reportMemory("start normalizeWindow")
+	utils.ReportMemory("start normalizeWindow")
 	w.normalizeWindow()
-	reportMemory("start paa")
+	utils.ReportMemory("start paa")
 	w.pAA()
 
 	// Apply SVD
-	reportMemory("start svd")
+	utils.ReportMemory("start svd")
 	_, err := w.sVD()
 	if err != nil {
 		log.Printf("svd failed for input %+v\n", w.postPAA)
 		return err
 	}
 	// CorrelationBuckets outputs a set of row index pairs.
-	reportMemory("start correlationPairs")
+	utils.ReportMemory("start correlationPairs")
 	err = w.correlationPairs(results)
 	if err != nil {
 		log.Printf("failed to find correlation pairs: %v", err)
 		return err
 	}
 
-	reportMemory("return from processBuffers")
+	utils.ReportMemory("return from processBuffers")
 	return nil
 }

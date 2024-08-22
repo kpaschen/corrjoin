@@ -5,7 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/kpaschen/corrjoin/lib"
-	"github.com/kpaschen/corrjoin/lib/buckets"
+	"github.com/kpaschen/corrjoin/lib/comparisons"
 	"github.com/kpaschen/corrjoin/lib/settings"
 	"log"
 	"os"
@@ -64,7 +64,7 @@ func main() {
 
 	window := lib.NewTimeseriesWindow(config)
 
-	results := make(chan *buckets.CorrjoinResult, 1)
+	results := make(chan *comparisons.CorrjoinResult, 1)
 	defer close(results)
 
 	result_ctr := 0

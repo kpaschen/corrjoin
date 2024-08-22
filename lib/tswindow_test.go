@@ -2,7 +2,7 @@ package lib
 
 import (
 	"fmt"
-	"github.com/kpaschen/corrjoin/lib/buckets"
+	"github.com/kpaschen/corrjoin/lib/comparisons"
 	"github.com/kpaschen/corrjoin/lib/settings"
 	"math"
 	"testing"
@@ -26,7 +26,7 @@ func TestNormalizeWindow(t *testing.T) {
 		[]float64{2.1, 2.2, 2.3},
 	}
 
-	results := make(chan *buckets.CorrjoinResult, 1)
+	results := make(chan *comparisons.CorrjoinResult, 1)
 	defer close(results)
 	tswindow.ShiftBuffer(bufferWindow, results)
 	tswindow.normalizeWindow()
@@ -76,7 +76,7 @@ func TestShiftBuffer(t *testing.T) {
 		[]float64{2.1, 2.2, 2.3},
 	}
 
-	results := make(chan *buckets.CorrjoinResult, 1)
+	results := make(chan *comparisons.CorrjoinResult, 1)
 	err := tswindow.ShiftBuffer(bufferWindow, results)
 
 	if err != nil {
@@ -128,7 +128,7 @@ func TestPAA(t *testing.T) {
 		[]float64{2.1, 2.2, 2.3, 2.4},
 	}
 
-	results := make(chan *buckets.CorrjoinResult, 1)
+	results := make(chan *comparisons.CorrjoinResult, 1)
 	tswindow.ShiftBuffer(bufferWindow, results)
 
 	// Cheat a little just to make the values easier to check.
@@ -167,7 +167,7 @@ func TestSVD(t *testing.T) {
 		[]float64{2.0, 3.0, -2.0},
 	}
 
-	results := make(chan *buckets.CorrjoinResult, 1)
+	results := make(chan *comparisons.CorrjoinResult, 1)
 	tswindow.ShiftBuffer(bufferWindow, results)
 	tswindow.postPAA = bufferWindow
 
@@ -214,7 +214,7 @@ func TestCorrelationPairs(t *testing.T) {
 	}
 	tswindow.normalizeWindow()
 	tswindow.postSVD = tswindow.normalized
-	results := make(chan *buckets.CorrjoinResult, 1)
+	results := make(chan *comparisons.CorrjoinResult, 1)
 	defer close(results)
 	found := false
 	go func() {

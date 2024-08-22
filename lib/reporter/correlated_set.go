@@ -1,13 +1,13 @@
 package reporter
 
 import (
-	"github.com/kpaschen/corrjoin/lib/buckets"
+	"github.com/kpaschen/corrjoin/lib/comparisons"
 	"log"
 	"slices"
 )
 
 type CorrelatedSet struct {
-	pairs   map[buckets.RowPair]float64
+	pairs   map[comparisons.RowPair]float64
 	members []int // maintained in sort order
 }
 
@@ -48,7 +48,7 @@ func (r *Reporter) PrintReport(tsids []string) {
 	r.correlations = make([]*CorrelatedSet, 0, 10000)
 }
 
-func (r *Reporter) AddCorrelatedPair(pair buckets.RowPair, corr float64) error {
+func (r *Reporter) AddCorrelatedPair(pair comparisons.RowPair, corr float64) error {
 	ids := pair.RowIds()
 	homeForT1 := -1
 	homeForT2 := -1
@@ -71,7 +71,7 @@ func (r *Reporter) AddCorrelatedPair(pair buckets.RowPair, corr float64) error {
 	// Case 1: new set needs to be created
 	if homeForT1 < 0 && homeForT2 < 0 {
 		newset := &CorrelatedSet{
-			pairs:   map[buckets.RowPair]float64{pair: corr},
+			pairs:   map[comparisons.RowPair]float64{pair: corr},
 			members: make([]int, 0, 100),
 		}
 		newset.insert(ids[0])
@@ -104,7 +104,7 @@ func (r *Reporter) AddCorrelatedPair(pair buckets.RowPair, corr float64) error {
 		for _, m := range r.correlations[homeForT2].members {
 			r.correlations[homeForT1].insert(m)
 		}
-		r.correlations[homeForT2].pairs = make(map[buckets.RowPair]float64)
+		r.correlations[homeForT2].pairs = make(map[comparisons.RowPair]float64)
 		r.correlations[homeForT2].members = make([]int, 0, 0)
 		return nil
 	}

@@ -1,11 +1,12 @@
 package buckets
 
 import (
+	"github.com/kpaschen/corrjoin/lib/comparisons"
 	"github.com/kpaschen/corrjoin/lib/settings"
 	"testing"
 )
 
-func setupBucketingScheme() (*BucketingScheme, chan *CorrjoinResult) {
+func setupBucketingScheme() (*BucketingScheme, chan *comparisons.CorrjoinResult) {
 	originalMatrix := [][]float64{
 		[]float64{0.1, 0.2, 0.3},
 		[]float64{0.1, 0.2, 0.3},
@@ -16,15 +17,17 @@ func setupBucketingScheme() (*BucketingScheme, chan *CorrjoinResult) {
 		[]float64{0.1, 0.2},
 		[]float64{2.1, 2.2},
 	}
-	replies := make(chan *CorrjoinResult, 1)
 	settings := settings.CorrjoinSettings{
 		SvdDimensions:        3,
 		EuclidDimensions:     2,
 		CorrelationThreshold: 0.9,
 		WindowSize:           3,
 		SvdOutputDimensions:  2,
-	}
-	return NewBucketingScheme(originalMatrix, svdOutputMatrix, []bool{}, settings.ComputeSettingsFields(), 0, replies), replies
+	}.ComputeSettingsFields()
+	comparer := &comparisons.InProcessComparer{}
+	results := make(chan *comparisons.CorrjoinResult)
+	comparer.Initialize(settings, &originalMatrix, results)
+	return NewBucketingScheme(originalMatrix, svdOutputMatrix, []bool{}, settings, 0, comparer), results
 }
 
 func TestBucketIndex(t *testing.T) {
@@ -76,8 +79,9 @@ func TestCorrelationCandidates(t *testing.T) {
 				t.Errorf("expected one correlated pair to be found but got %d", len(results.CorrelatedPairs))
 			}
 			for rowPair, correlation := range results.CorrelatedPairs {
-				if rowPair.r1 != 0 || rowPair.r2 != 1 {
-					t.Errorf("expected rows 0 and 1 to be correlated but got %d %d", rowPair.r1, rowPair.r2)
+				ids := rowPair.RowIds()
+				if ids[0] != 0 || ids[1] != 1 {
+					t.Errorf("expected rows 0 and 1 to be correlated but got %d %d", ids[0], ids[1])
 				}
 				if correlation != 1 {
 					t.Errorf("expected perfect correlation but got %f", correlation)

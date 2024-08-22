@@ -6,7 +6,7 @@ import (
 	"flag"
 	"github.com/gorilla/mux"
 	corrjoin "github.com/kpaschen/corrjoin/lib"
-	"github.com/kpaschen/corrjoin/lib/buckets"
+	"github.com/kpaschen/corrjoin/lib/comparisons"
 	"github.com/kpaschen/corrjoin/lib/reporter"
 	"github.com/kpaschen/corrjoin/lib/settings"
 	"github.com/prometheus/client_golang/prometheus"
@@ -178,7 +178,7 @@ func main() {
 	defer close(bufferChannel)
 
 	// The results channel is where we hear about correlated timeseries.
-	resultsChannel := make(chan *buckets.CorrjoinResult, 1)
+	resultsChannel := make(chan *comparisons.CorrjoinResult, 1)
 	defer close(resultsChannel)
 
 	config := &settings.CorrjoinSettings{

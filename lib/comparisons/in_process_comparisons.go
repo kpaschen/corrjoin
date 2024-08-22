@@ -14,7 +14,7 @@ type InProcessComparer struct {
 	normalizedMatrix *[][]float64
 	resultChannel    chan<- *CorrjoinResult
 	constantRows     []bool // TODO: fill these in
-	strideCounter    int  // TODO: this too
+	strideCounter    int    // TODO: this too
 }
 
 // Initialize provides the engine with the data and settings it needs.
@@ -45,6 +45,8 @@ func (s *InProcessComparer) Compare(index1 int, index2 int) error {
 
 	paaVec1 := paa.PAA(vec1, s.config.EuclidDimensions)
 	paaVec2 := paa.PAA(vec2, s.config.EuclidDimensions)
+
+	// This test is redundant for pairs that come from the same bucket.
 	distance, err := correlation.EuclideanDistance(paaVec1, paaVec2)
 	if err != nil {
 		return err
