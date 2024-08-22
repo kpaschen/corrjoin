@@ -26,7 +26,11 @@ func setupBucketingScheme() (*BucketingScheme, chan *comparisons.CorrjoinResult)
 	}.ComputeSettingsFields()
 	comparer := &comparisons.InProcessComparer{}
 	results := make(chan *comparisons.CorrjoinResult)
-	comparer.Initialize(settings, &originalMatrix, results)
+	comparer.Initialize(settings, results)
+	err := comparer.StartStride(originalMatrix, []bool{}, 0)
+	if err != nil {
+		panic(err)
+	}
 	return NewBucketingScheme(originalMatrix, svdOutputMatrix, []bool{}, settings, 0, comparer), results
 }
 

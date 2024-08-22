@@ -42,10 +42,6 @@ type BucketingScheme struct {
 
 	settings settings.CorrjoinSettings
 
-	// intermediate data storage
-	// ---------------------------
-	// lazily computed paa2 values
-	paa2    map[int][]float64
 	buckets map[string]*Bucket
 
 	strideCounter int
@@ -65,7 +61,6 @@ func NewBucketingScheme(originalMatrix [][]float64,
 		svdOutputMatrix: svdOutputMatrix,
 		constantRows:    constantRows,
 		settings:        settings,
-		paa2:            map[int][]float64{},
 		buckets:         map[string]*Bucket{},
 		strideCounter:   strideCounter,
 		comparer:        comparer,
@@ -128,7 +123,9 @@ func (s *BucketingScheme) CorrelationCandidates() error {
 			return err
 		}
 	}
-	// TODO: send stride-end to comparer here? Shutdown()?
+	if err := s.comparer.StopStride(s.strideCounter); err != nil {
+		return err
+	}
 	return nil
 }
 

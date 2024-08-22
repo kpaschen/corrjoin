@@ -149,6 +149,7 @@ func main() {
 	var svdDimensions int
 	var algorithm string
 	var skipConstantTs bool
+	var compareEngine string
 
 	flag.StringVar(&metricsAddr, "metrics-address", ":9203", "The address the metrics endpoint binds to.")
 	flag.StringVar(&listenAddr, "listen-address", ":9201", "The address that the storage endpoint binds to.")
@@ -160,6 +161,7 @@ func main() {
 	flag.IntVar(&svdDimensions, "svdDimensions", 3, "How many columns to choose after SVD")
 	flag.StringVar(&algorithm, "algorithm", "paa_svd", "Algorithm to use. Possible values: full_pearson, paa_only, paa_svd")
 	flag.BoolVar(&skipConstantTs, "skipConstantTs", true, "Whether to ignore timeseries whose value is constant in the current window")
+	flag.StringVar(&compareEngine, "comparer", "inprocess", "The comparison engine. Possible values are 'inprocess' or 'kafka'")
 
 	flag.Parse()
 
@@ -181,7 +183,7 @@ func main() {
 	resultsChannel := make(chan *comparisons.CorrjoinResult, 1)
 	defer close(resultsChannel)
 
-	config := &settings.CorrjoinSettings{
+	corrjoinConfig := settings.CorrjoinSettings{
 		SvdDimensions:        ks,
 		SvdOutputDimensions:  svdDimensions,
 		EuclidDimensions:     ke,
@@ -190,10 +192,19 @@ func main() {
 		Algorithm:            algorithm,
 	}
 
+	var comparer comparisons.Engine
+	if compareEngine == "inprocess" {
+		comparer = &comparisons.InProcessComparer{}
+	} else {
+		panic("currently only the in process comparer is supported")
+	}
+
+	comparer.Initialize(corrjoinConfig, resultsChannel)
+
 	processor := &tsProcessor{
-		accumulator:      corrjoin.NewTimeseriesAccumulator(stride, time.Now().UTC(), config.SampleInterval, bufferChannel),
-		settings:         config,
-		window:           corrjoin.NewTimeseriesWindow(*config),
+		accumulator:      corrjoin.NewTimeseriesAccumulator(stride, time.Now().UTC(), corrjoinConfig.SampleInterval, bufferChannel),
+		settings:         &corrjoinConfig,
+		window:           corrjoin.NewTimeseriesWindow(corrjoinConfig, comparer),
 		observationQueue: observationQueue,
 	}
 

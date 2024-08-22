@@ -35,13 +35,14 @@ type TimeseriesWindow struct {
 	postSVD [][]float64
 
 	settings settings.CorrjoinSettings
+	comparer comparisons.Engine
 
 	windowSize    int
 	StrideCounter int
 }
 
-func NewTimeseriesWindow(settings settings.CorrjoinSettings) *TimeseriesWindow {
-	return &TimeseriesWindow{settings: settings, StrideCounter: 0}
+func NewTimeseriesWindow(settings settings.CorrjoinSettings, comparer comparisons.Engine) *TimeseriesWindow {
+	return &TimeseriesWindow{settings: settings, StrideCounter: 0, comparer: comparer}
 }
 
 // shift _buffer_ into _w_ from the right, displacing the first buffer.width columns
@@ -99,9 +100,9 @@ func (w *TimeseriesWindow) ShiftBuffer(buffer [][]float64, results chan<- *compa
 		}
 	}
 
+	var err error
 	w.StrideCounter++
 
-	var err error
 	if sliceLengthToDelete > 0 {
 		log.Printf("starting a run of %v on %d rows\n", w.settings.Algorithm, newRowCount)
 		switch w.settings.Algorithm {
@@ -149,6 +150,11 @@ func (w *TimeseriesWindow) normalizeWindow() *TimeseriesWindow {
 		}
 	}
 	log.Printf("done normalizing window. found %d constant rows\n", constantRowCounter)
+	err := w.comparer.StartStride(w.normalized, w.constantRows, w.StrideCounter)
+	if err != nil {
+		// This could get a 'repeated start stride'
+		log.Printf("failed to start stride %d: %v", w.StrideCounter, err)
+	}
 	return w
 }
 
@@ -311,10 +317,8 @@ func (w *TimeseriesWindow) correlationPairs(results chan<- *comparisons.Corrjoin
 		return fmt.Errorf("you must run SVD before you can get correlation pairs")
 	}
 
-	comparer := &comparisons.InProcessComparer{}
-	comparer.Initialize(w.settings, &w.normalized, results)
 	scheme := buckets.NewBucketingScheme(w.normalized, w.postSVD, w.constantRows,
-		w.settings, w.StrideCounter, comparer)
+		w.settings, w.StrideCounter, w.comparer)
 	utils.ReportMemory("created scheme")
 	err := scheme.Initialize()
 	utils.ReportMemory("initialized scheme")

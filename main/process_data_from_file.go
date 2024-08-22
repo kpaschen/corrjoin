@@ -59,13 +59,16 @@ func main() {
 	if *full {
 		config.Algorithm = settings.ALGO_FULL_PEARSON
 	}
+	config.ComputeSettingsFields()
 
 	shiftCount := 0
-
-	window := lib.NewTimeseriesWindow(config)
-
 	results := make(chan *comparisons.CorrjoinResult, 1)
 	defer close(results)
+
+	comparer := &comparisons.InProcessComparer{}
+	comparer.Initialize(config, results)
+
+	window := lib.NewTimeseriesWindow(config, comparer)
 
 	result_ctr := 0
 	go func() {

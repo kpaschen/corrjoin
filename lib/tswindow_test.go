@@ -12,13 +12,18 @@ var (
 	config = settings.CorrjoinSettings{
 		Algorithm: settings.ALGO_NONE,
 	}
+	comparer = &comparisons.InProcessComparer{}
 )
 
 func TestNormalizeWindow(t *testing.T) {
 	config.WindowSize = 3
 	config.MaxRowsForSvd = 2
+	results := make(chan *comparisons.CorrjoinResult, 1)
+	defer close(results)
+	comparer.Initialize(config, results)
 	tswindow := &TimeseriesWindow{
 		settings: config,
+		comparer: comparer,
 	}
 	bufferWindow := [][]float64{
 		[]float64{0.1, 0.2, 0.3},
@@ -26,8 +31,6 @@ func TestNormalizeWindow(t *testing.T) {
 		[]float64{2.1, 2.2, 2.3},
 	}
 
-	results := make(chan *comparisons.CorrjoinResult, 1)
-	defer close(results)
 	tswindow.ShiftBuffer(bufferWindow, results)
 	tswindow.normalizeWindow()
 
@@ -67,8 +70,12 @@ func matrixEqual(a [][]float64, b [][]float64, epsilon float64) bool {
 
 func TestShiftBuffer(t *testing.T) {
 	config.WindowSize = 3
+	results := make(chan *comparisons.CorrjoinResult, 1)
+	defer close(results)
+	comparer.Initialize(config, results)
 	tswindow := &TimeseriesWindow{
 		settings: config,
+		comparer: comparer,
 	}
 	bufferWindow := [][]float64{
 		[]float64{0.1, 0.2, 0.3},
@@ -76,7 +83,6 @@ func TestShiftBuffer(t *testing.T) {
 		[]float64{2.1, 2.2, 2.3},
 	}
 
-	results := make(chan *comparisons.CorrjoinResult, 1)
 	err := tswindow.ShiftBuffer(bufferWindow, results)
 
 	if err != nil {
@@ -119,8 +125,12 @@ func TestShiftBuffer(t *testing.T) {
 func TestPAA(t *testing.T) {
 	config.WindowSize = 4
 	config.SvdDimensions = 2
+	results := make(chan *comparisons.CorrjoinResult, 1)
+	defer close(results)
+	comparer.Initialize(config, results)
 	tswindow := &TimeseriesWindow{
 		settings: config,
+		comparer: comparer,
 	}
 	bufferWindow := [][]float64{
 		[]float64{0.1, 0.2, 0.3, 0.4},
@@ -128,7 +138,6 @@ func TestPAA(t *testing.T) {
 		[]float64{2.1, 2.2, 2.3, 2.4},
 	}
 
-	results := make(chan *comparisons.CorrjoinResult, 1)
 	tswindow.ShiftBuffer(bufferWindow, results)
 
 	// Cheat a little just to make the values easier to check.
@@ -159,15 +168,19 @@ func TestSVD(t *testing.T) {
 	config.WindowSize = 3
 	config.SvdDimensions = 3
 	config.SvdOutputDimensions = 2
+	config.MaxRowsForSvd = 10000
+	results := make(chan *comparisons.CorrjoinResult, 1)
+	defer close(results)
+	comparer.Initialize(config, results)
 	tswindow := &TimeseriesWindow{
 		settings: config,
+		comparer: comparer,
 	}
 	bufferWindow := [][]float64{
 		[]float64{3.0, 2.0, 2.0},
 		[]float64{2.0, 3.0, -2.0},
 	}
 
-	results := make(chan *comparisons.CorrjoinResult, 1)
 	tswindow.ShiftBuffer(bufferWindow, results)
 	tswindow.postPAA = bufferWindow
 
@@ -208,14 +221,16 @@ func TestCorrelationPairs(t *testing.T) {
 	config.SvdOutputDimensions = 4
 	config.EuclidDimensions = 3
 	config.CorrelationThreshold = 0.9
+	results := make(chan *comparisons.CorrjoinResult, 1)
+	defer close(results)
+	comparer.Initialize(config, results)
 	tswindow := &TimeseriesWindow{
 		settings: config,
 		buffers:  initialTsData,
+		comparer: comparer,
 	}
 	tswindow.normalizeWindow()
 	tswindow.postSVD = tswindow.normalized
-	results := make(chan *comparisons.CorrjoinResult, 1)
-	defer close(results)
 	found := false
 	go func() {
 		for true {
