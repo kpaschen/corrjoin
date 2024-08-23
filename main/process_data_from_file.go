@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/kpaschen/corrjoin/lib"
 	"github.com/kpaschen/corrjoin/lib/comparisons"
+	"github.com/kpaschen/corrjoin/lib/reporter"
 	"github.com/kpaschen/corrjoin/lib/settings"
 	"log"
 	"os"
@@ -71,6 +72,8 @@ func main() {
 
 	window := lib.NewTimeseriesWindow(config, comparer)
 
+	correlationReporter := reporter.NewCsvReporter("/tmp/correlations")
+
 	result_ctr := 0
 	go func() {
 		log.Println("waiting for results")
@@ -85,6 +88,7 @@ func main() {
 					continue
 				}
 				result_ctr += len(correlationResult.CorrelatedPairs)
+				correlationReporter.AddCorrelatedPairs(*correlationResult)
 			}
 		}
 	}()

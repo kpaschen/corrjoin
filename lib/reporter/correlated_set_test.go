@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func printCorrelations(r Reporter) {
+func printCorrelations(r SetReporter) {
 	fmt.Println("===")
 	for _, c := range r.correlations {
 		fmt.Printf("corrset: %+v\n", *c)
@@ -15,11 +15,11 @@ func printCorrelations(r Reporter) {
 }
 
 func TestAddCorrelatedPair(t *testing.T) {
-	rep := NewReporter()
+	rep := NewSetReporter()
 
 	// Add a new pair
 	b := comparisons.NewRowPair(1, 2)
-	err := rep.AddCorrelatedPair(*b, 0.1)
+	err := rep.addCorrelatedPair(*b, 0.1)
 	if err != nil {
 		t.Errorf("failed to add correlated pair: %v", err)
 	}
@@ -30,7 +30,7 @@ func TestAddCorrelatedPair(t *testing.T) {
 
 	// Add a second new pair
 	b = comparisons.NewRowPair(3, 4)
-	err = rep.AddCorrelatedPair(*b, 0.2)
+	err = rep.addCorrelatedPair(*b, 0.2)
 	if err != nil {
 		t.Errorf("failed to add correlated pair: %v", err)
 	}
@@ -41,7 +41,7 @@ func TestAddCorrelatedPair(t *testing.T) {
 
 	// Add a pair with overlap.
 	b = comparisons.NewRowPair(3, 5)
-	err = rep.AddCorrelatedPair(*b, 0.3)
+	err = rep.addCorrelatedPair(*b, 0.3)
 	if err != nil {
 		t.Errorf("failed to add correlated pair: %v", err)
 	}
@@ -52,7 +52,7 @@ func TestAddCorrelatedPair(t *testing.T) {
 
 	// Add a redundant pair
 	b = comparisons.NewRowPair(4, 5)
-	err = rep.AddCorrelatedPair(*b, 0.4)
+	err = rep.addCorrelatedPair(*b, 0.4)
 	if err != nil {
 		t.Errorf("failed to add correlated pair: %v", err)
 	}
@@ -63,7 +63,7 @@ func TestAddCorrelatedPair(t *testing.T) {
 
 	// Add a pair that forces a merge
 	b = comparisons.NewRowPair(2, 5)
-	err = rep.AddCorrelatedPair(*b, 0.5)
+	err = rep.addCorrelatedPair(*b, 0.5)
 	if err != nil {
 		t.Errorf("failed to add correlated pair: %v", err)
 	}
@@ -77,7 +77,7 @@ func TestAddCorrelatedPair(t *testing.T) {
 
 	// Add another pair after merging.
 	b = comparisons.NewRowPair(6, 7)
-	err = rep.AddCorrelatedPair(*b, 0.6)
+	err = rep.addCorrelatedPair(*b, 0.6)
 	if err != nil {
 		t.Errorf("failed to add correlated pair: %v", err)
 	}

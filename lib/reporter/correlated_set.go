@@ -2,6 +2,7 @@ package reporter
 
 import (
 	"github.com/kpaschen/corrjoin/lib/comparisons"
+	"github.com/kpaschen/corrjoin/lib/settings"
 	"log"
 	"slices"
 )
@@ -11,8 +12,9 @@ type CorrelatedSet struct {
 	members []int // maintained in sort order
 }
 
-type Reporter struct {
+type SetReporter struct {
 	correlations []*CorrelatedSet
+	tsids        []string
 }
 
 func (s *CorrelatedSet) contains(member int) bool {
@@ -28,17 +30,21 @@ func (s *CorrelatedSet) insert(member int) bool {
 	return true
 }
 
-func NewReporter() *Reporter {
-	return &Reporter{correlations: make([]*CorrelatedSet, 0, 10000)}
+func NewSetReporter() *SetReporter {
+	return &SetReporter{correlations: make([]*CorrelatedSet, 0, 10000)}
 }
 
-func (r *Reporter) PrintReport(tsids []string) {
+func (r *SetReporter) Initialize(config settings.CorrjoinSettings, tsids []string) {
+	r.tsids = tsids
+}
+
+func (r *SetReporter) Flush() {
 	log.Printf("timeseries correlation report\n")
 	for _, c := range r.correlations {
 		log.Printf("correlated set with %d members\n", len(c.members))
 		if len(c.members) < 100 {
 			for i, m := range c.members {
-				log.Printf("%d: %s\n", i, tsids[m])
+				log.Printf("%d: %s\n", i, r.tsids[m])
 			}
 			for pair, score := range c.pairs {
 				log.Printf("%+v: %f\n", pair, score)
@@ -48,7 +54,17 @@ func (r *Reporter) PrintReport(tsids []string) {
 	r.correlations = make([]*CorrelatedSet, 0, 10000)
 }
 
-func (r *Reporter) AddCorrelatedPair(pair comparisons.RowPair, corr float64) error {
+func (r *SetReporter) AddCorrelatedPairs(results comparisons.CorrjoinResult) error {
+	var err error
+	for pair, pearson := range results.CorrelatedPairs {
+		if err = r.addCorrelatedPair(pair, pearson); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (r *SetReporter) addCorrelatedPair(pair comparisons.RowPair, corr float64) error {
 	ids := pair.RowIds()
 	homeForT1 := -1
 	homeForT2 := -1

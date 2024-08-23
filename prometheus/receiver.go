@@ -221,7 +221,7 @@ func main() {
 	}
 
 	strideStartTimes := make(map[int]time.Time)
-	correlationReporter := reporter.NewReporter()
+	correlationReporter := reporter.NewCsvReporter("/tmp/correlations")
 
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, os.Interrupt)
@@ -288,13 +288,10 @@ func main() {
 						correlationDuration.Set(float64(elapsed.Milliseconds()))
 						log.Printf("correlation batch processed in %d milliseconds\n", elapsed.Milliseconds())
 					}
-					correlationReporter.PrintReport(processor.accumulator.Tsids)
+					correlationReporter.Flush()
+				} else {
+					correlationReporter.AddCorrelatedPairs(*correlationResult)
 				}
-				/*
-					for pair, pearson := range correlationResult.CorrelatedPairs {
-						correlationReporter.AddCorrelatedPair(pair, pearson)
-					}
-				*/
 			}
 		}
 	}()
