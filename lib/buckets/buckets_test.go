@@ -1,79 +1,104 @@
 package buckets
 
 import (
-   "fmt"
-   "gonum.org/v1/gonum/mat"
-   //"math"
-   "testing"
+	"github.com/kpaschen/corrjoin/lib/comparisons"
+	"github.com/kpaschen/corrjoin/lib/settings"
+	"testing"
 )
 
-func setupBucketingScheme() *BucketingScheme {
-   initialTsData := []float64{
-      0.1, 0.2, 0.3,
-      1.1, 1.2, 1.3,
-      2.1, 2.2, 2.3,
-   }
-   originalMatrix := mat.NewDense(3, 3, initialTsData)
-   postSvdData := []float64{
-   0.1, 0.2,
-   0.1, 0.2,
-   2.1, 2.2,
-   }
-   svdOutputMatrix := mat.NewDense(3, 2, postSvdData)
-   return NewBucketingScheme(originalMatrix, svdOutputMatrix, 3, 2, 0.9)
+func setupBucketingScheme() (*BucketingScheme, chan *comparisons.CorrjoinResult) {
+	originalMatrix := [][]float64{
+		[]float64{0.1, 0.2, 0.3},
+		[]float64{0.1, 0.2, 0.3},
+		[]float64{2.1, 2.2, 2.3},
+	}
+	svdOutputMatrix := [][]float64{
+		[]float64{0.1, 0.2},
+		[]float64{0.1, 0.2},
+		[]float64{2.1, 2.2},
+	}
+	settings := settings.CorrjoinSettings{
+		SvdDimensions:        3,
+		EuclidDimensions:     2,
+		CorrelationThreshold: 0.9,
+		WindowSize:           3,
+		SvdOutputDimensions:  2,
+	}.ComputeSettingsFields()
+	comparer := &comparisons.InProcessComparer{}
+	results := make(chan *comparisons.CorrjoinResult)
+	comparer.Initialize(settings, results)
+	err := comparer.StartStride(originalMatrix, []bool{}, 0)
+	if err != nil {
+		panic(err)
+	}
+	return NewBucketingScheme(originalMatrix, svdOutputMatrix, []bool{}, settings, 0, comparer), results
 }
 
 func TestBucketIndex(t *testing.T) {
-   scheme := setupBucketingScheme()
-   b := scheme.BucketIndex(0.0)
-   if b != 0 { 
-      t.Errorf("expected bucket 0 for value 0.0 but got %d", b)
-   }
-   // With these settings, the bucket width is about 0.3
-   b = scheme.BucketIndex(0.5)
-   if b != 1 {
-      t.Errorf("expected bucket 1 for value 0.5 but got %d", b)
-   }
+	scheme, _ := setupBucketingScheme()
+	b := scheme.BucketIndex(0.0)
+	if b != 0 {
+		t.Errorf("expected bucket 0 for value 0.0 but got %d", b)
+	}
+	// With these settings, the bucket width is about 0.3
+	b = scheme.BucketIndex(0.5)
+	if b != 1 {
+		t.Errorf("expected bucket 1 for value 0.5 but got %d", b)
+	}
 }
 
 func TestInitialize(t *testing.T) {
-   scheme := setupBucketingScheme()
-   err := scheme.Initialize()
-   if err != nil {
-      t.Errorf("unexpected error in bucket scheme initialization: %v", err)
-   }
-   if len(scheme.buckets) != 2 {
-      t.Errorf("expected two buckets but got %d", len(scheme.buckets))
-   }
+	scheme, _ := setupBucketingScheme()
+	err := scheme.Initialize()
+	if err != nil {
+		t.Errorf("unexpected error in bucket scheme initialization: %v", err)
+	}
+	if len(scheme.buckets) != 2 {
+		t.Errorf("expected two buckets but got %d", len(scheme.buckets))
+	}
 }
 
 func TestNeighbourCoordinates(t *testing.T) {
-   x := neighbourCoordinates([]int{1,2,3})
-   if len(x) != 26 {
-      t.Errorf("unexpected number of neighbours %d", len(x))
-   }
-   x = neighbourCoordinates([]int{1,2,3,4})
-   if len(x) != 80 {
-      t.Errorf("unexpected number of neighbours %d", len(x))
-   }
+	x := neighbourCoordinates([]int{1, 2, 3})
+	if len(x) != 26 {
+		t.Errorf("unexpected number of neighbours %d", len(x))
+	}
+	x = neighbourCoordinates([]int{1, 2, 3, 4})
+	if len(x) != 80 {
+		t.Errorf("unexpected number of neighbours %d", len(x))
+	}
 }
 
 func TestCorrelationCandidates(t *testing.T) {
-   scheme := setupBucketingScheme()
-   scheme.Initialize()
-   cand, err := scheme.CorrelationCandidates()
-   if err != nil {
-      fmt.Errorf("unexpected error in CorrelationCandidates: %v", err)
-   }
-   if len(cand) != 1 {
-      fmt.Errorf("expected one correlated pair to be found but got %d", len(cand))
-   }
-   for rowPair, correlation := range cand {
-      if rowPair.r1 != 0 || rowPair.r2 != 1 {
-         fmt.Errorf("expected rows 0 and 1 to be correlated but got %d %d", rowPair.r1, rowPair.r2)
-      }
-      if correlation != 1 {
-         fmt.Errorf("expected perfect correlation but got %f", correlation)
-      }
-   }
+	scheme, resultChannel := setupBucketingScheme()
+	scheme.Initialize()
+	go func() {
+		found := false
+		for true {
+			results, ok := <-resultChannel
+			if !ok {
+				break
+			}
+			if ok && len(results.CorrelatedPairs) > 1 {
+				t.Errorf("expected one correlated pair to be found but got %d", len(results.CorrelatedPairs))
+			}
+			for rowPair, correlation := range results.CorrelatedPairs {
+				ids := rowPair.RowIds()
+				if ids[0] != 0 || ids[1] != 1 {
+					t.Errorf("expected rows 0 and 1 to be correlated but got %d %d", ids[0], ids[1])
+				}
+				if correlation != 1 {
+					t.Errorf("expected perfect correlation but got %f", correlation)
+				}
+				found = true
+			}
+		}
+		if !found {
+			t.Errorf("expected one correlated pair")
+		}
+	}()
+	err := scheme.CorrelationCandidates()
+	if err != nil {
+		t.Errorf("unexpected error in CorrelationCandidates: %v", err)
+	}
 }

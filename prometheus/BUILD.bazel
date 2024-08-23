@@ -1,0 +1,26 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
+
+### gazelle:resolve proto github.com/gogo/protobuf/gogoproto/gogo.proto @gogo_special_proto//github.com/gogo/protobuf/gogoproto
+### gazelle:resolve proto go github.com/gogo/protobuf/gogoproto/gogo.proto @com_github_gogo_protobuf//gogoproto:go_default_library
+
+go_library(
+    name = "prometheus_lib",
+    srcs = ["receiver.go"],
+    importpath = "github.com/kpaschen/corrjoin/prometheus",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//lib",
+        "@com_github_gorilla_mux//:mux",
+        "@com_github_prometheus_client_golang//prometheus",
+        "@com_github_prometheus_client_golang//prometheus/promhttp",
+        "@com_github_prometheus_common//model",
+        "@com_github_prometheus_prometheus//prompb",
+        "@com_github_prometheus_prometheus//storage/remote",
+    ],
+)
+
+go_binary(
+    name = "receiver",
+    embed = [":prometheus_lib"],
+    visibility = ["//visibility:public"],
+)

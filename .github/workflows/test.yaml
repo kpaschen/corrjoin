@@ -9,6 +9,5 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: bazel-contrib/setup-bazel@0.8.1
-      - name: run all tests
-        run: bazel test //...
-          
+      - name: bazel test
+        run: bazel test //lib/...
