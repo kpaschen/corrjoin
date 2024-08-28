@@ -102,7 +102,7 @@ func (a *TimeseriesAccumulator) AddObservation(observation *Observation) {
 	colcount := a.stride
 	slot, err := a.computeSlotIndex(observation.Timestamp)
 	if err != nil {
-		a.bufferChannel <- &ObservationResult{Buffers: nil, Err: err}
+		// a.bufferChannel <- &ObservationResult{Buffers: nil, Err: err}
 		return
 	}
 	if slot < 0 {

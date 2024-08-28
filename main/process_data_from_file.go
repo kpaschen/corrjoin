@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/kpaschen/corrjoin/lib"
 	"github.com/kpaschen/corrjoin/lib/comparisons"
+	"github.com/kpaschen/corrjoin/lib/datatypes"
 	"github.com/kpaschen/corrjoin/lib/reporter"
 	"github.com/kpaschen/corrjoin/lib/settings"
 	"log"
@@ -64,7 +65,7 @@ func main() {
 	log.Printf("config is %+v\n", config)
 
 	shiftCount := 0
-	results := make(chan *comparisons.CorrjoinResult, 1)
+	results := make(chan *datatypes.CorrjoinResult, 1)
 	defer close(results)
 
 	comparer := &comparisons.InProcessComparer{}

@@ -69,6 +69,15 @@ helm repo update
 kubectl create ns monitoring
 helm upgrade --install prometheus prometheus-community/kube-prometheus-stack -f prometheus-values.yaml
 
+# Install strimzi
+kubectl create namespace kafka
+kubectl create -f 'https://strimzi.io/install/latest?namespace=kafka' -n kafka
+
+# Bring up a kafka cluster with a single broker node
+kubectl apply -f https://strimzi.io/examples/latest/kafka/kraft/kafka-single-node.yaml -n kafka 
+
 kubectl apply -f receiver/receiver-deployment.yaml
 kubectl apply -f receiver/receiver-svc.yaml
 kubectl apply -f receiver/receiver-service-monitor.yaml
+
+kubectl apply -f kafka-worker/deployment.yaml

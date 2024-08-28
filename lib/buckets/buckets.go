@@ -117,6 +117,7 @@ func BucketName(coordinates []int) string {
 }
 
 func (s *BucketingScheme) CorrelationCandidates() error {
+	fmt.Printf("Correlation candidates: looking at %d buckets\n", len(s.buckets))
 	for _, bucket := range s.buckets {
 		err := s.candidatesForBucket(bucket)
 		if err != nil {

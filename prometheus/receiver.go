@@ -7,6 +7,7 @@ import (
 	"github.com/gorilla/mux"
 	corrjoin "github.com/kpaschen/corrjoin/lib"
 	"github.com/kpaschen/corrjoin/lib/comparisons"
+	"github.com/kpaschen/corrjoin/lib/datatypes"
 	"github.com/kpaschen/corrjoin/lib/reporter"
 	"github.com/kpaschen/corrjoin/lib/settings"
 	"github.com/prometheus/client_golang/prometheus"
@@ -150,6 +151,7 @@ func main() {
 	var algorithm string
 	var skipConstantTs bool
 	var compareEngine string
+	var kafkaURL string
 
 	flag.StringVar(&metricsAddr, "metrics-address", ":9203", "The address the metrics endpoint binds to.")
 	flag.StringVar(&listenAddr, "listen-address", ":9201", "The address that the storage endpoint binds to.")
@@ -162,6 +164,7 @@ func main() {
 	flag.StringVar(&algorithm, "algorithm", "paa_svd", "Algorithm to use. Possible values: full_pearson, paa_only, paa_svd")
 	flag.BoolVar(&skipConstantTs, "skipConstantTs", true, "Whether to ignore timeseries whose value is constant in the current window")
 	flag.StringVar(&compareEngine, "comparer", "inprocess", "The comparison engine. Possible values are 'inprocess' or 'kafka'")
+	flag.StringVar(&kafkaURL, "kafkaURL", "", "The URL for the kafka broker. Only useful when compareEngine is kafka")
 
 	flag.Parse()
 
@@ -180,7 +183,7 @@ func main() {
 	defer close(bufferChannel)
 
 	// The results channel is where we hear about correlated timeseries.
-	resultsChannel := make(chan *comparisons.CorrjoinResult, 1)
+	resultsChannel := make(chan *datatypes.CorrjoinResult, 1)
 	defer close(resultsChannel)
 
 	corrjoinConfig := settings.CorrjoinSettings{
@@ -190,6 +193,7 @@ func main() {
 		CorrelationThreshold: float64(float64(correlationThreshold) / 100.0),
 		WindowSize:           windowSize,
 		Algorithm:            algorithm,
+		KafkaURL:             kafkaURL,
 	}
 	corrjoinConfig = corrjoinConfig.ComputeSettingsFields()
 
@@ -197,7 +201,11 @@ func main() {
 	if compareEngine == "inprocess" {
 		comparer = &comparisons.InProcessComparer{}
 	} else {
-		panic("currently only the in process comparer is supported")
+		if compareEngine == "kafka" {
+			comparer = &comparisons.KafkaComparer{}
+		} else {
+			panic("currently only the in process and kafka comparers are supported")
+		}
 	}
 
 	comparer.Initialize(corrjoinConfig, resultsChannel)
@@ -253,6 +261,7 @@ func main() {
 				if observationResult.Err != nil {
 					log.Printf("failed to process window: %v", observationResult.Err)
 				} else {
+					log.Printf("got an observation request\n")
 					requestedCorrelationBatches.Inc()
 					requestStart := time.Now()
 					strideStartTimes[processor.window.StrideCounter] = requestStart

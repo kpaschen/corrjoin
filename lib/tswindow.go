@@ -5,6 +5,7 @@ import (
 	"github.com/kpaschen/corrjoin/lib/buckets"
 	"github.com/kpaschen/corrjoin/lib/comparisons"
 	"github.com/kpaschen/corrjoin/lib/correlation"
+	"github.com/kpaschen/corrjoin/lib/datatypes"
 	"github.com/kpaschen/corrjoin/lib/paa"
 	"github.com/kpaschen/corrjoin/lib/settings"
 	"github.com/kpaschen/corrjoin/lib/svd"
@@ -97,7 +98,7 @@ func (w *TimeseriesWindow) shiftBufferIntoWindow(buffer [][]float64) (bool, erro
 
 // shift _buffer_ into _w_ from the right, displacing the first buffer.width columns
 // of w.
-func (w *TimeseriesWindow) ShiftBuffer(buffer [][]float64, results chan<- *comparisons.CorrjoinResult) error {
+func (w *TimeseriesWindow) ShiftBuffer(buffer [][]float64, results chan<- *datatypes.CorrjoinResult) error {
 
 	// TODO: make an error type so I can signal whether the window
 	// is busy vs. a different kind of error.
@@ -136,7 +137,7 @@ func (w *TimeseriesWindow) ShiftBuffer(buffer [][]float64, results chan<- *compa
 		return err
 	}
 
-	w.comparer.StopStride(w.StrideCounter)
+	// w.comparer.StopStride(w.StrideCounter)
 	return nil
 }
 

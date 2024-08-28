@@ -45,6 +45,8 @@ type CorrjoinSettings struct {
 	SampleInterval int
 
 	Algorithm string
+
+	KafkaURL string
 }
 
 func (s CorrjoinSettings) ComputeSettingsFields() CorrjoinSettings {

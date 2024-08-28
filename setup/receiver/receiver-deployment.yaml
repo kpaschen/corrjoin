@@ -19,14 +19,17 @@ spec:
         image: localhost:5001/receiver:v0.1
         imagePullPolicy: Always
         command: ["/receiver"]
-        args: ["-windowSize", "1200", "-stride", "120", "-svdDimensions", "7", "-algorithm", "paa_svd"]
+        args: ["-windowSize", "100", "-stride", "50", "-svdDimensions", "7", "-algorithm", "paa_svd",
+               "-comparer", "kafka",
+               "-kafkaURL", "my-cluster-kafka-bootstrap.kafka:9092",
+              ]
         resources:
            limits:
-              cpu: "2"
-              memory: "8Gi"
+              cpu: "1"
+              memory: "4Gi"
            requests:
-              cpu: "2"
-              memory: "8Gi"
+              cpu: "1"
+              memory: "4Gi"
         ports:
         - containerPort: 9201
           name: api
