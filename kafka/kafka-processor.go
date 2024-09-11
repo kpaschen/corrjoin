@@ -27,6 +27,7 @@ func main() {
 
 	kafkaPairReader := kafka.NewReader(kafka.ReaderConfig{
 		Brokers: []string{kafkaURL},
+		// TODO: add partition here so we can have multiple pair readers
 		GroupID: "1",
 		Topic:   "corrjoin_pairs",
 	})

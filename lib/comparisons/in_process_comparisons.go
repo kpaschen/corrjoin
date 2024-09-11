@@ -9,6 +9,10 @@ import (
 	"log"
 )
 
+const (
+	BUFFER_SIZE = 1000
+)
+
 // An InProcessComparer implements Engine.
 type InProcessComparer struct {
 	// These settings remain for the lifetime of an engine.
@@ -18,6 +22,7 @@ type InProcessComparer struct {
 
 	baseComparer  *BaseComparer
 	strideCounter int
+	resultsBuffer map[datatypes.RowPair]float64
 }
 
 func (s *InProcessComparer) Initialize(config settings.CorrjoinSettings, results chan<- *datatypes.CorrjoinResult) {
@@ -48,6 +53,7 @@ func (s *InProcessComparer) StartStride(normalizedMatrix [][]float64, constantRo
 		comparisons: 0,
 		correlated:  0,
 	}
+	s.resultsBuffer = make(map[datatypes.RowPair]float64)
 
 	return nil
 }
@@ -66,18 +72,21 @@ func (s *InProcessComparer) Compare(index1 int, index2 int) error {
 		return err
 	}
 	if pearson > 0.0 {
-		// This is a match, send it to the results channel
-		ret := map[datatypes.RowPair]float64{}
+		// This is a match, put it into our buffer.
 		var pair datatypes.RowPair
 		if index1 > index2 {
 			pair = *datatypes.NewRowPair(index2, index1)
 		} else {
 			pair = *datatypes.NewRowPair(index1, index2)
 		}
-		ret[pair] = pearson
-		s.resultChannel <- &datatypes.CorrjoinResult{
-			CorrelatedPairs: ret,
-			StrideCounter:   s.strideCounter,
+		s.resultsBuffer[pair] = pearson
+
+		if len(s.resultsBuffer) >= BUFFER_SIZE {
+			s.resultChannel <- &datatypes.CorrjoinResult{
+				CorrelatedPairs: s.resultsBuffer,
+				StrideCounter:   s.strideCounter,
+			}
+			s.resultsBuffer = make(map[datatypes.RowPair]float64)
 		}
 	}
 	return nil
@@ -87,6 +96,13 @@ func (s *InProcessComparer) StopStride(strideCounter int) error {
 	if strideCounter != s.strideCounter {
 		return fmt.Errorf("trying to stop stride %d but i am processing stride %d",
 			strideCounter, s.strideCounter)
+	}
+	// If we have anything left in the buffer, send it now.
+	if len(s.resultsBuffer) > 0 {
+		s.resultChannel <- &datatypes.CorrjoinResult{
+			CorrelatedPairs: s.resultsBuffer,
+			StrideCounter:   s.strideCounter,
+		}
 	}
 	// Send stride end to results channel
 	s.resultChannel <- &datatypes.CorrjoinResult{

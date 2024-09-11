@@ -137,7 +137,6 @@ func (w *TimeseriesWindow) ShiftBuffer(buffer [][]float64, results chan<- *datat
 		return err
 	}
 
-	// w.comparer.StopStride(w.StrideCounter)
 	return nil
 }
 

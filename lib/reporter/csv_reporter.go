@@ -22,20 +22,34 @@ func NewCsvReporter(filenameBase string) *CsvReporter {
 }
 
 func (c *CsvReporter) Initialize(config settings.CorrjoinSettings, tsids []string) {
-	log.Printf("initialize called, now have %d ts ids\n", len(c.tsids))
 	c.tsids = tsids
+	idsfile := filepath.Join(c.filenameBase, fmt.Sprintf("tsids_%d.csv", 1))
+	file, err := os.OpenFile(idsfile, os.O_WRONLY|os.O_CREATE, 0600)
+	if err != nil {
+		log.Printf("failed to open ts ids file: %e\n", err)
+		return
+	}
+	defer file.Close()
+	writer := csv.NewWriter(file)
+	for i, tsid := range tsids {
+		record := []string{fmt.Sprintf("%d", i), tsid}
+		err = writer.Write(record)
+		if err != nil {
+			log.Printf("failed to write record: %e\n", err)
+		}
+	}
+	writer.Flush()
 }
 
 func (c *CsvReporter) csvRecordFromCorrelatedPair(pair datatypes.RowPair, pearson float64) ([]string, error) {
 	rowids := pair.RowIds()
-	if rowids[0] >= len(c.tsids) || rowids[1] >= len(c.tsids) {
-		log.Printf("not enough ts ids for %+v\n", rowids)
-		return []string{fmt.Sprintf("%d", rowids[0]), fmt.Sprintf("%d", rowids[1]),
+	//if rowids[0] >= len(c.tsids) || rowids[1] >= len(c.tsids) {
+	return []string{fmt.Sprintf("%d", rowids[0]), fmt.Sprintf("%d", rowids[1]),
 			fmt.Sprintf("%f", pearson)}, nil
-	}
-	name1 := c.tsids[rowids[0]]
-	name2 := c.tsids[rowids[1]]
-	return []string{name1, name2, fmt.Sprintf("%f", pearson)}, nil
+	//}
+	//name1 := c.tsids[rowids[0]]
+	//name2 := c.tsids[rowids[1]]
+	//return []string{name1, name2, fmt.Sprintf("%f", pearson)}, nil
 }
 
 func (c *CsvReporter) AddCorrelatedPairs(result datatypes.CorrjoinResult) error {
@@ -46,8 +60,6 @@ func (c *CsvReporter) AddCorrelatedPairs(result datatypes.CorrjoinResult) error 
 		return err
 	}
 	defer file.Close()
-
-	log.Printf("writing results to %s\n", resultsPath)
 
 	writer := csv.NewWriter(file)
 	ctr := 0

@@ -7,6 +7,7 @@ import (
 	"github.com/gorilla/mux"
 	corrjoin "github.com/kpaschen/corrjoin/lib"
 	"github.com/kpaschen/corrjoin/lib/comparisons"
+	"github.com/kpaschen/corrjoin/lib/explorer"
 	"github.com/kpaschen/corrjoin/lib/datatypes"
 	"github.com/kpaschen/corrjoin/lib/reporter"
 	"github.com/kpaschen/corrjoin/lib/settings"
@@ -221,6 +222,7 @@ func main() {
 
 	router := mux.NewRouter().StrictSlash(true)
 	router.HandleFunc("/api/v1/write", processor.receivePrometheusData)
+	router.HandleFunc("/explore", explorer.exploreCorrelations).Methods("GET")
 
 	http.Handle("/metrics", promhttp.Handler())
 	go http.ListenAndServe(cfg.metricsAddress, nil)

@@ -124,7 +124,8 @@ func (s *BucketingScheme) CorrelationCandidates() error {
 			return err
 		}
 	}
-	return nil
+	// Let the comparer know there will be no further requests for this stride.
+	return s.comparer.StopStride(s.strideCounter)
 }
 
 // candidatesForBucket processes rowPairs for a Bucket and its neighbours.

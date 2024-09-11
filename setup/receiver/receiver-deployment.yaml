@@ -28,7 +28,7 @@ spec:
         imagePullPolicy: Always
         command: ["/receiver"]
         args: ["-windowSize", "100", "-stride", "50", "-svdDimensions", "7", "-algorithm", "paa_svd",
-               "-comparer", "kafka",
+               "-comparer", "inprocess",
                "-kafkaURL", "my-cluster-kafka-bootstrap.kafka:9092",
               ]
         resources:

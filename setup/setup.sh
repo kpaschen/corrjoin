@@ -81,25 +81,28 @@ fi
 helm upgrade --install prometheus prometheus-community/kube-prometheus-stack -f prometheus-values.yaml
 
 # Install strimzi
-ns_exists=$(kubectl get namespace -o name | grep kafka)
-if [ -z $ns_exists ]; then 
-   kubectl create namespace kafka
-else
-   kubectl delete namespace kafka
-   kubectl create namespace kafka
-fi
-kubectl delete -f 'https://strimzi.io/install/latest?namespace=kafka' -n kafka 2>/dev/null
-kubectl create -f 'https://strimzi.io/install/latest?namespace=kafka' -n kafka
+#ns_exists=$(kubectl get namespace -o name | grep kafka)
+#if [ -z $ns_exists ]; then 
+#   kubectl create namespace kafka
+#else
+#   kubectl delete namespace kafka
+#   kubectl create namespace kafka
+#fi
+#kubectl delete -f 'https://strimzi.io/install/latest?namespace=kafka' -n kafka 2>/dev/null
+#kubectl create -f 'https://strimzi.io/install/latest?namespace=kafka' -n kafka
 
 # Bring up a kafka cluster with a single broker node
 # kubectl apply -f https://strimzi.io/examples/latest/kafka/kraft/kafka-single-node.yaml -n kafka 
-kubectl apply -f strimzi-single-node.yaml -n kafka 
+#kubectl apply -f strimzi-single-node.yaml -n kafka 
 
+kubectl apply -f receiver/receiver-deployment.yaml
 kubectl apply -f receiver/receiver-results-pv.yaml
 kubectl apply -f receiver/receiver-svc.yaml
 kubectl apply -f receiver/receiver-service-monitor.yaml
 
+#echo "Waiting for kafka broker to start ..."
+#sleep 60s
+
 # Wait for the kafka broker to come up before starting workers.
-kubectl -n kafka wait --for=condition=Ready --timeout=600s pod/my-cluster-dual-role-0 && \
-kubectl apply -f receiver/receiver-deployment.yaml && \
-kubectl apply -f kafka-worker/deployment.yaml
+#kubectl -n kafka wait --for=condition=Ready --timeout=600s pod/my-cluster-dual-role-0 && \
+#kubectl apply -f kafka-worker/deployment.yaml
