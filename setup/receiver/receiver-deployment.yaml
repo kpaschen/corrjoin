@@ -14,6 +14,14 @@ spec:
       labels:
         app: corrjoin
     spec:
+      nodeSelector:
+        resultsVolumeMounted: "true"
+      securityContext:
+        fsGroup: 2000
+      volumes:
+         - name: results-store
+           persistentVolumeClaim:
+              claimName: receiver-results
       containers:
       - name: receiver
         image: localhost:5001/receiver:v0.1
@@ -35,4 +43,7 @@ spec:
           name: api
         - containerPort: 9203
           name: metrics
+        volumeMounts:
+           - name: results-store
+             mountPath: /tmp/corrjoinResults
 

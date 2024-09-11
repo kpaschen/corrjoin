@@ -36,7 +36,7 @@ func (s *InProcessComparer) StartStride(normalizedMatrix [][]float64, constantRo
 	if s.baseComparer == nil {
 		s.baseComparer = &BaseComparer{
 			paa2:  make(map[int][]float64),
-			stats: make(map[int]*StrideStats),
+			stats: StrideStats{},
 		}
 	}
 	s.strideCounter = strideCounter
@@ -44,7 +44,7 @@ func (s *InProcessComparer) StartStride(normalizedMatrix [][]float64, constantRo
 	s.baseComparer.normalizedMatrix = normalizedMatrix
 	s.baseComparer.config = s.config
 	s.baseComparer.strideCounter = strideCounter
-	s.baseComparer.stats[s.strideCounter] = &StrideStats{
+	s.baseComparer.stats = StrideStats{
 		comparisons: 0,
 		correlated:  0,
 	}
@@ -94,7 +94,7 @@ func (s *InProcessComparer) StopStride(strideCounter int) error {
 		StrideCounter:   s.strideCounter,
 	}
 
-	log.Printf("stride %d complete, stats: %+v\n", strideCounter, s.baseComparer.stats[s.strideCounter])
+	log.Printf("stride %d complete, stats: %+v\n", strideCounter, s.baseComparer.stats)
 
 	return nil
 }

@@ -4,6 +4,7 @@ import (
 	"github.com/kpaschen/corrjoin/lib/correlation"
 	"github.com/kpaschen/corrjoin/lib/paa"
 	"github.com/kpaschen/corrjoin/lib/settings"
+	"log"
 )
 
 type StrideStats struct {
@@ -20,7 +21,7 @@ type BaseComparer struct {
 	strideCounter    int
 	paa2             map[int][]float64
 
-	stats map[int]*StrideStats
+	stats StrideStats
 }
 
 func NewBaseComparer(
@@ -33,7 +34,7 @@ func NewBaseComparer(
 		normalizedRows: normalizedRows,
 		strideCounter:  strideCounter,
 		paa2:           make(map[int][]float64),
-		stats:          make(map[int]*StrideStats),
+		stats:          StrideStats{},
 	}
 }
 
@@ -59,6 +60,15 @@ func (b *BaseComparer) Compare(index1 int, index2 int) (float64, error) {
 	vec1 = b.getVector(index1)
 	vec2 = b.getVector(index2)
 
+	if vec1 == nil {
+		log.Printf("did not find row %d in rows provided\n", index1)
+		return 0.0, nil
+	}
+	if vec2 == nil {
+		log.Printf("did not find row %d in rows provided\n", index2)
+		return 0.0, nil
+	}
+
 	paaVec1 := paa.PAA(vec1, b.config.EuclidDimensions)
 	paaVec2 := paa.PAA(vec2, b.config.EuclidDimensions)
 
@@ -72,16 +82,15 @@ func (b *BaseComparer) Compare(index1 int, index2 int) (float64, error) {
 		return 0.0, nil
 	}
 	// Now apply pearson
-	b.stats[b.strideCounter].comparisons++
+	b.stats.comparisons++
 	pearson, err := correlation.PearsonCorrelation(paaVec1, paaVec2)
 	if err != nil {
 		return 0.0, err
 	}
 
 	if pearson >= b.config.CorrelationThreshold {
-		b.stats[b.strideCounter].correlated++
+		b.stats.correlated++
 		return pearson, nil
 	}
 	return 0.0, nil
-
 }

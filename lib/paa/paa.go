@@ -1,8 +1,8 @@
 package paa
 
 import (
-	"fmt"
 	"gonum.org/v1/gonum/mat"
+	"log"
 	"math"
 )
 
@@ -74,7 +74,7 @@ func NormalizeSlice(slice []float64) bool {
 func PAA(slice []float64, targetColumnCount int) []float64 {
 	windowSize := len(slice) / targetColumnCount
 	if windowSize < 1 {
-		fmt.Printf("window size is too small\n")
+		log.Printf("window size is too small. Slice length %d divided by targetColumnCount %d is %d\n", len(slice), targetColumnCount, windowSize)
 	}
 	ret := make([]float64, targetColumnCount, targetColumnCount)
 

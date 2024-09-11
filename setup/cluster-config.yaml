@@ -10,5 +10,20 @@ networking:
 nodes:
         - role: control-plane
         - role: worker
+          labels:
+             resultsVolumeMounted: true
+          extraMounts:
+             - hostPath: /tmp/corrjoinResults
+               containerPath: /tmp/corrjoinResults
+          kubeadmConfigPatches:
+          - |
+            kind:  JoinConfiguration
+            nodeRegistration:
+               name: "N1"
         - role: worker
+          kubeadmConfigPatches:
+          - |
+            kind:  JoinConfiguration
+            nodeRegistration:
+               name: "N2"
 

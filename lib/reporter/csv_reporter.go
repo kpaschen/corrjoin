@@ -7,6 +7,7 @@ import (
 	"github.com/kpaschen/corrjoin/lib/settings"
 	"log"
 	"os"
+	"path/filepath"
 )
 
 type CsvReporter struct {
@@ -21,12 +22,14 @@ func NewCsvReporter(filenameBase string) *CsvReporter {
 }
 
 func (c *CsvReporter) Initialize(config settings.CorrjoinSettings, tsids []string) {
+	log.Printf("initialize called, now have %d ts ids\n", len(c.tsids))
 	c.tsids = tsids
 }
 
 func (c *CsvReporter) csvRecordFromCorrelatedPair(pair datatypes.RowPair, pearson float64) ([]string, error) {
 	rowids := pair.RowIds()
 	if rowids[0] >= len(c.tsids) || rowids[1] >= len(c.tsids) {
+		log.Printf("not enough ts ids for %+v\n", rowids)
 		return []string{fmt.Sprintf("%d", rowids[0]), fmt.Sprintf("%d", rowids[1]),
 			fmt.Sprintf("%f", pearson)}, nil
 	}
@@ -36,12 +39,15 @@ func (c *CsvReporter) csvRecordFromCorrelatedPair(pair datatypes.RowPair, pearso
 }
 
 func (c *CsvReporter) AddCorrelatedPairs(result datatypes.CorrjoinResult) error {
-	filename := fmt.Sprintf("%s_%d.csv", c.filenameBase, result.StrideCounter)
-	file, err := os.OpenFile(filename, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
+	filename := fmt.Sprintf("correlations_%d.csv", result.StrideCounter)
+	resultsPath := filepath.Join(c.filenameBase, filename)
+	file, err := os.OpenFile(resultsPath, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
 	if err != nil {
 		return err
 	}
 	defer file.Close()
+
+	log.Printf("writing results to %s\n", resultsPath)
 
 	writer := csv.NewWriter(file)
 	ctr := 0

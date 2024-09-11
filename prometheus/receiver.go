@@ -152,6 +152,7 @@ func main() {
 	var skipConstantTs bool
 	var compareEngine string
 	var kafkaURL string
+	var resultsDirectory string
 
 	flag.StringVar(&metricsAddr, "metrics-address", ":9203", "The address the metrics endpoint binds to.")
 	flag.StringVar(&listenAddr, "listen-address", ":9201", "The address that the storage endpoint binds to.")
@@ -165,6 +166,7 @@ func main() {
 	flag.BoolVar(&skipConstantTs, "skipConstantTs", true, "Whether to ignore timeseries whose value is constant in the current window")
 	flag.StringVar(&compareEngine, "comparer", "inprocess", "The comparison engine. Possible values are 'inprocess' or 'kafka'")
 	flag.StringVar(&kafkaURL, "kafkaURL", "", "The URL for the kafka broker. Only useful when compareEngine is kafka")
+	flag.StringVar(&resultsDirectory, "resultsDirectory", "/tmp/corrjoinResults", "The directory to write results to.")
 
 	flag.Parse()
 
@@ -229,7 +231,7 @@ func main() {
 	}
 
 	strideStartTimes := make(map[int]time.Time)
-	correlationReporter := reporter.NewCsvReporter("/tmp/correlations")
+	correlationReporter := reporter.NewCsvReporter(resultsDirectory)
 
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, os.Interrupt)
@@ -272,6 +274,7 @@ func main() {
 					if err != nil {
 						log.Printf("failed to process window: %v", err)
 					}
+					correlationReporter.Initialize(corrjoinConfig, processor.accumulator.Tsids)
 				}
 			case <-time.After(10 * time.Minute):
 				log.Printf("got no timeseries data for 10 minutes")
@@ -299,7 +302,11 @@ func main() {
 					}
 					correlationReporter.Flush()
 				} else {
-					correlationReporter.AddCorrelatedPairs(*correlationResult)
+					log.Printf("logging %d correlated pairs\n", len(correlationResult.CorrelatedPairs))
+					err := correlationReporter.AddCorrelatedPairs(*correlationResult)
+					if err != nil {
+						log.Printf("failed to log results: %v\n", err)
+					}
 				}
 			}
 		}

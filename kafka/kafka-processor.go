@@ -17,7 +17,7 @@ func decodePairMessage(msg kafka.Message, pairs *messages.PairMessage) error {
 }
 
 func encodeCorrelationMessage(corr datatypes.CorrjoinResult) ([]byte, error) {
-	return json.Marshal(corr)
+	return (&corr).MarshalJSON()
 }
 
 func main() {
@@ -33,13 +33,12 @@ func main() {
 	defer kafkaPairReader.Close()
 
 	kafkaResultsWriter := &kafka.Writer{
-		Addr:     kafka.TCP(kafkaURL),
-		Topic:    "corrjoin_results",
-		Balancer: &kafka.LeastBytes{},
+		Addr:  kafka.TCP(kafkaURL),
+		Topic: "corrjoin_results",
+		// Balancer: &kafka.LeastBytes{},
+		Balancer: &kafka.Hash{},
 	}
 	defer kafkaResultsWriter.Close()
-
-	comparers := make(map[int]comparisons.BaseComparer)
 
 	log.Println("Kafka worker waiting for pairs to compare")
 	for {
@@ -48,25 +47,20 @@ func main() {
 			log.Printf("failed to open pair reader: %v\n", err)
 			continue
 		}
-		log.Printf("Received pairs: %+v\n", msg)
 		// parse and process
 		pairs := &messages.PairMessage{}
+		log.Printf("received pairs message with key %s, partition %d\n", string(msg.Key[:]), msg.Partition)
 		err = decodePairMessage(msg, pairs)
 		if err != nil {
 			log.Printf("failed to decode pair message: %v\n", err)
 			continue
 		}
-		log.Printf("got %d pairs for stride %d\n", len(pairs.Pairs), pairs.StrideCounter)
 
-		comparer, exists := comparers[pairs.StrideCounter]
-		if !exists {
-			comparer = *comparisons.NewBaseComparer(
-				pairs.Config,
-				pairs.StrideCounter,
-				pairs.Rows,
-			)
-			comparers[pairs.StrideCounter] = comparer
-		}
+		comparer := *comparisons.NewBaseComparer(
+			pairs.Config,
+			pairs.StrideCounter,
+			pairs.Rows,
+		)
 		result := datatypes.CorrjoinResult{
 			StrideCounter:   pairs.StrideCounter,
 			CorrelatedPairs: make(map[datatypes.RowPair]float64),
@@ -97,6 +91,8 @@ func main() {
 			err = kafkaResultsWriter.WriteMessages(context.Background(), msg)
 			if err != nil {
 				log.Printf("failed to send kafka correlation message: %v\n", err)
+			} else {
+				log.Printf("sent %d correlated pairs back\n", len(result.CorrelatedPairs))
 			}
 		}
 	}
