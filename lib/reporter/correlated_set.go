@@ -5,6 +5,7 @@ import (
 	"github.com/kpaschen/corrjoin/lib/settings"
 	"log"
 	"slices"
+	"time"
 )
 
 type CorrelatedSet struct {
@@ -34,7 +35,7 @@ func NewSetReporter() *SetReporter {
 	return &SetReporter{correlations: make([]*CorrelatedSet, 0, 10000)}
 }
 
-func (r *SetReporter) Initialize(config settings.CorrjoinSettings, tsids []string) {
+func (r *SetReporter) Initialize(config settings.CorrjoinSettings, s int, start time.Time, tsids []string) {
 	r.tsids = tsids
 }
 

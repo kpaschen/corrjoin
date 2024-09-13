@@ -12,6 +12,7 @@ RUN CGO_ENABLED=0 go build -C prometheus -o receiver
 FROM gcr.io/distroless/static-debian12:nonroot
 
 COPY --from=build /src/prometheus/receiver /
+COPY --from=build /src/explorer/templates /templates
 USER 65532:65532
 CMD ["/receiver"]
 

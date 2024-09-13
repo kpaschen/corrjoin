@@ -1,13 +1,13 @@
-{{ define "clusters" }}
-<h2>Timeseries explorer:</h2></p>
-<p><strong>Clusters:</strong> {{ . | len }}</p>
+{{ define "strides" }}
+<h2>Timeseries explorer:</h2>
+<p><strong>Strides:</strong> {{ . | len }}</p>
 {{ range . }}
 <hr />
 <dl>
-	<dt>Id</dt>
+	<dt>ID</dt>
 	<dd>{{ .Id }}</dd>
-	<dt>Size</dt>
-	<dd>{{ .Size }}</dd>
+	<dt>Started: </dt>
+	<dd>{{ .StartTime }}</dd>
 </dl>
 {{ end }}
 {{ end }}

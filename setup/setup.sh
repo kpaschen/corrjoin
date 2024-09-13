@@ -85,3 +85,18 @@ kubectl apply -f receiver/receiver-results-pv.yaml
 kubectl apply -f receiver/receiver-svc.yaml
 kubectl apply -f receiver/receiver-service-monitor.yaml
 
+# Set up nginx gateway
+kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.1.0/standard-install.yaml
+ns_exists=$(kubectl get namespace -o name | grep nginx-gateway-fabric)
+if [ -z $ns_exists ]; then 
+   kubectl create ns nginx-gateway-fabric
+fi
+
+helm pull oci://ghcr.io/nginxinc/charts/nginx-gateway-fabric --untar
+(cd nginx-gateway-fabric
+ kubectl config set-context --current --namespace=nginx-gateway
+ helm upgrade --install ngf .
+)
+
+kubectl config set-context --current --namespace=default
+

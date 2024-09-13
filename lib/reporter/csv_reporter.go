@@ -8,22 +8,29 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"time"
 )
 
 type CsvReporter struct {
 	filenameBase string
 	tsids        []string
+	strideStartTimes map[int]string
 }
 
 func NewCsvReporter(filenameBase string) *CsvReporter {
 	return &CsvReporter{
 		filenameBase: filenameBase,
+		strideStartTimes: make(map[int]string),
 	}
 }
 
-func (c *CsvReporter) Initialize(config settings.CorrjoinSettings, tsids []string) {
+func (c *CsvReporter) Initialize(config settings.CorrjoinSettings, strideCounter int,
+	strideStart time.Time, tsids []string) {
 	c.tsids = tsids
-	idsfile := filepath.Join(c.filenameBase, fmt.Sprintf("tsids_%d.csv", 1))
+	c.strideStartTimes[strideCounter] = strideStart.UTC().Format("20060102150405")
+	log.Printf("initializing with strideCounter %d and start time %s\n", strideCounter,
+		c.strideStartTimes[strideCounter])
+	idsfile := filepath.Join(c.filenameBase, fmt.Sprintf("tsids_%d.csv", strideCounter))
 	file, err := os.OpenFile(idsfile, os.O_WRONLY|os.O_CREATE, 0600)
 	if err != nil {
 		log.Printf("failed to open ts ids file: %e\n", err)
@@ -43,17 +50,16 @@ func (c *CsvReporter) Initialize(config settings.CorrjoinSettings, tsids []strin
 
 func (c *CsvReporter) csvRecordFromCorrelatedPair(pair datatypes.RowPair, pearson float64) ([]string, error) {
 	rowids := pair.RowIds()
-	//if rowids[0] >= len(c.tsids) || rowids[1] >= len(c.tsids) {
 	return []string{fmt.Sprintf("%d", rowids[0]), fmt.Sprintf("%d", rowids[1]),
 			fmt.Sprintf("%f", pearson)}, nil
-	//}
-	//name1 := c.tsids[rowids[0]]
-	//name2 := c.tsids[rowids[1]]
-	//return []string{name1, name2, fmt.Sprintf("%f", pearson)}, nil
 }
 
 func (c *CsvReporter) AddCorrelatedPairs(result datatypes.CorrjoinResult) error {
-	filename := fmt.Sprintf("correlations_%d.csv", result.StrideCounter)
+	startTime, ok := c.strideStartTimes[result.StrideCounter]
+	if !ok {
+		return fmt.Errorf("missing stride start time for %d", result.StrideCounter)
+	}
+	filename := fmt.Sprintf("correlations_%d_%s.csv", result.StrideCounter, startTime)
 	resultsPath := filepath.Join(c.filenameBase, filename)
 	file, err := os.OpenFile(resultsPath, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
 	if err != nil {

@@ -192,7 +192,9 @@ func main() {
 		observationQueue: observationQueue,
 	}
 
-	expl := &explorer.CorrelationExplorer{}
+	expl := &explorer.CorrelationExplorer{
+		FilenameBase: resultsDirectory,
+	}
 	err := expl.Initialize()
 	if err != nil {
 		log.Printf("failed to initialize explorer: %v\n", err)
@@ -248,7 +250,6 @@ func main() {
 					log.Printf("got an observation request\n")
 					requestedCorrelationBatches.Inc()
 					requestStart := time.Now()
-					strideStartTimes[processor.window.StrideCounter] = requestStart
 					// TODO: this has to return quickly.
 					err := processor.window.ShiftBuffer(observationResult.Buffers, resultsChannel)
 					// TODO: check for error type.
@@ -256,7 +257,9 @@ func main() {
 					if err != nil {
 						log.Printf("failed to process window: %v", err)
 					}
-					correlationReporter.Initialize(corrjoinConfig, processor.accumulator.Tsids)
+					strideStartTimes[processor.window.StrideCounter] = requestStart
+					correlationReporter.Initialize(corrjoinConfig, processor.window.StrideCounter,
+                                           requestStart, processor.accumulator.Tsids)
 				}
 			case <-time.After(10 * time.Minute):
 				log.Printf("got no timeseries data for 10 minutes")

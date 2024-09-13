@@ -17,7 +17,7 @@ spec:
       nodeSelector:
         resultsVolumeMounted: "true"
       securityContext:
-        fsGroup: 2000
+        fsGroup: 1001
       volumes:
          - name: results-store
            persistentVolumeClaim:

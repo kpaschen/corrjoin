@@ -1,0 +1,28 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+   name: explorer-gateway
+   namespace: default
+spec:
+   gatewayClassName: nginx
+   listeners:
+   - name: http
+     protocol: http
+     port: 8888
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+   name: explorer-route
+   namespace: default
+spec:
+   parentRefs:
+   - name: explorer-gateway
+   rules:
+   - matches:
+     - path:
+         type: PathPrefix
+         value: /explore
+     backendRefs:
+     - name: correlation-service
+       port: 9201
