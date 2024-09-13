@@ -7,7 +7,7 @@ import (
 	"github.com/gorilla/mux"
 	corrjoin "github.com/kpaschen/corrjoin/lib"
 	"github.com/kpaschen/corrjoin/lib/comparisons"
-	"github.com/kpaschen/corrjoin/lib/explorer"
+	"github.com/kpaschen/corrjoin/explorer"
 	"github.com/kpaschen/corrjoin/lib/datatypes"
 	"github.com/kpaschen/corrjoin/lib/reporter"
 	"github.com/kpaschen/corrjoin/lib/settings"
@@ -99,25 +99,6 @@ func (t *tsProcessor) observeTs(req *prompb.WriteRequest) error {
 	return nil
 }
 
-func (t *tsProcessor) protoToSamples(req *prompb.WriteRequest) model.Samples {
-	var samples model.Samples
-	for _, ts := range req.Timeseries {
-		metric := make(model.Metric, len(ts.Labels))
-		for _, l := range ts.Labels {
-			metric[model.LabelName(l.Name)] = model.LabelValue(l.Value)
-		}
-
-		for _, s := range ts.Samples {
-			samples = append(samples, &model.Sample{
-				Metric:    metric,
-				Value:     model.SampleValue(s.Value),
-				Timestamp: model.Time(s.Timestamp),
-			})
-		}
-	}
-	return samples
-}
-
 func (t *tsProcessor) receivePrometheusData(w http.ResponseWriter, r *http.Request) {
 	req, err := remote.DecodeWriteRequest(r.Body)
 	if err != nil {
@@ -129,8 +110,6 @@ func (t *tsProcessor) receivePrometheusData(w http.ResponseWriter, r *http.Reque
 	// TODO: either this or the accumulator need to evaluate the stale marker.
 	// That is a special NaN value 0x7ff0000000000002
 
-	// Later: pass samples to the processor here.
-	// samples := t.protoToSamples(req)
 	// For now, convert samples directly and add them as observations
 	err = t.observeTs(req)
 	if err != nil {
@@ -152,7 +131,6 @@ func main() {
 	var algorithm string
 	var skipConstantTs bool
 	var compareEngine string
-	var kafkaURL string
 	var resultsDirectory string
 
 	flag.StringVar(&metricsAddr, "metrics-address", ":9203", "The address the metrics endpoint binds to.")
@@ -165,8 +143,7 @@ func main() {
 	flag.IntVar(&svdDimensions, "svdDimensions", 3, "How many columns to choose after SVD")
 	flag.StringVar(&algorithm, "algorithm", "paa_svd", "Algorithm to use. Possible values: full_pearson, paa_only, paa_svd")
 	flag.BoolVar(&skipConstantTs, "skipConstantTs", true, "Whether to ignore timeseries whose value is constant in the current window")
-	flag.StringVar(&compareEngine, "comparer", "inprocess", "The comparison engine. Possible values are 'inprocess' or 'kafka'")
-	flag.StringVar(&kafkaURL, "kafkaURL", "", "The URL for the kafka broker. Only useful when compareEngine is kafka")
+	flag.StringVar(&compareEngine, "comparer", "inprocess", "The comparison engine.")
 	flag.StringVar(&resultsDirectory, "resultsDirectory", "/tmp/corrjoinResults", "The directory to write results to.")
 
 	flag.Parse()
@@ -196,7 +173,6 @@ func main() {
 		CorrelationThreshold: float64(float64(correlationThreshold) / 100.0),
 		WindowSize:           windowSize,
 		Algorithm:            algorithm,
-		KafkaURL:             kafkaURL,
 	}
 	corrjoinConfig = corrjoinConfig.ComputeSettingsFields()
 
@@ -204,11 +180,7 @@ func main() {
 	if compareEngine == "inprocess" {
 		comparer = &comparisons.InProcessComparer{}
 	} else {
-		if compareEngine == "kafka" {
-			comparer = &comparisons.KafkaComparer{}
-		} else {
-			panic("currently only the in process and kafka comparers are supported")
-		}
+		panic("currently only the in process comparer is supported")
 	}
 
 	comparer.Initialize(corrjoinConfig, resultsChannel)
@@ -220,9 +192,17 @@ func main() {
 		observationQueue: observationQueue,
 	}
 
+	expl := &explorer.CorrelationExplorer{}
+	err := expl.Initialize()
+	if err != nil {
+		log.Printf("failed to initialize explorer: %v\n", err)
+	}
+
 	router := mux.NewRouter().StrictSlash(true)
 	router.HandleFunc("/api/v1/write", processor.receivePrometheusData)
-	router.HandleFunc("/explore", explorer.exploreCorrelations).Methods("GET")
+
+	// TODO: maybe serve the explorer on another port.
+	router.HandleFunc("/explore", expl.ExploreCorrelations).Methods("GET")
 
 	http.Handle("/metrics", promhttp.Handler())
 	go http.ListenAndServe(cfg.metricsAddress, nil)
@@ -304,7 +284,6 @@ func main() {
 					}
 					correlationReporter.Flush()
 				} else {
-					log.Printf("logging %d correlated pairs\n", len(correlationResult.CorrelatedPairs))
 					err := correlationReporter.AddCorrelatedPairs(*correlationResult)
 					if err != nil {
 						log.Printf("failed to log results: %v\n", err)

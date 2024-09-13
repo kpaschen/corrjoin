@@ -4,7 +4,6 @@ metadata:
    name: receiver-results
 spec:
    accessModes:
-      # use ReadWriteMany for the kafka metadata?
       - ReadWriteOnce
    storageClassName: local-storage
    capacity:

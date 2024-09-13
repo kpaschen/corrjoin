@@ -148,6 +148,7 @@ func (s *BucketingScheme) candidatesForBucket(bucket *Bucket) error {
 	}
 
 	n := neighbourCoordinates(bucket.coordinates)
+	log.Printf("bucket %s has %d neighbours\n", BucketName(bucket.coordinates), len(n))
 	for _, d := range n {
 		name := BucketName(d)
 		neighbour, exists := s.buckets[name]
@@ -166,6 +167,7 @@ func (s *BucketingScheme) candidatesForBucket(bucket *Bucket) error {
 			}
 		}
 	}
+	log.Printf("done with bucket %s\n", BucketName(bucket.coordinates))
 	return nil
 }
 

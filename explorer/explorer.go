@@ -1,27 +1,29 @@
 package explorer
 
 import (
-	"encoding/csv"
 	"fmt"
-	"html/templates"
+	"log"
+	"html/template"
 	"net/http"
 )
 
 type CorrelationExplorer struct {
-	template.Template clusterListTemplate
+	clusterListTemplate *template.Template
 }
 
 func (c *CorrelationExplorer) Initialize() error {
-	c.clusterListTemplate, err := template.ParseFiles("./templates/index.tmpl")
+	t, err := template.ParseFiles("./templates/index.tmpl")
 	if err != nil {
 		log.Println(fmt.Sprintf("%v", err))
 		return err
 	}
+	c.clusterListTemplate = t
+	return nil
 }
 
-func (c *CorrelationExplorer) exploreCorrelations(w http.ResponseWriter, r *http.Request) {
-	if err := clusterListTemplate.ExecuteTemplate(w, "clusters",  []); err != nil {
-		log.Println("failed to execute template: %v\n", err)
+func (c *CorrelationExplorer) ExploreCorrelations(w http.ResponseWriter, r *http.Request) {
+	if err := c.clusterListTemplate.ExecuteTemplate(w, "clusters",  nil); err != nil {
+		log.Printf("failed to execute template: %v\n", err)
 	}
 }
 
