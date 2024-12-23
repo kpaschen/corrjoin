@@ -3770,7 +3770,7 @@ prometheus:
       - sourceLabels: ["__name__"]
         regex: "correlated_timeseries|node_os_|node_network_iface_|node_network_info|node_network_name_|prometheus_operator_build_info|ALERTS|etcd_request_duration_seconds_.*|_bucket$"
         action: Drop
-      - regex: "instance|job|prometheus|service"
+      - regex: "instance|job|prometheus|service|prometheus_replica"
         action: LabelDrop
 
     ## additionalRemoteWrite is appended to remoteWrite

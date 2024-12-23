@@ -23,7 +23,7 @@ type ObservationResult struct {
 // rowid and it accumulates data until it has reached the stride length.
 // When it reaches the stride length, it sends the collected buffers to
 // a channel.
-// TODO: decide what to do if there is a computation ongoing at the time the
+// TODO: return quickly if there is a computation ongoing at the time the
 // stride is reached.
 
 type TimeseriesAccumulator struct {
@@ -43,8 +43,8 @@ type TimeseriesAccumulator struct {
 	// this an array of arrays.
 	buffers              map[int]([]float64)
 	maxRow               int
-	currentStrideStartTs time.Time
-	currentStrideMaxTs   time.Time
+	CurrentStrideStartTs time.Time
+	CurrentStrideMaxTs   time.Time
 	sampleTime           int
 	strideDuration       time.Duration
 
@@ -68,21 +68,21 @@ func NewTimeseriesAccumulator(stride int, startTime time.Time, sampleInterval in
 		buffers:              make(map[int][]float64),
 		maxRow:               0,
 		sampleTime:           sampleInterval,
-		currentStrideStartTs: startTime,
-		currentStrideMaxTs:   maxTime(startTime, strideDuration),
+		CurrentStrideStartTs: startTime,
+		CurrentStrideMaxTs:   maxTime(startTime, strideDuration),
 		strideDuration:       strideDuration,
 		bufferChannel:        bc,
 	}
 }
 
 func (a *TimeseriesAccumulator) computeSlotIndex(timestamp time.Time) (int32, error) {
-	if timestamp.After(a.currentStrideMaxTs) {
+	if timestamp.After(a.CurrentStrideMaxTs) {
 		return int32(-1), nil
 	}
-	if timestamp.Before(a.currentStrideStartTs) {
+	if timestamp.Before(a.CurrentStrideStartTs) {
 		return int32(-2), fmt.Errorf("backfill timestamp, ignore")
 	}
-	diff := timestamp.Sub(a.currentStrideStartTs).Seconds()
+	diff := timestamp.Sub(a.CurrentStrideStartTs).Seconds()
 	return int32(diff / float64(a.sampleTime)), nil
 }
 
@@ -106,8 +106,8 @@ func (a *TimeseriesAccumulator) AddObservation(observation *Observation) {
 		return
 	}
 	if slot < 0 {
-		a.currentStrideStartTs = observation.Timestamp
-		a.currentStrideMaxTs = maxTime(observation.Timestamp, a.strideDuration)
+		a.CurrentStrideStartTs = observation.Timestamp
+		a.CurrentStrideMaxTs = maxTime(observation.Timestamp, a.strideDuration)
 		slot, err = a.computeSlotIndex(observation.Timestamp)
 		if err != nil {
 			a.bufferChannel <- &ObservationResult{Buffers: nil, Err: err}
@@ -124,9 +124,17 @@ func (a *TimeseriesAccumulator) AddObservation(observation *Observation) {
 	rowid, ok := a.rowmap[observation.MetricName]
 	if !ok {
 		rowid = a.maxRow
+		// TODO: debugging
+		if rowid > 100 {
+			return
+		}
 		a.rowmap[observation.MetricName] = rowid
 		a.buffers[rowid] = make([]float64, colcount, colcount)
 		a.Tsids = append(a.Tsids, observation.MetricName)
+               	if a.Tsids[rowid] != observation.MetricName {
+			log.Printf("tsid for %d is %s but should be %s\n", rowid, a.Tsids[rowid], observation.MetricName)
+			panic("code bug")
+		}
 		a.maxRow += 1
 	}
 

@@ -84,6 +84,7 @@ func (s *BucketingScheme) Initialize() error {
 	// but it is usually 3 - 7.
 	for i := 0; i < rowCount; i++ {
 		if len(s.constantRows) > 0 && s.constantRows[i] {
+			log.Printf("skipping ts %d because it is constant\n", i)
 			continue
 		}
 		vec := s.svdOutputMatrix[i]

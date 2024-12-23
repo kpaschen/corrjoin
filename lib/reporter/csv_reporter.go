@@ -12,26 +12,30 @@ import (
 )
 
 type CsvReporter struct {
-	filenameBase string
-	tsids        []string
+	filenameBase     string
+	tsids            []string
 	strideStartTimes map[int]string
+	strideEndTimes map[int]string
 }
 
 func NewCsvReporter(filenameBase string) *CsvReporter {
 	return &CsvReporter{
-		filenameBase: filenameBase,
+		filenameBase:     filenameBase,
 		strideStartTimes: make(map[int]string),
+		strideEndTimes: make(map[int]string),
 	}
 }
 
 func (c *CsvReporter) Initialize(config settings.CorrjoinSettings, strideCounter int,
-	strideStart time.Time, tsids []string) {
+	strideStart time.Time, strideEnd time.Time, tsids []string) {
 	c.tsids = tsids
 	c.strideStartTimes[strideCounter] = strideStart.UTC().Format("20060102150405")
-	log.Printf("initializing with strideCounter %d and start time %s\n", strideCounter,
-		c.strideStartTimes[strideCounter])
-	idsfile := filepath.Join(c.filenameBase, fmt.Sprintf("tsids_%d.csv", strideCounter))
-	file, err := os.OpenFile(idsfile, os.O_WRONLY|os.O_CREATE, 0600)
+	c.strideEndTimes[strideCounter] = strideEnd.UTC().Format("20060102150405")
+	log.Printf("initializing with strideCounter %d, start time %s, end time %s\n", strideCounter,
+		c.strideStartTimes[strideCounter], c.strideEndTimes[strideCounter])
+	idsfile := filepath.Join(c.filenameBase, fmt.Sprintf("tsids_%d_%s.csv", strideCounter,
+		c.strideStartTimes[strideCounter]))
+	file, err := os.OpenFile(idsfile, os.O_WRONLY|os.O_CREATE, 0640)
 	if err != nil {
 		log.Printf("failed to open ts ids file: %e\n", err)
 		return
@@ -51,7 +55,7 @@ func (c *CsvReporter) Initialize(config settings.CorrjoinSettings, strideCounter
 func (c *CsvReporter) csvRecordFromCorrelatedPair(pair datatypes.RowPair, pearson float64) ([]string, error) {
 	rowids := pair.RowIds()
 	return []string{fmt.Sprintf("%d", rowids[0]), fmt.Sprintf("%d", rowids[1]),
-			fmt.Sprintf("%f", pearson)}, nil
+		fmt.Sprintf("%f", pearson)}, nil
 }
 
 func (c *CsvReporter) AddCorrelatedPairs(result datatypes.CorrjoinResult) error {
@@ -59,9 +63,13 @@ func (c *CsvReporter) AddCorrelatedPairs(result datatypes.CorrjoinResult) error 
 	if !ok {
 		return fmt.Errorf("missing stride start time for %d", result.StrideCounter)
 	}
-	filename := fmt.Sprintf("correlations_%d_%s.csv", result.StrideCounter, startTime)
+	endTime, ok := c.strideEndTimes[result.StrideCounter]
+	if !ok {
+		return fmt.Errorf("missing stride end time for %d", result.StrideCounter)
+	}
+	filename := fmt.Sprintf("correlations_%d_%s-%s.csv", result.StrideCounter, startTime, endTime)
 	resultsPath := filepath.Join(c.filenameBase, filename)
-	file, err := os.OpenFile(resultsPath, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
+	file, err := os.OpenFile(resultsPath, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0640)
 	if err != nil {
 		return err
 	}

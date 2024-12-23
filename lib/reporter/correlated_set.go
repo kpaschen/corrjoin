@@ -35,7 +35,7 @@ func NewSetReporter() *SetReporter {
 	return &SetReporter{correlations: make([]*CorrelatedSet, 0, 10000)}
 }
 
-func (r *SetReporter) Initialize(config settings.CorrjoinSettings, s int, start time.Time, tsids []string) {
+func (r *SetReporter) Initialize(config settings.CorrjoinSettings, s int, start time.Time, _ time.Time, tsids []string) {
 	r.tsids = tsids
 }
 

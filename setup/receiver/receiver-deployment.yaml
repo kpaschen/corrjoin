@@ -26,8 +26,8 @@ spec:
       - name: receiver
         image: localhost:5001/receiver:v0.1
         imagePullPolicy: Always
-        command: ["/receiver"]
-        args: ["-windowSize", "100", "-stride", "50", "-svdDimensions", "7", "-algorithm", "paa_svd",
+        command: ["/webroot/app"]
+        args: ["-windowSize", "100", "-stride", "50", "-svdDimensions", "7",
                "-comparer", "inprocess",
               ]
         resources:
@@ -42,6 +42,8 @@ spec:
           name: api
         - containerPort: 9203
           name: metrics
+        - containerPort: 9205
+          name: explorer
         volumeMounts:
            - name: results-store
              mountPath: /tmp/corrjoinResults

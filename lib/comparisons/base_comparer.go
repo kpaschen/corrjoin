@@ -84,9 +84,12 @@ func (b *BaseComparer) Compare(index1 int, index2 int) (float64, error) {
 	// Now apply pearson
 	b.stats.comparisons++
 	pearson, err := correlation.PearsonCorrelation(paaVec1, paaVec2)
+
 	if err != nil {
 		return 0.0, err
 	}
+	// TODO: debug
+	log.Printf("pearson correlation of %+v and %+v is %f\n", paaVec1, paaVec2, pearson)
 
 	if pearson >= b.config.CorrelationThreshold {
 		b.stats.correlated++

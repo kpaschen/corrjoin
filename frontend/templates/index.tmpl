@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head>
+   <meta charset="UTF-8">
+   <title>Timeseries Explorer</title>
+</head>
+<body>
+{{ define "strides" }}
+<p><strong>Strides:</strong> {{ . | len }}</p>
+{{ range . }}
+<hr />
+<dl>
+	<dt>ID</dt><dd>{{ .ID }} from {{ .Filename }}</dd><dt>Started: </dt><dd>{{ .StartTimeString }}</dd>
+        <dt>Status</dt><dd> {{ .Status }}</dd>
+        {{ if .Clusters }}
+	   {{ $filename := .Filename }}
+        <dt>Clusters: {{ .Clusters.Sizes | len }}</dt>
+	<dd><dl>{{ range $id, $size := .Clusters.Sizes }}
+              {{ $url := printf "/exploreCluster?id=%d&stride=%s" $id $filename }}
+              <dt><a href={{ $url }}>Cluster {{ $id }}</a> has {{ $size }} elements.</dt>
+            {{ end }}
+        </dl>
+	</dd>
+        {{ end }}
+</dl>
+{{ end }}
+{{ end }}
+</body>
+</html>

@@ -7,9 +7,10 @@ import (
 )
 
 type Reporter interface {
-	Initialize(config settings.CorrjoinSettings, strideCounter int, startTime time.Time, tsids []string)
+	Initialize(config settings.CorrjoinSettings, strideCounter int,
+		 startTime time.Time, endTime time.Time, tsids []string)
 
-	AddCorrelatedPairs(map[datatypes.RowPair]float64) error
+	AddCorrelatedPairs(datatypes.CorrjoinResult) error
 
 	Flush() error
 }
