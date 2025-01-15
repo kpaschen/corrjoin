@@ -14,22 +14,37 @@ spec:
       labels:
         app: corrjoin
     spec:
+      nodeSelector:
+        resultsVolumeMounted: "true"
+      securityContext:
+        fsGroup: 1001
+      volumes:
+         - name: results-store
+           persistentVolumeClaim:
+              claimName: receiver-results
       containers:
       - name: receiver
         image: localhost:5001/receiver:v0.1
         imagePullPolicy: Always
-        command: ["/receiver"]
-        args: ["-windowSize", "1200", "-stride", "120", "-svdDimensions", "7", "-algorithm", "paa_svd"]
+        command: ["/webroot/app"]
+        args: ["-svdDimensions", "7", 
+           "-windowSize", "100", "-stride", "50", 
+           "-comparer", "inprocess", "-correlationThreshold", "99", "-justExplore" ]
         resources:
            limits:
-              cpu: "2"
-              memory: "8Gi"
+              cpu: "1"
+              memory: "4Gi"
            requests:
-              cpu: "2"
-              memory: "8Gi"
+              cpu: "1"
+              memory: "4Gi"
         ports:
         - containerPort: 9201
           name: api
         - containerPort: 9203
           name: metrics
+        - containerPort: 9205
+          name: explorer
+        volumeMounts:
+           - name: results-store
+             mountPath: /tmp/corrjoinResults
 

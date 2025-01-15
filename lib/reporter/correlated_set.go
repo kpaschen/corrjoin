@@ -1,14 +1,15 @@
 package reporter
 
 import (
-	"github.com/kpaschen/corrjoin/lib/comparisons"
+	"github.com/kpaschen/corrjoin/lib/datatypes"
 	"github.com/kpaschen/corrjoin/lib/settings"
 	"log"
 	"slices"
+	"time"
 )
 
 type CorrelatedSet struct {
-	pairs   map[comparisons.RowPair]float64
+	pairs   map[datatypes.RowPair]float64
 	members []int // maintained in sort order
 }
 
@@ -34,7 +35,7 @@ func NewSetReporter() *SetReporter {
 	return &SetReporter{correlations: make([]*CorrelatedSet, 0, 10000)}
 }
 
-func (r *SetReporter) Initialize(config settings.CorrjoinSettings, tsids []string) {
+func (r *SetReporter) Initialize(config settings.CorrjoinSettings, s int, start time.Time, _ time.Time, tsids []string) {
 	r.tsids = tsids
 }
 
@@ -54,7 +55,7 @@ func (r *SetReporter) Flush() {
 	r.correlations = make([]*CorrelatedSet, 0, 10000)
 }
 
-func (r *SetReporter) AddCorrelatedPairs(results comparisons.CorrjoinResult) error {
+func (r *SetReporter) AddCorrelatedPairs(results datatypes.CorrjoinResult) error {
 	var err error
 	for pair, pearson := range results.CorrelatedPairs {
 		if err = r.addCorrelatedPair(pair, pearson); err != nil {
@@ -64,7 +65,7 @@ func (r *SetReporter) AddCorrelatedPairs(results comparisons.CorrjoinResult) err
 	return nil
 }
 
-func (r *SetReporter) addCorrelatedPair(pair comparisons.RowPair, corr float64) error {
+func (r *SetReporter) addCorrelatedPair(pair datatypes.RowPair, corr float64) error {
 	ids := pair.RowIds()
 	homeForT1 := -1
 	homeForT2 := -1
@@ -87,7 +88,7 @@ func (r *SetReporter) addCorrelatedPair(pair comparisons.RowPair, corr float64) 
 	// Case 1: new set needs to be created
 	if homeForT1 < 0 && homeForT2 < 0 {
 		newset := &CorrelatedSet{
-			pairs:   map[comparisons.RowPair]float64{pair: corr},
+			pairs:   map[datatypes.RowPair]float64{pair: corr},
 			members: make([]int, 0, 100),
 		}
 		newset.insert(ids[0])
@@ -120,7 +121,7 @@ func (r *SetReporter) addCorrelatedPair(pair comparisons.RowPair, corr float64) 
 		for _, m := range r.correlations[homeForT2].members {
 			r.correlations[homeForT1].insert(m)
 		}
-		r.correlations[homeForT2].pairs = make(map[comparisons.RowPair]float64)
+		r.correlations[homeForT2].pairs = make(map[datatypes.RowPair]float64)
 		r.correlations[homeForT2].members = make([]int, 0, 0)
 		return nil
 	}

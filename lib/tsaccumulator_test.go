@@ -2,6 +2,7 @@ package lib
 
 import (
 	"fmt"
+	"math"
 	"testing"
 	"time"
 )
@@ -59,18 +60,15 @@ func TestAddObservation(t *testing.T) {
 		t.Errorf("expected two buffer rows but got %+v\n", acc.buffers)
 	}
 	b1 := acc.rowmap["ts1"]
-	if len(acc.buffers[b1]) != 6 {
-		t.Errorf("buffer rows should have window size 6 but got %d\n", len(acc.buffers[b1]))
-	}
 
-	if acc.buffers[b1][0] != 0.1 || acc.buffers[b1][1] != 0.2 || acc.buffers[b1][2] != 0.0 {
-		t.Errorf("buffer for ts1 should be 0.1, 0.2, 0.0, ... but got %+v\n", acc.buffers[b1])
+	if acc.buffers[b1][0] != 0.1 || acc.buffers[b1][1] != 0.2 {
+		t.Errorf("buffer for ts1 should be 0.1, 0.2, ... but got %+v\n", acc.buffers[b1])
 	}
 
 	b2 := acc.rowmap["ts2"]
 
-	if acc.buffers[b2][0] != 0.0 || acc.buffers[b2][1] != 0.3 || acc.buffers[b2][2] != 0.0 {
-		t.Errorf("buffer for ts2 should be 0.0, 0.3, 0.0, ... but got %+v\n", acc.buffers[b2])
+	if acc.buffers[b2][0] != 0.0 || acc.buffers[b2][1] != 0.3 {
+		t.Errorf("buffer for ts2 should be 0.0, 0.3, ... but got %+v\n", acc.buffers[b2])
 	}
 }
 
@@ -102,8 +100,59 @@ func TestAddObservation_newStride(t *testing.T) {
 
 	select {
 	case buffers := <-replies:
+		if len(buffers.Buffers) != 2 {
+			t.Errorf("expected two items in reply but got %d", len(buffers.Buffers))
+		}
+		if len(buffers.Buffers[0]) != 2 || len(buffers.Buffers[1]) != 2 {
+			t.Errorf("expected both buffers to have length 2 but got %d and %d", len(buffers.Buffers[0]), len(buffers.Buffers[1]))
+		}
 		fmt.Printf("got buffer reply: %v\n", buffers)
 		fmt.Printf("acc buffers are now %v\n", acc.buffers)
+	default:
+		t.Errorf("failed to get new stride channel message")
+	}
+}
+
+func TestAddObservation_interpolate(t *testing.T) {
+	now := time.Now()
+	replies := make(chan *ObservationResult, 1)
+	defer close(replies)
+	acc := NewTimeseriesAccumulator(6, now, 2, replies)
+	acc.AddObservation(&Observation{
+		MetricName: "ts1",
+		Value:      0.1,
+		Timestamp:  now.Add(time.Second * 2),
+	})
+	acc.AddObservation(&Observation{
+		MetricName: "ts2",
+		Value:      0.4,
+		Timestamp:  now.Add(time.Second * 2),
+	})
+	acc.AddObservation(&Observation{
+		MetricName: "ts1",
+		Value:      0.2,
+		Timestamp:  now.Add(time.Second * 7),
+	})
+	acc.AddObservation(&Observation{
+		MetricName: "ts1",
+		Value:      0.3,
+		Timestamp:  now.Add(time.Second * 20),
+	})
+	select {
+	case buffers := <-replies:
+		fmt.Printf("got buffer reply: %v\n", buffers)
+		if buffers.Buffers[0][1] != 0.1 {
+			t.Errorf("expected first non-zero value to be 0.1 but got %f", buffers.Buffers[0][1])
+		}
+		if buffers.Buffers[0][3] != 0.2 {
+			t.Errorf("expected last non-zero value to be 0.2 but got %f", buffers.Buffers[0][3])
+		}
+		if math.Abs(buffers.Buffers[0][2]-0.15) > 0.0001 {
+			t.Errorf("expected middle value to be 0.15 but got %f", buffers.Buffers[0][2])
+		}
+		if len(buffers.Buffers[0]) != len(buffers.Buffers[1]) {
+			t.Errorf("expected both rows to be the same length")
+		}
 	default:
 		t.Errorf("failed to get new stride channel message")
 	}

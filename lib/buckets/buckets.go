@@ -105,9 +105,6 @@ func (s *BucketingScheme) Initialize() error {
 	}
 
 	utils.ReportMemory(fmt.Sprintf("initialized buckets. There are %d buckets\n", len(s.buckets)))
-	for name, b := range s.buckets {
-		log.Printf("bucket with name %s has %d members\n", name, len(b.members))
-	}
 
 	return nil
 }
@@ -117,13 +114,15 @@ func BucketName(coordinates []int) string {
 }
 
 func (s *BucketingScheme) CorrelationCandidates() error {
+	fmt.Printf("Correlation candidates: looking at %d buckets\n", len(s.buckets))
 	for _, bucket := range s.buckets {
 		err := s.candidatesForBucket(bucket)
 		if err != nil {
 			return err
 		}
 	}
-	return nil
+	// Let the comparer know there will be no further requests for this stride.
+	return s.comparer.StopStride(s.strideCounter)
 }
 
 // candidatesForBucket processes rowPairs for a Bucket and its neighbours.
@@ -146,6 +145,7 @@ func (s *BucketingScheme) candidatesForBucket(bucket *Bucket) error {
 	}
 
 	n := neighbourCoordinates(bucket.coordinates)
+	log.Printf("bucket %s has %d neighbours\n", BucketName(bucket.coordinates), len(n))
 	for _, d := range n {
 		name := BucketName(d)
 		neighbour, exists := s.buckets[name]
@@ -164,6 +164,7 @@ func (s *BucketingScheme) candidatesForBucket(bucket *Bucket) error {
 			}
 		}
 	}
+	log.Printf("done with bucket %s\n", BucketName(bucket.coordinates))
 	return nil
 }
 

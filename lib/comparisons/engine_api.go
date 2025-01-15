@@ -3,32 +3,15 @@
 package comparisons
 
 import (
+	"github.com/kpaschen/corrjoin/lib/datatypes"
 	"github.com/kpaschen/corrjoin/lib/settings"
 )
-
-type RowPair struct {
-	r1 int
-	r2 int
-}
-
-type CorrjoinResult struct {
-	CorrelatedPairs map[RowPair]float64
-	StrideCounter   int
-}
-
-func (r RowPair) RowIds() [2]int {
-	return [2]int{r.r1, r.r2}
-}
-
-func NewRowPair(r1 int, r2 int) *RowPair {
-	return &RowPair{r1: r1, r2: r2}
-}
 
 // An engine can take pairs of timeseries. It compares them and returns the results.
 type Engine interface {
 
 	// Initialize provides the engine with settings and a channel for results.
-	Initialize(config settings.CorrjoinSettings, results chan<- *CorrjoinResult)
+	Initialize(config settings.CorrjoinSettings, results chan<- *datatypes.CorrjoinResult)
 
 	// StartStride tells the engine that subsequent comparisons are for the new stride.
 	StartStride(normalizedMatrix [][]float64, constantRows []bool, strideCounter int) error

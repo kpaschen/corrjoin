@@ -2,11 +2,12 @@ package buckets
 
 import (
 	"github.com/kpaschen/corrjoin/lib/comparisons"
+	"github.com/kpaschen/corrjoin/lib/datatypes"
 	"github.com/kpaschen/corrjoin/lib/settings"
 	"testing"
 )
 
-func setupBucketingScheme() (*BucketingScheme, chan *comparisons.CorrjoinResult) {
+func setupBucketingScheme() (*BucketingScheme, chan *datatypes.CorrjoinResult) {
 	originalMatrix := [][]float64{
 		[]float64{0.1, 0.2, 0.3},
 		[]float64{0.1, 0.2, 0.3},
@@ -25,7 +26,7 @@ func setupBucketingScheme() (*BucketingScheme, chan *comparisons.CorrjoinResult)
 		SvdOutputDimensions:  2,
 	}.ComputeSettingsFields()
 	comparer := &comparisons.InProcessComparer{}
-	results := make(chan *comparisons.CorrjoinResult)
+	results := make(chan *datatypes.CorrjoinResult)
 	comparer.Initialize(settings, results)
 	err := comparer.StartStride(originalMatrix, []bool{}, 0)
 	if err != nil {

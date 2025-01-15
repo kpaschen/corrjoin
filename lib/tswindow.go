@@ -5,6 +5,7 @@ import (
 	"github.com/kpaschen/corrjoin/lib/buckets"
 	"github.com/kpaschen/corrjoin/lib/comparisons"
 	"github.com/kpaschen/corrjoin/lib/correlation"
+	"github.com/kpaschen/corrjoin/lib/datatypes"
 	"github.com/kpaschen/corrjoin/lib/paa"
 	"github.com/kpaschen/corrjoin/lib/settings"
 	"github.com/kpaschen/corrjoin/lib/svd"
@@ -59,6 +60,12 @@ func (w *TimeseriesWindow) shiftBufferIntoWindow(buffer [][]float64) (bool, erro
 			"new buffer has wrong row count (%d, needed %d)", newRowCount, currentRowCount)
 	}
 
+	for i, buf := range buffer {
+		if len(buf) != newColumnCount {
+			return false, fmt.Errorf("before copy: bad column count %d in row %d (expected %d)", len(buf), i, newColumnCount)
+		}
+	}
+
 	// This is a new ts window receiving its first stride.
 	if currentRowCount == 0 {
 		// Stride should really always be < windowsize, but check here to be sure.
@@ -84,11 +91,20 @@ func (w *TimeseriesWindow) shiftBufferIntoWindow(buffer [][]float64) (bool, erro
 		// This would leak memory if w.buffers[i] held anything other than a basic data type.
 		w.buffers[i] = append(buf[sliceLengthToDelete:], buffer[i]...)
 	}
+	expected := len(w.buffers[0])
+	for i, buf := range w.buffers {
+		if len(buf) != expected {
+			return false, fmt.Errorf("before extend: bad column count %d in row %d (expected %d)", len(buf), i, expected)
+		}
+	}
 	currentRowCount = len(w.buffers)
 	if newRowCount > currentRowCount {
 		for i := currentRowCount; i < newRowCount; i++ {
 			row := make([]float64, w.settings.WindowSize-newColumnCount, w.settings.WindowSize)
 			row = append(row, buffer[i]...)
+			if len(row) != expected {
+				return false, fmt.Errorf("during extend: bad column count %d in row %d (expected %d)", len(row), i, expected)
+			}
 			w.buffers = append(w.buffers, row)
 		}
 	}
@@ -97,7 +113,7 @@ func (w *TimeseriesWindow) shiftBufferIntoWindow(buffer [][]float64) (bool, erro
 
 // shift _buffer_ into _w_ from the right, displacing the first buffer.width columns
 // of w.
-func (w *TimeseriesWindow) ShiftBuffer(buffer [][]float64, results chan<- *comparisons.CorrjoinResult) error {
+func (w *TimeseriesWindow) ShiftBuffer(buffer [][]float64, results chan<- *datatypes.CorrjoinResult) error {
 
 	// TODO: make an error type so I can signal whether the window
 	// is busy vs. a different kind of error.
@@ -136,7 +152,6 @@ func (w *TimeseriesWindow) ShiftBuffer(buffer [][]float64, results chan<- *compa
 		return err
 	}
 
-	w.comparer.StopStride(w.StrideCounter)
 	return nil
 }
 
@@ -175,15 +190,20 @@ func (w *TimeseriesWindow) pAA() *TimeseriesWindow {
 	if len(w.postPAA) < len(w.normalized) {
 		w.postPAA = slices.Grow(w.postPAA, len(w.normalized)-len(w.postPAA))
 	}
-	// TODO: skip constantRows during PAA
+	constantCounter := 0
 	for i, b := range w.normalized {
+		// TODO: skip constantRows during PAA?
+		paaResults, constant := paa.PAA(b, w.settings.SvdDimensions)
+		if constant && !w.constantRows[i] {
+			constantCounter++
+		}
 		if i >= len(w.postPAA) {
-			w.postPAA = append(w.postPAA, paa.PAA(b, w.settings.SvdDimensions))
+			w.postPAA = append(w.postPAA, paaResults)
 		} else {
-			w.postPAA[i] = paa.PAA(b, w.settings.SvdDimensions)
+			w.postPAA[i] = paaResults
 		}
 	}
-	log.Printf("done with PAA\n")
+	log.Printf("done with PAA, had %d additional constant rows\n", constantCounter)
 	return w
 }
 
@@ -238,6 +258,7 @@ func (w *TimeseriesWindow) sVD() (*TimeseriesWindow, error) {
 	for i, r := range w.postPAA {
 		fullData = append(fullData, r...)
 		if svdRowCount < w.settings.MaxRowsForSvd && (len(w.constantRows) <= i || !w.constantRows[i]) {
+			// TODO: check if r is constant
 			if i%modulus == 0 {
 				svdData = append(svdData, r...)
 				svdRowCount++

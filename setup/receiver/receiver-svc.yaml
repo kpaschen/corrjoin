@@ -16,3 +16,7 @@ spec:
         port: 9203
         name: metrics
         targetPort: 9203
+      - protocol: TCP
+        port: 9205
+        name: explorer
+        targetPort: 9205

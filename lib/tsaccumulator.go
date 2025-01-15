@@ -23,7 +23,7 @@ type ObservationResult struct {
 // rowid and it accumulates data until it has reached the stride length.
 // When it reaches the stride length, it sends the collected buffers to
 // a channel.
-// TODO: decide what to do if there is a computation ongoing at the time the
+// TODO: return quickly if there is a computation ongoing at the time the
 // stride is reached.
 
 type TimeseriesAccumulator struct {
@@ -43,8 +43,8 @@ type TimeseriesAccumulator struct {
 	// this an array of arrays.
 	buffers              map[int]([]float64)
 	maxRow               int
-	currentStrideStartTs time.Time
-	currentStrideMaxTs   time.Time
+	CurrentStrideStartTs time.Time
+	CurrentStrideMaxTs   time.Time
 	sampleTime           int
 	strideDuration       time.Duration
 
@@ -68,29 +68,29 @@ func NewTimeseriesAccumulator(stride int, startTime time.Time, sampleInterval in
 		buffers:              make(map[int][]float64),
 		maxRow:               0,
 		sampleTime:           sampleInterval,
-		currentStrideStartTs: startTime,
-		currentStrideMaxTs:   maxTime(startTime, strideDuration),
+		CurrentStrideStartTs: startTime,
+		CurrentStrideMaxTs:   maxTime(startTime, strideDuration),
 		strideDuration:       strideDuration,
 		bufferChannel:        bc,
 	}
 }
 
-func (a *TimeseriesAccumulator) computeSlotIndex(timestamp time.Time) (int32, error) {
-	if timestamp.After(a.currentStrideMaxTs) {
-		return int32(-1), nil
+func (a *TimeseriesAccumulator) computeSlotIndex(timestamp time.Time) (int, error) {
+	if timestamp.After(a.CurrentStrideMaxTs) {
+		return -1, nil
 	}
-	if timestamp.Before(a.currentStrideStartTs) {
-		return int32(-2), fmt.Errorf("backfill timestamp, ignore")
+	if timestamp.Before(a.CurrentStrideStartTs) {
+		return -2, fmt.Errorf("backfill timestamp, ignore")
 	}
-	diff := timestamp.Sub(a.currentStrideStartTs).Seconds()
-	return int32(diff / float64(a.sampleTime)), nil
+	diff := timestamp.Sub(a.CurrentStrideStartTs).Seconds()
+	return int(diff / float64(a.sampleTime)), nil
 }
 
 func (a *TimeseriesAccumulator) extractMatrixData() *ObservationResult {
 	ret := make([][]float64, a.maxRow)
 	for i, b := range a.buffers {
 		ret[i] = b // This is a move
-		a.buffers[i] = make([]float64, a.stride, a.stride)
+		a.buffers[i] = make([]float64, 0, a.stride)
 	}
 	return &ObservationResult{
 		Buffers: ret,
@@ -98,16 +98,34 @@ func (a *TimeseriesAccumulator) extractMatrixData() *ObservationResult {
 	}
 }
 
+func (a *TimeseriesAccumulator) completeRows() {
+	for j, b := range a.buffers {
+		if len(b) > cap(b) {
+			log.Printf("row %d has length %d greater than capacity %d\n", j, len(b), cap(b))
+			panic("bug")
+		}
+		if len(b) < cap(b) {
+			interpolatedValue := float64(0)
+			if len(b) > 0 {
+				interpolatedValue = b[len(b)-1]
+			}
+			for i := len(b); i < cap(b); i++ {
+				a.buffers[j] = append(a.buffers[j], interpolatedValue)
+			}
+		}
+	}
+}
+
 func (a *TimeseriesAccumulator) AddObservation(observation *Observation) {
 	colcount := a.stride
 	slot, err := a.computeSlotIndex(observation.Timestamp)
 	if err != nil {
-		a.bufferChannel <- &ObservationResult{Buffers: nil, Err: err}
+		// This is a backfill, it is safe to ignore.
 		return
 	}
 	if slot < 0 {
-		a.currentStrideStartTs = observation.Timestamp
-		a.currentStrideMaxTs = maxTime(observation.Timestamp, a.strideDuration)
+		a.CurrentStrideStartTs = observation.Timestamp
+		a.CurrentStrideMaxTs = maxTime(observation.Timestamp, a.strideDuration)
 		slot, err = a.computeSlotIndex(observation.Timestamp)
 		if err != nil {
 			a.bufferChannel <- &ObservationResult{Buffers: nil, Err: err}
@@ -117,6 +135,8 @@ func (a *TimeseriesAccumulator) AddObservation(observation *Observation) {
 			panic("got negative timestamp after resetting buffers")
 		}
 
+		a.completeRows()
+
 		log.Printf("publish %d rows to channel\n", len(a.buffers))
 		a.bufferChannel <- a.extractMatrixData()
 	}
@@ -125,13 +145,43 @@ func (a *TimeseriesAccumulator) AddObservation(observation *Observation) {
 	if !ok {
 		rowid = a.maxRow
 		a.rowmap[observation.MetricName] = rowid
-		a.buffers[rowid] = make([]float64, colcount, colcount)
+		a.buffers[rowid] = make([]float64, 0, colcount)
 		a.Tsids = append(a.Tsids, observation.MetricName)
+		if a.Tsids[rowid] != observation.MetricName {
+			log.Printf("tsid for %d is %s but should be %s\n", rowid, a.Tsids[rowid], observation.MetricName)
+			panic("code bug")
+		}
 		a.maxRow += 1
 	}
 
 	if math.IsNaN(observation.Value) {
 		observation.Value = float64(0)
 	}
-	a.buffers[rowid][slot] = observation.Value
+
+	if slot < len(a.buffers[rowid]) {
+		// Sometimes there is a double message for the same slot, just ignore it.
+		// Could verify that the values are the same here.
+		return
+	}
+
+	lastSlot := len(a.buffers[rowid]) - 1
+	// If we have skipped a timeslot, fill the gap with an interpolated value.
+	if lastSlot < slot-1 {
+		interpolatedValue := float64(0)
+		if len(a.buffers[rowid]) > 0 {
+			interpolatedValue = (a.buffers[rowid][lastSlot] + observation.Value) / float64(2)
+		}
+		for i := lastSlot + 1; i < slot; i++ {
+			a.buffers[rowid] = append(a.buffers[rowid], interpolatedValue)
+		}
+		if len(a.buffers[rowid]) != slot {
+			log.Printf("wrong length for buffer %d: %d when it should be %d", rowid, len(a.buffers[rowid]), slot)
+			panic("bug!")
+		}
+	}
+	a.buffers[rowid] = append(a.buffers[rowid], observation.Value)
+	if len(a.buffers[rowid]) != slot+1 {
+		log.Printf("wrong length for buffer %d: %d when it should be %d", rowid, len(a.buffers[rowid]), slot+1)
+		panic("bug")
+	}
 }
