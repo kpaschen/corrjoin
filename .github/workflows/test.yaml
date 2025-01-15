@@ -33,7 +33,7 @@ jobs:
           context: .
           push: true
           file: Dockerfile-receiver
-          tags: receiver:${{ date +%s }}
+          tags: receiver:v01
       
       - name: Generate artifact attestation
         uses: actions/attest-build-provenance@v2
