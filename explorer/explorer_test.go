@@ -6,7 +6,7 @@ import (
 
 func TestComputePrometheusGraphURL(t *testing.T) {
 	m := Metric{
-	   Data: make(map[string]interface{}),
+		Data: make(map[string]interface{}),
 	}
 	m.computePrometheusGraphURL("http://localhost:9090", "", "")
 	if m.PrometheusGraphURL != "http://localhost:9090/graph" {
@@ -27,5 +27,3 @@ func TestComputePrometheusGraphURL(t *testing.T) {
 		t.Errorf("expected %s but got %s\n", targetURL, m.PrometheusGraphURL)
 	}
 }
-
-

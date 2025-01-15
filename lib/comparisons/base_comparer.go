@@ -69,8 +69,18 @@ func (b *BaseComparer) Compare(index1 int, index2 int) (float64, error) {
 		return 0.0, nil
 	}
 
-	paaVec1 := paa.PAA(vec1, b.config.EuclidDimensions)
-	paaVec2 := paa.PAA(vec2, b.config.EuclidDimensions)
+	if len(vec1) != len(vec2) {
+		log.Printf("mismatched lengths %d vs. %d for vectors %d, %d", len(vec1), len(vec2), index1, index2)
+		return 0.0, nil
+	}
+
+	paaVec1, constantVec1 := paa.PAA(vec1, b.config.EuclidDimensions)
+	paaVec2, constantVec2 := paa.PAA(vec2, b.config.EuclidDimensions)
+
+	// A constant vector cannot match a non-constant one.
+	if constantVec1 != constantVec2 {
+		return 0.0, nil
+	}
 
 	// This test is redundant for pairs that come from the same bucket.
 	distance, err := correlation.EuclideanDistance(paaVec1, paaVec2)
@@ -83,13 +93,15 @@ func (b *BaseComparer) Compare(index1 int, index2 int) (float64, error) {
 	}
 	// Now apply pearson
 	b.stats.comparisons++
-	pearson, err := correlation.PearsonCorrelation(paaVec1, paaVec2)
+
+	// TODO: the code used to do a pearson correlation of paaVec1 and paaVec2 here,
+	// but surely that will give us false positives?
+	pearson, err := correlation.PearsonCorrelation(vec1, vec2)
 
 	if err != nil {
 		return 0.0, err
 	}
-	// TODO: debug
-	log.Printf("pearson correlation of %+v and %+v is %f\n", paaVec1, paaVec2, pearson)
+	// log.Printf("pearson correlation of %+v and %+v is %f\n", paaVec1, paaVec2, pearson)
 
 	if pearson >= b.config.CorrelationThreshold {
 		b.stats.correlated++

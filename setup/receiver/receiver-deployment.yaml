@@ -27,9 +27,9 @@ spec:
         image: localhost:5001/receiver:v0.1
         imagePullPolicy: Always
         command: ["/webroot/app"]
-        args: ["-windowSize", "100", "-stride", "50", "-svdDimensions", "7",
-               "-comparer", "inprocess",
-              ]
+        args: ["-svdDimensions", "7", 
+           "-windowSize", "100", "-stride", "50", 
+           "-comparer", "inprocess", "-correlationThreshold", "99", "-justExplore" ]
         resources:
            limits:
               cpu: "1"

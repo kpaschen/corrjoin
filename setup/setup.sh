@@ -80,17 +80,13 @@ if [ -z $ns_exists ]; then
 fi
 helm upgrade --install prometheus prometheus-community/kube-prometheus-stack -f prometheus-values.yaml
 
+kubectl apply -f ingress-deploy.yaml
 kubectl apply -f receiver/receiver-deployment.yaml
 kubectl apply -f receiver/receiver-results-pv.yaml
 kubectl apply -f receiver/receiver-svc.yaml
 kubectl apply -f receiver/receiver-service-monitor.yaml
 
-kubectl label namespaces default shared-gateway-access=true
-kubectl label namespaces monitoring shared-gateway-access=true
+kubectl -n ingress-nginx wait --for=condition=available deploy/ingress-nginx-controller --timeout=240s
+kubectl apply -f receiver/ingress.yaml
 
-# Set up nginx gateway
-kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.1.0/standard-install.yaml
-helm upgrade --install ngf oci://ghcr.io/nginxinc/charts/nginx-gateway-fabric --create-namespace -n nginx-gateway
-
-kubectl apply -f receiver/gateway.yaml
 

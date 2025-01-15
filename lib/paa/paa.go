@@ -71,15 +71,17 @@ func NormalizeSlice(slice []float64) bool {
 
 // Reduce slice to targetColumnCount columns by dividing it into
 // equi-length segments and using mean values.
-func PAA(slice []float64, targetColumnCount int) []float64 {
+func PAA(slice []float64, targetColumnCount int) ([]float64, bool) {
 	windowSize := len(slice) / targetColumnCount
 	if windowSize < 1 {
 		log.Printf("window size is too small. Slice length %d divided by targetColumnCount %d is %d\n", len(slice), targetColumnCount, windowSize)
+		return nil, true
 	}
 	ret := make([]float64, targetColumnCount, targetColumnCount)
 
 	for i := 0; i < targetColumnCount; i++ {
 		ret[i] = mean(slice[(i * windowSize):((i + 1) * windowSize)])
 	}
-	return ret
+	constant := isSliceConstant(ret, 0.0001)
+	return ret, constant
 }

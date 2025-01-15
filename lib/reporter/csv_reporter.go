@@ -15,14 +15,14 @@ type CsvReporter struct {
 	filenameBase     string
 	tsids            []string
 	strideStartTimes map[int]string
-	strideEndTimes map[int]string
+	strideEndTimes   map[int]string
 }
 
 func NewCsvReporter(filenameBase string) *CsvReporter {
 	return &CsvReporter{
 		filenameBase:     filenameBase,
 		strideStartTimes: make(map[int]string),
-		strideEndTimes: make(map[int]string),
+		strideEndTimes:   make(map[int]string),
 	}
 }
 
@@ -31,8 +31,9 @@ func (c *CsvReporter) Initialize(config settings.CorrjoinSettings, strideCounter
 	c.tsids = tsids
 	c.strideStartTimes[strideCounter] = strideStart.UTC().Format("20060102150405")
 	c.strideEndTimes[strideCounter] = strideEnd.UTC().Format("20060102150405")
-	log.Printf("initializing with strideCounter %d, start time %s, end time %s\n", strideCounter,
-		c.strideStartTimes[strideCounter], c.strideEndTimes[strideCounter])
+	log.Printf("initializing with strideCounter %d, start time %s (%s), end time %s (%s)\n",
+		strideCounter, c.strideStartTimes[strideCounter], strideStart.UTC().String(),
+		c.strideEndTimes[strideCounter], strideEnd.UTC().String())
 	idsfile := filepath.Join(c.filenameBase, fmt.Sprintf("tsids_%d_%s.csv", strideCounter,
 		c.strideStartTimes[strideCounter]))
 	file, err := os.OpenFile(idsfile, os.O_WRONLY|os.O_CREATE, 0640)

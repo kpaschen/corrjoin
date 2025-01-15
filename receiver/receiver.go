@@ -171,9 +171,6 @@ func NewTsProcessor(corrjoinConfig settings.CorrjoinSettings, strideLength int,
 						processor.accumulator.Tsids)
 					// TODO: this has to return quickly.
 
-					// TODO: debug
-					log.Printf("processing buffers %+v\n", observationResult.Buffers)
-					log.Printf("ts ids are %+v\n", processor.accumulator.Tsids)
 					err := processor.window.ShiftBuffer(observationResult.Buffers, resultsChannel)
 					// TODO: check for error type.
 					// If window is busy, hold the observationResult

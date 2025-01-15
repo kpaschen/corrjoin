@@ -36,6 +36,7 @@ func main() {
 	var compareEngine string
 	var resultsDirectory string
 	var webRoot string
+	var justExplore bool
 
 	flag.StringVar(&metricsAddr, "metrics-address", ":9203", "The address the metrics endpoint binds to.")
 	flag.StringVar(&prometheusAddr, "listen-address", ":9201", "The address that the storage endpoint binds to.")
@@ -52,6 +53,7 @@ func main() {
 	flag.StringVar(&compareEngine, "comparer", "inprocess", "The comparison engine.")
 	flag.StringVar(&resultsDirectory, "resultsDirectory", "/tmp/corrjoinResults", "The directory to write results to.")
 	flag.StringVar(&webRoot, "webRoot", "/webroot", "Web server root")
+	flag.BoolVar(&justExplore, "justExplore", false, "If true, launch only the explorer endpoint")
 
 	flag.Parse()
 
@@ -73,19 +75,12 @@ func main() {
 
 	expl := &explorer.CorrelationExplorer{
 		FilenameBase: resultsDirectory,
-		WebRoot: webRoot,
+		WebRoot:      webRoot,
 	}
 	err := expl.Initialize()
 	if err != nil {
 		log.Printf("failed to initialize explorer: %v\n", err)
 	}
-
-	correlationReporter := reporter.NewCsvReporter(resultsDirectory)
-
-	processor := receiver.NewTsProcessor(corrjoinConfig, stride, correlationReporter)
-
-	prometheusRouter := mux.NewRouter().StrictSlash(true)
-	prometheusRouter.HandleFunc("/api/v1/write", processor.ReceivePrometheusData)
 
 	explorerRouter := mux.NewRouter().StrictSlash(true)
 	explorerRouter.HandleFunc("/explore", expl.ExploreCorrelations).Methods("GET")
@@ -95,26 +90,34 @@ func main() {
 	http.Handle("/metrics", promhttp.Handler())
 	go http.ListenAndServe(cfg.metricsAddress, nil)
 
-	prometheusServer := &http.Server{
-		Addr:    cfg.prometheusAddress,
-		Handler: prometheusRouter,
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, os.Interrupt)
+
+	var prometheusServer *http.Server
+
+	if !justExplore {
+		correlationReporter := reporter.NewCsvReporter(resultsDirectory)
+		processor := receiver.NewTsProcessor(corrjoinConfig, stride, correlationReporter)
+		prometheusRouter := mux.NewRouter().StrictSlash(true)
+		prometheusRouter.HandleFunc("/api/v1/write", processor.ReceivePrometheusData)
+		prometheusServer = &http.Server{
+			Addr:    cfg.prometheusAddress,
+			Handler: prometheusRouter,
+		}
+		go func() {
+			log.Printf("correlation service listening on port %s\n", cfg.prometheusAddress)
+			if err := prometheusServer.ListenAndServe(); err != nil {
+				if err != http.ErrServerClosed {
+					log.Fatal(err)
+				}
+			}
+		}()
 	}
+
 	explorerServer := &http.Server{
 		Addr:    cfg.explorerAddress,
 		Handler: explorerRouter,
 	}
-
-	stop := make(chan os.Signal, 1)
-	signal.Notify(stop, os.Interrupt)
-
-	go func() {
-		log.Printf("correlation service listening on port %s\n", cfg.prometheusAddress)
-		if err := prometheusServer.ListenAndServe(); err != nil {
-			if err != http.ErrServerClosed {
-				log.Fatal(err)
-			}
-		}
-	}()
 
 	go func() {
 		log.Printf("explorer service listening on port %s\n", cfg.explorerAddress)
@@ -131,8 +134,10 @@ func main() {
 	defer cancel()
 
 	// This is where the correlation service gets a chance to dump results to disk.
-	if err := prometheusServer.Shutdown(ctx); err != nil {
-		log.Fatal(err)
+	if !justExplore && prometheusServer != nil {
+		if err := prometheusServer.Shutdown(ctx); err != nil {
+			log.Fatal(err)
+		}
 	}
 	// This is best effort, there is nothing really to do.
 	if err := explorerServer.Shutdown(ctx); err != nil {

@@ -39,7 +39,10 @@ func TestNormalizeSlice(t *testing.T) {
 
 func TestPAA(t *testing.T) {
 	vec := []float64{0.1, 0.2, 0.3, 0.4, 0.5, 0.6}
-	smaller := PAA(vec, 3)
+	smaller, constant := PAA(vec, 3)
+	if constant {
+		t.Errorf("did not expect vector to be constant post PAA")
+	}
 	if len(smaller) != 3 {
 		t.Errorf("expected reduced vector to have length 3 but it has %d", len(smaller))
 	}

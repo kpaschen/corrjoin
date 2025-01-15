@@ -84,7 +84,6 @@ func (s *BucketingScheme) Initialize() error {
 	// but it is usually 3 - 7.
 	for i := 0; i < rowCount; i++ {
 		if len(s.constantRows) > 0 && s.constantRows[i] {
-			log.Printf("skipping ts %d because it is constant\n", i)
 			continue
 		}
 		vec := s.svdOutputMatrix[i]
@@ -106,9 +105,6 @@ func (s *BucketingScheme) Initialize() error {
 	}
 
 	utils.ReportMemory(fmt.Sprintf("initialized buckets. There are %d buckets\n", len(s.buckets)))
-	for name, b := range s.buckets {
-		log.Printf("bucket with name %s has %d members\n", name, len(b.members))
-	}
 
 	return nil
 }

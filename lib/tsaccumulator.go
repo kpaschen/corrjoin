@@ -75,22 +75,22 @@ func NewTimeseriesAccumulator(stride int, startTime time.Time, sampleInterval in
 	}
 }
 
-func (a *TimeseriesAccumulator) computeSlotIndex(timestamp time.Time) (int32, error) {
+func (a *TimeseriesAccumulator) computeSlotIndex(timestamp time.Time) (int, error) {
 	if timestamp.After(a.CurrentStrideMaxTs) {
-		return int32(-1), nil
+		return -1, nil
 	}
 	if timestamp.Before(a.CurrentStrideStartTs) {
-		return int32(-2), fmt.Errorf("backfill timestamp, ignore")
+		return -2, fmt.Errorf("backfill timestamp, ignore")
 	}
 	diff := timestamp.Sub(a.CurrentStrideStartTs).Seconds()
-	return int32(diff / float64(a.sampleTime)), nil
+	return int(diff / float64(a.sampleTime)), nil
 }
 
 func (a *TimeseriesAccumulator) extractMatrixData() *ObservationResult {
 	ret := make([][]float64, a.maxRow)
 	for i, b := range a.buffers {
 		ret[i] = b // This is a move
-		a.buffers[i] = make([]float64, a.stride, a.stride)
+		a.buffers[i] = make([]float64, 0, a.stride)
 	}
 	return &ObservationResult{
 		Buffers: ret,
@@ -98,11 +98,29 @@ func (a *TimeseriesAccumulator) extractMatrixData() *ObservationResult {
 	}
 }
 
+func (a *TimeseriesAccumulator) completeRows() {
+	for j, b := range a.buffers {
+		if len(b) > cap(b) {
+			log.Printf("row %d has length %d greater than capacity %d\n", j, len(b), cap(b))
+			panic("bug")
+		}
+		if len(b) < cap(b) {
+			interpolatedValue := float64(0)
+			if len(b) > 0 {
+				interpolatedValue = b[len(b)-1]
+			}
+			for i := len(b); i < cap(b); i++ {
+				a.buffers[j] = append(a.buffers[j], interpolatedValue)
+			}
+		}
+	}
+}
+
 func (a *TimeseriesAccumulator) AddObservation(observation *Observation) {
 	colcount := a.stride
 	slot, err := a.computeSlotIndex(observation.Timestamp)
 	if err != nil {
-		// a.bufferChannel <- &ObservationResult{Buffers: nil, Err: err}
+		// This is a backfill, it is safe to ignore.
 		return
 	}
 	if slot < 0 {
@@ -117,6 +135,8 @@ func (a *TimeseriesAccumulator) AddObservation(observation *Observation) {
 			panic("got negative timestamp after resetting buffers")
 		}
 
+		a.completeRows()
+
 		log.Printf("publish %d rows to channel\n", len(a.buffers))
 		a.bufferChannel <- a.extractMatrixData()
 	}
@@ -124,14 +144,10 @@ func (a *TimeseriesAccumulator) AddObservation(observation *Observation) {
 	rowid, ok := a.rowmap[observation.MetricName]
 	if !ok {
 		rowid = a.maxRow
-		// TODO: debugging
-		if rowid > 100 {
-			return
-		}
 		a.rowmap[observation.MetricName] = rowid
-		a.buffers[rowid] = make([]float64, colcount, colcount)
+		a.buffers[rowid] = make([]float64, 0, colcount)
 		a.Tsids = append(a.Tsids, observation.MetricName)
-               	if a.Tsids[rowid] != observation.MetricName {
+		if a.Tsids[rowid] != observation.MetricName {
 			log.Printf("tsid for %d is %s but should be %s\n", rowid, a.Tsids[rowid], observation.MetricName)
 			panic("code bug")
 		}
@@ -141,5 +157,31 @@ func (a *TimeseriesAccumulator) AddObservation(observation *Observation) {
 	if math.IsNaN(observation.Value) {
 		observation.Value = float64(0)
 	}
-	a.buffers[rowid][slot] = observation.Value
+
+	if slot < len(a.buffers[rowid]) {
+		// Sometimes there is a double message for the same slot, just ignore it.
+		// Could verify that the values are the same here.
+		return
+	}
+
+	lastSlot := len(a.buffers[rowid]) - 1
+	// If we have skipped a timeslot, fill the gap with an interpolated value.
+	if lastSlot < slot-1 {
+		interpolatedValue := float64(0)
+		if len(a.buffers[rowid]) > 0 {
+			interpolatedValue = (a.buffers[rowid][lastSlot] + observation.Value) / float64(2)
+		}
+		for i := lastSlot + 1; i < slot; i++ {
+			a.buffers[rowid] = append(a.buffers[rowid], interpolatedValue)
+		}
+		if len(a.buffers[rowid]) != slot {
+			log.Printf("wrong length for buffer %d: %d when it should be %d", rowid, len(a.buffers[rowid]), slot)
+			panic("bug!")
+		}
+	}
+	a.buffers[rowid] = append(a.buffers[rowid], observation.Value)
+	if len(a.buffers[rowid]) != slot+1 {
+		log.Printf("wrong length for buffer %d: %d when it should be %d", rowid, len(a.buffers[rowid]), slot+1)
+		panic("bug")
+	}
 }

@@ -17,37 +17,39 @@ import (
 )
 
 type CorrelationExplorer struct {
-	clusterTemplate *template.Template
+	clusterTemplate     *template.Template
 	strideListTemplate  *template.Template
 	correlationTemplate *template.Template
 	FilenameBase        string
-	WebRoot string
-        cache strideCache
-	prometheusBaseURL string
+	WebRoot             string
+	cache               strideCache
+	prometheusBaseURL   string
 
-        // This should be the length of a stride expressed as a duration that
+	// This should be the length of a stride expressed as a duration that
 	// Prometheus can understand. e.g. "10m" or "1h".
 	TimeRange string // e.g. "10m"
 }
 
 type strideCache struct {
-   strides map[string]Stride
+	strides map[string]Stride
 }
 
 func (m *Metric) computePrometheusGraphURL(prometheusBaseURL string, timeRange string, endTime string) {
-	if len(m.Data) == 0 { 
+	if len(m.Data) == 0 {
 		m.PrometheusGraphURL = fmt.Sprintf("%s/graph", prometheusBaseURL)
 		return
 	}
-        attributeString := "{"
+	attributeString := "{"
 	first := true
-        for key, value := range m.Data {
+	for key, value := range m.Data {
 		stringv, ok := value.(string)
 		if !ok {
 			log.Printf("value %q was not a string\n", value)
 			continue
 		}
-		if key == "__name__" { continue }
+		if key == "__name__" {
+			continue
+		}
 		if first {
 			attributeString = fmt.Sprintf("%s%s=\"%s\"", attributeString, key, string(stringv))
 			first = false
@@ -59,7 +61,7 @@ func (m *Metric) computePrometheusGraphURL(prometheusBaseURL string, timeRange s
 	attributeString = url.QueryEscape(attributeString)
 
 	m.PrometheusGraphURL = fmt.Sprintf("%s/graph?g0.expr=%s%s&g0.tab=0&g0.display_mode=lines&g0.show_exemplars=0&g0.range_input=%s&g0.end_input=%s&g0.moment_input=%s",
-		 prometheusBaseURL, m.Data["__name__"], attributeString, timeRange, url.QueryEscape(endTime),
+		prometheusBaseURL, m.Data["__name__"], attributeString, timeRange, url.QueryEscape(endTime),
 		url.QueryEscape(endTime))
 }
 
@@ -82,56 +84,56 @@ func (c *CorrelationExplorer) Initialize() error {
 		return err
 	}
 	c.correlationTemplate = t
-        c.cache = strideCache{
+	c.cache = strideCache{
 		strides: make(map[string]Stride),
-  	}
+	}
 	c.prometheusBaseURL = "http://localhost:9090"
 	return nil
 }
 
 func (c *ClusterAssignments) addPair(row1 int64, row2 int64) {
-        c1, have1 := c.Rows[row1]
-        c2, have2 := c.Rows[row2]
+	c1, have1 := c.Rows[row1]
+	c2, have2 := c.Rows[row2]
 
-        // Case 1: neither row has a cluster yet -> add them both to a new cluster.
-        if !have1 && !have2 {
-                c.Rows[row1] = c.nextClusterId
-                c.Rows[row2] = c.nextClusterId
-                c.nextClusterId++
-                return
-        }
+	// Case 1: neither row has a cluster yet -> add them both to a new cluster.
+	if !have1 && !have2 {
+		c.Rows[row1] = c.nextClusterId
+		c.Rows[row2] = c.nextClusterId
+		c.nextClusterId++
+		return
+	}
 
-        // Case 2: only one row has a cluster id
-        if !have2 {
-                c.Rows[row2] = c1
-                return
-        }
+	// Case 2: only one row has a cluster id
+	if !have2 {
+		c.Rows[row2] = c1
+		return
+	}
 
-        if !have1 {
-                c.Rows[row1] = c2
-                return
-        }
+	if !have1 {
+		c.Rows[row1] = c2
+		return
+	}
 
-        // Case 2: both rows have a cluster id. Nothing to do if they match,
-        // otherwise merge.
-        if c1 == c2 {
-                return
-        }
+	// Case 2: both rows have a cluster id. Nothing to do if they match,
+	// otherwise merge.
+	if c1 == c2 {
+		return
+	}
 
-        // Always merge into the lower-numbered cluster.
-        if c1 < c2 {
-                for row, cluster := range c.Rows {
-                        if cluster == c2 {
-                                c.Rows[row] = c1
-                        }
-                }
-        } else {
-                for row, cluster := range c.Rows {
-                        if cluster == c1 {
-                                c.Rows[row] = c2
-                        }
-                }
-        }
+	// Always merge into the lower-numbered cluster.
+	if c1 < c2 {
+		for row, cluster := range c.Rows {
+			if cluster == c2 {
+				c.Rows[row] = c1
+			}
+		}
+	} else {
+		for row, cluster := range c.Rows {
+			if cluster == c1 {
+				c.Rows[row] = c2
+			}
+		}
+	}
 }
 
 func (c *CorrelationExplorer) readTsNames(reader *csv.Reader, tsids []int64, stride Stride) (map[int64]Metric, error) {
@@ -143,8 +145,12 @@ func (c *CorrelationExplorer) readTsNames(reader *csv.Reader, tsids []int64, str
 	strideEnd := time.Unix(stride.EndTime, 0).Format("2006-01-02 15:04:05")
 	for {
 		record, err := reader.Read()
-		if err == io.EOF { break }
-		if err != nil { return ret, err }
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return ret, err
+		}
 		if len(record) != 2 {
 			log.Printf("unexpected ts name record: %v\n", record)
 			continue
@@ -155,7 +161,9 @@ func (c *CorrelationExplorer) readTsNames(reader *csv.Reader, tsids []int64, str
 			continue
 		}
 		m, requested := ret[tsid]
-		if !requested { continue }
+		if !requested {
+			continue
+		}
 		if !m.empty {
 			log.Printf("metric id %d was requested twice\n", tsid)
 			continue
@@ -176,7 +184,7 @@ func (c *CorrelationExplorer) retrieveCorrelations(reader *csv.Reader, tsid int6
 	// Disable record length testing.
 	reader.FieldsPerRecord = -1
 	ret := Correlations{
-		Row: tsid,
+		Row:        tsid,
 		Correlated: make(map[int64]float64),
 		Timeseries: make(map[int64]Metric),
 	}
@@ -224,9 +232,9 @@ func (c *CorrelationExplorer) retrieveCorrelations(reader *csv.Reader, tsid int6
 
 func (c *CorrelationExplorer) evaluateStride(reader *csv.Reader) (ClusterAssignments, error) {
 	clusters := ClusterAssignments{
-		Rows: make(map[int64]int),
-		Sizes: make(map[int]int),
-		nextClusterId: 0,	
+		Rows:          make(map[int64]int),
+		Sizes:         make(map[int]int),
+		nextClusterId: 0,
 	}
 	for {
 		record, err := reader.Read()
@@ -294,13 +302,13 @@ func (c *CorrelationExplorer) findReadyStrides() error {
 			continue
 		}
 		c.cache.strides[filename] = Stride{
-			ID: strideCounter,
-			StartTime: startT.UTC().Unix(),
+			ID:              strideCounter,
+			StartTime:       startT.UTC().Unix(),
 			StartTimeString: startT.UTC().Format("2006-01-02 15:04:05"),
-			EndTime: endT.UTC().Unix(),
-			EndTimeString: endT.UTC().Format("2006-01-02 15:04:05"),
-			Status: "Processing",
-			Filename: filename,
+			EndTime:         endT.UTC().Unix(),
+			EndTimeString:   endT.UTC().Format("2006-01-02 15:04:05"),
+			Status:          "Processing",
+			Filename:        filename,
 		}
 		idsFilename := fmt.Sprintf("tsids_%d_%d.csv", strideCounter, startTime)
 		idsFile, err := os.Open(filepath.Join(c.FilenameBase, idsFilename))
@@ -328,13 +336,13 @@ func (c *CorrelationExplorer) findReadyStrides() error {
 			if err != nil {
 				log.Printf("failed to evaluate file %s: %v\n", filename, err)
 				stride := c.cache.strides[filename]
-				stride.Status = "Error"	
+				stride.Status = "Error"
 				c.cache.strides[filename] = stride
 			}
 			log.Printf("got %d clusters from file %s\n", len(clusters.Sizes), filename)
 			stride := c.cache.strides[filename]
 			stride.Clusters = clusters
-			stride.Status = "Ready"	
+			stride.Status = "Ready"
 			c.cache.strides[filename] = stride
 		}()
 	}
@@ -346,8 +354,8 @@ func (c *CorrelationExplorer) ExploreTimeseries(w http.ResponseWriter, r *http.R
 	var rowID int64
 	n, err := fmt.Sscanf(params["id"][0], "%d", &rowID)
 	if n != 1 || err != nil {
-		http.Error(w, fmt.Sprintf("failed to parse row id out of %s\n",params["id"][0]), http.StatusBadRequest)
-		return	
+		http.Error(w, fmt.Sprintf("failed to parse row id out of %s\n", params["id"][0]), http.StatusBadRequest)
+		return
 	}
 	strideKey := params["stride"][0]
 	stride, have := c.cache.strides[strideKey]
@@ -364,7 +372,7 @@ func (c *CorrelationExplorer) ExploreTimeseries(w http.ResponseWriter, r *http.R
 	corr, err := c.retrieveCorrelations(csv.NewReader(file), rowID)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Failed to get correlation information for row %d\n", rowID), http.StatusBadRequest)
-		return	
+		return
 	}
 
 	file, err = os.Open(filepath.Join(c.FilenameBase, stride.idsFile))
@@ -373,13 +381,15 @@ func (c *CorrelationExplorer) ExploreTimeseries(w http.ResponseWriter, r *http.R
 		return
 	}
 	defer file.Close()
-	rowIds := make([]int64, 0, len(corr.Correlated) + 1)
+	rowIds := make([]int64, 0, len(corr.Correlated)+1)
 	rowIds = append(rowIds, rowID)
 	for row, _ := range corr.Correlated {
-		{ rowIds = append(rowIds, row) }
+		{
+			rowIds = append(rowIds, row)
+		}
 	}
 	corr.Timeseries, _ = c.readTsNames(csv.NewReader(file), rowIds, stride)
-	log.Printf("correlations for row %d: %+v\n",rowID, corr)
+	log.Printf("correlations for row %d: %+v\n", rowID, corr)
 	// w.WriteHeader(http.StatusOK)
 	if err := c.correlationTemplate.ExecuteTemplate(w, "correlations", corr); err != nil {
 		http.Error(w, fmt.Sprintf("Failed to apply template: %v\n", err), http.StatusBadRequest)
@@ -392,8 +402,8 @@ func (c *CorrelationExplorer) ExploreCluster(w http.ResponseWriter, r *http.Requ
 	var clusterID int
 	n, err := fmt.Sscanf(params["id"][0], "%d", &clusterID)
 	if n != 1 || err != nil {
-		http.Error(w, fmt.Sprintf("failed to parse cluster id out of %s\n",params["id"][0]), http.StatusBadRequest)
-		return	
+		http.Error(w, fmt.Sprintf("failed to parse cluster id out of %s\n", params["id"][0]), http.StatusBadRequest)
+		return
 	}
 	strideKey := params["stride"][0]
 	stride, have := c.cache.strides[strideKey]
@@ -419,7 +429,9 @@ func (c *CorrelationExplorer) ExploreCluster(w http.ResponseWriter, r *http.Requ
 	defer file.Close()
 	rowIds := make([]int64, 0, rowCount)
 	for row, cluster := range stride.Clusters.Rows {
-		if cluster == clusterID { rowIds = append(rowIds, row) }
+		if cluster == clusterID {
+			rowIds = append(rowIds, row)
+		}
 	}
 	tsMetricMap, err := c.readTsNames(csv.NewReader(file), rowIds, stride)
 	rows := make([]Row, 0, rowCount)
@@ -430,9 +442,9 @@ func (c *CorrelationExplorer) ExploreCluster(w http.ResponseWriter, r *http.Requ
 			continue
 		}
 		rows = append(rows, Row{
-			TimeseriesID: row,
+			TimeseriesID:   row,
 			TimeseriesName: name,
-			Filename: strideKey,
+			Filename:       strideKey,
 		})
 	}
 	if err := c.clusterTemplate.ExecuteTemplate(w, "rows", rows); err != nil {

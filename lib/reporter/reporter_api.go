@@ -8,7 +8,7 @@ import (
 
 type Reporter interface {
 	Initialize(config settings.CorrjoinSettings, strideCounter int,
-		 startTime time.Time, endTime time.Time, tsids []string)
+		startTime time.Time, endTime time.Time, tsids []string)
 
 	AddCorrelatedPairs(datatypes.CorrjoinResult) error
 
