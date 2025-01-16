@@ -38,7 +38,7 @@ jobs:
           context: .
           push: true
           file: Dockerfile-receiver
-          tags: ${{ steps.meta.outpus.tags }}
+          tags: ${{ steps.meta.output.tags }}
           labels: ${{ steps.meta.output.labels }}
       
       - name: Generate artifact attestation
