@@ -1,9 +1,0 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library")
-
-go_library(
-    name = "svd",
-    srcs = ["truncatedsvd.go"],
-    importpath = "github.com/kpaschen/corrjoin/lib/svd",
-    visibility = ["//visibility:public"],
-    deps = ["@org_gonum_v1_gonum//mat"],
-)
