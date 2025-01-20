@@ -80,13 +80,9 @@ if [ -z $ns_exists ]; then
 fi
 helm upgrade --install prometheus prometheus-community/kube-prometheus-stack -f prometheus-values.yaml
 
-kubectl apply -f ingress-deploy.yaml
 kubectl apply -f receiver/receiver-deployment.yaml
 kubectl apply -f receiver/receiver-results-pv.yaml
 kubectl apply -f receiver/receiver-svc.yaml
 kubectl apply -f receiver/receiver-service-monitor.yaml
-
-kubectl -n ingress-nginx wait --for=condition=available deploy/ingress-nginx-controller --timeout=240s
-kubectl apply -f receiver/ingress.yaml
 
 

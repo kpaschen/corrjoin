@@ -106,8 +106,8 @@ ingress_nginx_enabled: true
 ingress_nginx_service_type: NodePort
 ingress_nginx_service_annotations:
    example.io/loadbalancerIPs: 195.15.254.89
-# ingress_nginx_service_nodeport_http: 30080
-# ingress_nginx_service_nodeport_https: 30081
+ingress_nginx_service_nodeport_http: 30080
+ingress_nginx_service_nodeport_https: 30081
 ingress_publish_status_address: ""
 # ingress_nginx_nodeselector:
 #   kubernetes.io/os: "linux"
