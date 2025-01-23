@@ -952,6 +952,9 @@ grafana:
   enabled: true
   namespaceOverride: ""
 
+  plugins:
+  - yesoreyeram-infinity-datasource
+
   ## ForceDeployDatasources Create datasource configmap even if grafana deployment has been disabled
   ##
   forceDeployDatasources: false
@@ -983,7 +986,7 @@ grafana:
   ingress:
     ## If true, Grafana Ingress will be created
     ##
-    enabled: true
+    enabled: false
 
     ## IngressClassName for Grafana Ingress.
     ## Should be provided if Ingress is enable.
@@ -1127,11 +1130,14 @@ grafana:
   #   version: 1
 
   ## Passed to grafana subchart and used by servicemonitor below
+  ## The grafana subchart lives here: https://github.com/grafana/helm-charts/blob/main/charts/grafana/values.yaml
   ##
   service:
     portName: http-web
     ipFamilies: []
     ipFamilyPolicy: ""
+    type: NodePort
+    nodePort: 30030
 
   serviceMonitor:
     # If true, a ServiceMonitor CRD is created for a prometheus operator
@@ -3096,7 +3102,8 @@ prometheus:
 
     ## Service type
     ##
-    type: ClusterIP
+    # type: ClusterIP
+    type: NodePort
 
     ## Additional ports to open for Prometheus service
     ##
