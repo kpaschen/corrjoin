@@ -138,7 +138,7 @@ func main() {
 			// This triggers computation once the window is full.
 			// You can capture and print the results here but it'll make the system appear slow, so I don't
 			// do it by default.
-			err = window.ShiftBuffer(data, results)
+			err = window.ShiftBuffer(data)
 			if err != nil {
 				log.Printf("caught error: %v\n", err)
 				break

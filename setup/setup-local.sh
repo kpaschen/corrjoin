@@ -81,7 +81,7 @@ fi
 helm upgrade --install prometheus prometheus-community/kube-prometheus-stack -f prometheus-values.yaml
 
 kubectl apply -f receiver/receiver-deployment.yaml
-kubectl apply -f receiver/receiver-results-pv.yaml
+kubectl apply -f receiver/receiver-results-pv-localstorage.yaml
 kubectl apply -f receiver/receiver-svc.yaml
 kubectl apply -f receiver/receiver-service-monitor.yaml
 

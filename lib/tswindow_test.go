@@ -32,7 +32,7 @@ func TestNormalizeWindow(t *testing.T) {
 		[]float64{2.1, 2.2, 2.3},
 	}
 
-	err := tswindow.ShiftBuffer(bufferWindow, results)
+	err := tswindow.ShiftBuffer(bufferWindow)
 	if err != nil {
 		t.Errorf("unexpected: %v", err)
 	}
@@ -88,7 +88,7 @@ func TestShiftBuffer(t *testing.T) {
 		[]float64{2.1, 2.2, 2.3},
 	}
 
-	err := tswindow.ShiftBuffer(bufferWindow, results)
+	err := tswindow.ShiftBuffer(bufferWindow)
 
 	if err != nil {
 		t.Errorf("unexpected error %v shifting buffer into time series window", err)
@@ -101,7 +101,7 @@ func TestShiftBuffer(t *testing.T) {
 	wrongSizeBuffer := [][]float64{
 		[]float64{0.4, 0.5},
 	}
-	err = tswindow.ShiftBuffer(wrongSizeBuffer, results)
+	err = tswindow.ShiftBuffer(wrongSizeBuffer)
 	if err == nil {
 		t.Errorf("expected error for mismatched buffer shift")
 	}
@@ -111,7 +111,7 @@ func TestShiftBuffer(t *testing.T) {
 		[]float64{1.4},
 		[]float64{2.4},
 	}
-	err = tswindow.ShiftBuffer(strideBuffer, results)
+	err = tswindow.ShiftBuffer(strideBuffer)
 	if err != nil {
 		t.Errorf("unexpected error %v shifting buffer into ts window", err)
 	}
@@ -143,7 +143,7 @@ func TestPAA(t *testing.T) {
 		[]float64{2.1, 2.2, 2.3, 2.4},
 	}
 
-	// tswindow.ShiftBuffer(bufferWindow, results)
+	// tswindow.ShiftBuffer(bufferWindow)
 
 	tswindow.buffers = bufferWindow
 	// Cheat a little just to make the values easier to check.
@@ -187,7 +187,7 @@ func TestSVD(t *testing.T) {
 		[]float64{2.0, 3.0, -2.0},
 	}
 
-	tswindow.ShiftBuffer(bufferWindow, results)
+	tswindow.ShiftBuffer(bufferWindow)
 	tswindow.postPAA = bufferWindow
 
 	svd, err := tswindow.sVD()

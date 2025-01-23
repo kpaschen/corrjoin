@@ -29,7 +29,8 @@ spec:
         command: ["/webroot/app"]
         args: ["-svdDimensions", "7", 
            "-windowSize", "100", "-stride", "50", 
-           "-comparer", "inprocess", "-correlationThreshold", "99", "-justExplore" ]
+           #"-comparer", "inprocess", "-correlationThreshold", "99", "-justExplore" ]
+           "-comparer", "inprocess", "-correlationThreshold", "99" ]
         resources:
            limits:
               cpu: "1"

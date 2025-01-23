@@ -171,7 +171,7 @@ func NewTsProcessor(corrjoinConfig settings.CorrjoinSettings, strideLength int,
 						processor.accumulator.Tsids)
 					// TODO: this has to return quickly.
 
-					err := processor.window.ShiftBuffer(observationResult.Buffers, resultsChannel)
+					err := processor.window.ShiftBuffer(observationResult.Buffers)
 					// TODO: check for error type.
 					// If window is busy, hold the observationResult
 					if err != nil {
@@ -204,6 +204,7 @@ func NewTsProcessor(corrjoinConfig settings.CorrjoinSettings, strideLength int,
 					}
 					reporter.Flush()
 				} else {
+          log.Printf("received correlation result with %d pairs\n", len(correlationResult.CorrelatedPairs))
 					err := reporter.AddCorrelatedPairs(*correlationResult)
 					if err != nil {
 						log.Printf("failed to log results: %v\n", err)
