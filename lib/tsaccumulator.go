@@ -23,8 +23,6 @@ type ObservationResult struct {
 // rowid and it accumulates data until it has reached the stride length.
 // When it reaches the stride length, it sends the collected buffers to
 // a channel.
-// TODO: return quickly if there is a computation ongoing at the time the
-// stride is reached.
 
 type TimeseriesAccumulator struct {
 	stride int

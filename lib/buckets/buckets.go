@@ -5,9 +5,28 @@ import (
 	"github.com/kpaschen/corrjoin/lib/comparisons"
 	"github.com/kpaschen/corrjoin/lib/settings"
 	"github.com/kpaschen/corrjoin/lib/utils"
+	"github.com/prometheus/client_golang/prometheus"
 	"log"
 	"math"
+	"time"
 )
+
+var (
+	bucketSizeHist = prometheus.NewHistogram(
+		prometheus.HistogramOpts{
+			Name:                            "correlation_bucket_size_histogram",
+			Help:                            "Size of correlation buckets.",
+			Buckets:                         prometheus.DefBuckets,
+			NativeHistogramBucketFactor:     1.1,
+			NativeHistogramMaxBucketNumber:  100,
+			NativeHistogramMinResetDuration: 1 * time.Hour,
+		},
+	)
+)
+
+func init() {
+	prometheus.MustRegister(bucketSizeHist)
+}
 
 // A Bucket is an n-dimensional epsilon-tree leaf.
 // The coordinates are a list of the bucket indices on each level of
@@ -129,6 +148,7 @@ func (s *BucketingScheme) CorrelationCandidates() error {
 func (s *BucketingScheme) candidatesForBucket(bucket *Bucket) error {
 	utils.ReportMemory(fmt.Sprintf("starting on bucket %s with %d members\n",
 		BucketName(bucket.coordinates), len(bucket.members)))
+	bucketSizeHist.Observe(float64(len(bucket.members)))
 	for i := 0; i < len(bucket.members); i++ {
 		r1 := bucket.members[i]
 		for j := i + 1; j < len(bucket.members); j++ {
@@ -156,14 +176,14 @@ func (s *BucketingScheme) candidatesForBucket(bucket *Bucket) error {
 						return fmt.Errorf("element %d is in buckets %s and %s", r1,
 							BucketName(bucket.coordinates), name)
 					}
-          // The neighbour relationship is symmetric. It would be more efficient to compute neighbours
-          // so the relationship is not symmetric, but much harder.
-          if r1 < r2 {
-					   err := s.comparer.Compare(r1, r2)
-					   if err != nil {
-					   	return err
-					   }
-          }
+					// The neighbour relationship is symmetric. It would be more efficient to compute neighbours
+					// so the relationship is not symmetric, but much harder.
+					if r1 < r2 {
+						err := s.comparer.Compare(r1, r2)
+						if err != nil {
+							return err
+						}
+					}
 				}
 			}
 		}

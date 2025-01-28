@@ -73,11 +73,11 @@ repo_exists=$(helm repo list -o json | yq '.[] | select(.name == "prometheus-com
 if [ -z $repo_exists ]; then
    helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
 fi
-helm repo update
 ns_exists=$(kubectl get namespace -o name | grep monitoring)
 if [ -z $ns_exists ]; then 
    kubectl create ns monitoring
 fi
+helm repo update
 helm upgrade --install prometheus prometheus-community/kube-prometheus-stack -f prometheus-values.yaml
 
 kubectl apply -f receiver/receiver-deployment.yaml

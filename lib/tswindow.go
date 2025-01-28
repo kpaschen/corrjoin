@@ -268,6 +268,8 @@ func (w *TimeseriesWindow) sVD() (*TimeseriesWindow, error) {
 	fullMatrix := mat.NewDense(rowCount, columnCount, fullData)
 	svdMatrix := mat.NewDense(svdRowCount, columnCount, svdData)
 
+	log.Printf("computing svd using a matrix with %d columns and %d rows\n", columnCount, svdRowCount)
+
 	ret, err := svd.FitTransform(svdMatrix, fullMatrix)
 	if err != nil {
 		return nil, err
