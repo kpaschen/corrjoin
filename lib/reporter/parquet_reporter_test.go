@@ -3,7 +3,6 @@ package reporter
 import (
   "encoding/json"
   "errors"
-  "fmt"
   "io"
   "os"
   "strings"
@@ -147,17 +146,17 @@ func TestAddCorrelatedPairs(t *testing.T) {
         if i >= numRead { break }
         if results.ID != 0 { continue }
         if results.Metric == "myMetric" {
-           if results.Labels == nil { fmt.Errorf("expected labels on row %+v", results) }
+           if results.Labels == nil { t.Errorf("expected labels on row %+v", results) }
            foundMetricRow = true
         }
         if results.Pearson != 0 {
            if results.Correlated != 2 || results.Pearson != 0.99 {
-              fmt.Errorf("expected correlation 0.99 with ts 2 but got %+v", results)
+              t.Errorf("expected correlation 0.99 with ts 2 but got %+v", results)
            }
            foundCorrelationRow = true
         }   
      }
-     if !foundMetricRow { fmt.Errorf("metrics row missing") }
-     if !foundCorrelationRow { fmt.Errorf("correlation row missing") }
+     if !foundMetricRow { t.Errorf("metrics row missing") }
+     if !foundCorrelationRow { t.Errorf("correlation row missing") }
   }
 }
