@@ -79,11 +79,11 @@ func TestAddCorrelatedPairs(t *testing.T) {
      CorrelatedPairs: make(map[datatypes.RowPair]float64),
      StrideCounter: 1,
   }
-  rp1 := datatypes.RowPair{1, 2}
-  results1.CorrelatedPairs[rp1] = 0.95
+  rp1 := datatypes.NewRowPair(1, 2)
+  results1.CorrelatedPairs[*rp1] = 0.95
 
-  rp2 := datatypes.RowPair{0, 2}
-  results1.CorrelatedPairs[rp2] = 0.99
+  rp2 := datatypes.NewRowPair(0, 2)
+  results1.CorrelatedPairs[*rp2] = 0.99
 
   err = rep.AddCorrelatedPairs(results1)
   if err != nil { t.Errorf("failed to add correlated pair") }
