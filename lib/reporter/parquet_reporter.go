@@ -13,7 +13,6 @@ import (
 	"time"
 )
 
-// TODO: extract for reusability
 type Timeseries struct {
   ID int  `parquet:"id"`
   Metric string `parquet:"metric,optional,zstd"`
@@ -47,6 +46,7 @@ func NewParquetReporter(filenameBase string) *ParquetReporter {
 	}
 }
 
+// TODO: unused parameter config
 func (r *ParquetReporter) Initialize(config settings.CorrjoinSettings, strideCounter int,
 	strideStart time.Time, strideEnd time.Time, tsids []string) {
 	r.tsids = tsids
