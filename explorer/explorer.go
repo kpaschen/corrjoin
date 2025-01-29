@@ -349,6 +349,11 @@ func (c *CorrelationExplorer) findReadyStrides() error {
 	return nil
 }
 
+func (c *CorrelationExplorer) ExploreByName(w http.ResponseWriter, r *http.Request) {
+	params := r.URL.Query()
+	fmt.Printf("got params: %+v\n", params)
+}
+
 func (c *CorrelationExplorer) ExploreTimeseries(w http.ResponseWriter, r *http.Request) {
 	params := r.URL.Query()
 	var rowID int64

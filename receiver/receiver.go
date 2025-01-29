@@ -160,10 +160,12 @@ func NewTsProcessor(corrjoinConfig settings.CorrjoinSettings, strideLength int,
 					log.Printf("failed to process window: %v", observationResult.Err)
 				} else {
 					log.Printf("got an observation request\n")
+					reporter.Flush()
 					requestedCorrelationBatches.Inc()
 					requestStart := time.Now()
 					// TODO: this is a hack because ShiftBuffer only returns after the window
 					// is done processing. Fix this when I add the lock to the window.
+					// TODO: make the processor call the reporter
 					processor.strideStartTimes[processor.window.StrideCounter+1] = requestStart
 					reporter.Initialize(corrjoinConfig, processor.window.StrideCounter+1,
 						processor.accumulator.CurrentStrideStartTs,

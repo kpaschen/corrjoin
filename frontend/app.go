@@ -86,6 +86,7 @@ func main() {
 	explorerRouter.HandleFunc("/explore", expl.ExploreCorrelations).Methods("GET")
 	explorerRouter.HandleFunc("/exploreCluster", expl.ExploreCluster).Methods("GET")
 	explorerRouter.HandleFunc("/exploreTimeseries", expl.ExploreTimeseries).Methods("GET")
+	explorerRouter.HandleFunc("/exploreByName", expl.ExploreByName).Methods("GET")
 
 	http.Handle("/metrics", promhttp.Handler())
 	go http.ListenAndServe(cfg.metricsAddress, nil)
@@ -96,7 +97,7 @@ func main() {
 	var prometheusServer *http.Server
 
 	if !justExplore {
-		correlationReporter := reporter.NewCsvReporter(resultsDirectory)
+		correlationReporter := reporter.NewParquetReporter(resultsDirectory)
 		processor := receiver.NewTsProcessor(corrjoinConfig, stride, correlationReporter)
 		prometheusRouter := mux.NewRouter().StrictSlash(true)
 		prometheusRouter.HandleFunc("/api/v1/write", processor.ReceivePrometheusData)
