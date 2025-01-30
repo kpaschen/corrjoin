@@ -8,9 +8,15 @@ import (
 )
 
 type Observation struct {
-	MetricName string
-	Value      float64
-	Timestamp  time.Time
+	MetricFingerprint uint64
+	MetricName        string
+	Value             float64
+	Timestamp         time.Time
+}
+
+type TsId struct {
+	MetricFingerprint uint64
+	MetricName        string
 }
 
 type ObservationResult struct {
@@ -27,13 +33,13 @@ type ObservationResult struct {
 type TimeseriesAccumulator struct {
 	stride int
 
-	// rowmap maps the timeseries names to row ids
-	rowmap map[string]int
+	// rowmap maps the timeseries fingerprints to row ids
+	rowmap map[uint64]int
 
 	// The ids of the timeseries, in order.
 	// A tsid is a json serialization of the metric name and the labels.
 	// invariant: rowmap[Tsids[i]] == i for 0 <= i <= maxRow
-	Tsids []string
+	Tsids []TsId
 
 	// buffers maps rowids to observations
 	// This is a map because it is possible for a timeseries that we have
@@ -61,8 +67,8 @@ func NewTimeseriesAccumulator(stride int, startTime time.Time, sampleInterval in
 	strideDuration, _ := time.ParseDuration(fmt.Sprintf("%ds", stride*sampleInterval))
 	return &TimeseriesAccumulator{
 		stride:               stride,
-		rowmap:               make(map[string]int),
-		Tsids:                make([]string, 0, 5000), // TODO: initialize capacity based on a config value.
+		rowmap:               make(map[uint64]int),
+		Tsids:                make([]TsId, 0, 5000),
 		buffers:              make(map[int][]float64),
 		maxRow:               0,
 		sampleTime:           sampleInterval,
@@ -139,14 +145,15 @@ func (a *TimeseriesAccumulator) AddObservation(observation *Observation) {
 		a.bufferChannel <- a.extractMatrixData()
 	}
 
-	rowid, ok := a.rowmap[observation.MetricName]
+	rowid, ok := a.rowmap[observation.MetricFingerprint]
 	if !ok {
 		rowid = a.maxRow
-		a.rowmap[observation.MetricName] = rowid
+		a.rowmap[observation.MetricFingerprint] = rowid
 		a.buffers[rowid] = make([]float64, 0, colcount)
-		a.Tsids = append(a.Tsids, observation.MetricName)
-		if a.Tsids[rowid] != observation.MetricName {
-			log.Printf("tsid for %d is %s but should be %s\n", rowid, a.Tsids[rowid], observation.MetricName)
+		a.Tsids = append(a.Tsids,
+			TsId{MetricName: observation.MetricName, MetricFingerprint: observation.MetricFingerprint})
+		if a.Tsids[rowid].MetricFingerprint != observation.MetricFingerprint {
+			log.Printf("tsid for %d is %d but should be %d\n", rowid, a.Tsids[rowid].MetricFingerprint, observation.MetricFingerprint)
 			panic("code bug")
 		}
 		a.maxRow += 1

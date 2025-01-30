@@ -3,6 +3,7 @@ package reporter
 import (
 	"encoding/json"
 	"errors"
+	"github.com/kpaschen/corrjoin/lib"
 	"github.com/kpaschen/corrjoin/lib/datatypes"
 	"github.com/kpaschen/corrjoin/lib/settings"
 	"github.com/parquet-go/parquet-go"
@@ -45,7 +46,15 @@ func TestInitialize(t *testing.T) {
 		WindowSize:           3,
 		SvdOutputDimensions:  2,
 	}.ComputeSettingsFields()
-	rep.Initialize(settings, 1, time.Now(), time.Now(), []string{string(sampleMetricString), string(sampleMetricString2)})
+	tsid1 := lib.TsId{
+		MetricName:        string(sampleMetricString),
+		MetricFingerprint: uint64(1),
+	}
+	tsid2 := lib.TsId{
+		MetricName:        string(sampleMetricString2),
+		MetricFingerprint: uint64(2),
+	}
+	rep.Initialize(settings, 1, time.Now(), time.Now(), []lib.TsId{tsid1, tsid2})
 
 	rep.Flush()
 }
@@ -81,7 +90,15 @@ func TestAddCorrelatedPairs(t *testing.T) {
 		WindowSize:           3,
 		SvdOutputDimensions:  2,
 	}.ComputeSettingsFields()
-	rep.Initialize(settings, 1, time.Now(), time.Now(), []string{string(sampleMetricString), string(sampleMetricString2)})
+	tsid1 := lib.TsId{
+		MetricName:        string(sampleMetricString),
+		MetricFingerprint: uint64(1),
+	}
+	tsid2 := lib.TsId{
+		MetricName:        string(sampleMetricString2),
+		MetricFingerprint: uint64(2),
+	}
+	rep.Initialize(settings, 1, time.Now(), time.Now(), []lib.TsId{tsid1, tsid2})
 
 	results1 := datatypes.CorrjoinResult{
 		CorrelatedPairs: make(map[datatypes.RowPair]float64),

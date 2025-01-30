@@ -20,6 +20,7 @@ type BaseComparer struct {
 	normalizedRows   map[int][]float64
 	strideCounter    int
 	paa2             map[int][]float64
+	constantPostPaa2 map[int]bool
 
 	stats StrideStats
 }
@@ -30,11 +31,12 @@ func NewBaseComparer(
 	normalizedRows map[int][]float64,
 ) *BaseComparer {
 	return &BaseComparer{
-		config:         config,
-		normalizedRows: normalizedRows,
-		strideCounter:  strideCounter,
-		paa2:           make(map[int][]float64),
-		stats:          StrideStats{},
+		config:           config,
+		normalizedRows:   normalizedRows,
+		strideCounter:    strideCounter,
+		paa2:             make(map[int][]float64),
+		constantPostPaa2: make(map[int]bool),
+		stats:            StrideStats{},
 	}
 }
 
@@ -54,7 +56,6 @@ func (b *BaseComparer) getVector(index int) []float64 {
 }
 
 func (b *BaseComparer) Compare(index1 int, index2 int) (float64, error) {
-	// TODO: cache paa2 outputs
 
 	var vec1, vec2 []float64
 	vec1 = b.getVector(index1)
@@ -74,8 +75,29 @@ func (b *BaseComparer) Compare(index1 int, index2 int) (float64, error) {
 		return 0.0, nil
 	}
 
-	paaVec1, constantVec1 := paa.PAA(vec1, b.config.EuclidDimensions)
-	paaVec2, constantVec2 := paa.PAA(vec2, b.config.EuclidDimensions)
+	paaVec1, exists := b.paa2[index1]
+	constantVec1 := false
+	if !exists {
+		paaVec1, constantVec1 = paa.PAA(vec1, b.config.EuclidDimensions)
+		b.paa2[index1] = paaVec1
+		if constantVec1 {
+			b.constantPostPaa2[index1] = constantVec1
+		}
+	} else {
+		constantVec1 = b.constantPostPaa2[index1]
+	}
+
+	paaVec2, exists := b.paa2[index2]
+	constantVec2 := false
+	if !exists {
+		paaVec2, constantVec2 = paa.PAA(vec2, b.config.EuclidDimensions)
+		b.paa2[index2] = paaVec2
+		if constantVec2 {
+			b.constantPostPaa2[index2] = constantVec2
+		}
+	} else {
+		constantVec2 = b.constantPostPaa2[index2]
+	}
 
 	// A constant vector cannot match a non-constant one.
 	if constantVec1 != constantVec2 {
@@ -94,14 +116,11 @@ func (b *BaseComparer) Compare(index1 int, index2 int) (float64, error) {
 	// Now apply pearson
 	b.stats.comparisons++
 
-	// TODO: the code used to do a pearson correlation of paaVec1 and paaVec2 here,
-	// but surely that will give us false positives?
 	pearson, err := correlation.PearsonCorrelation(vec1, vec2)
 
 	if err != nil {
 		return 0.0, err
 	}
-	// log.Printf("pearson correlation of %+v and %+v is %f\n", paaVec1, paaVec2, pearson)
 
 	if pearson >= b.config.CorrelationThreshold {
 		b.stats.correlated++

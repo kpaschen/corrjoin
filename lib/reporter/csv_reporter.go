@@ -3,6 +3,7 @@ package reporter
 import (
 	"encoding/csv"
 	"fmt"
+	"github.com/kpaschen/corrjoin/lib"
 	"github.com/kpaschen/corrjoin/lib/datatypes"
 	"github.com/kpaschen/corrjoin/lib/settings"
 	"log"
@@ -13,7 +14,7 @@ import (
 
 type CsvReporter struct {
 	filenameBase     string
-	tsids            []string
+	tsids            []lib.TsId
 	strideStartTimes map[int]string
 	strideEndTimes   map[int]string
 }
@@ -27,7 +28,7 @@ func NewCsvReporter(filenameBase string) *CsvReporter {
 }
 
 func (c *CsvReporter) Initialize(config settings.CorrjoinSettings, strideCounter int,
-	strideStart time.Time, strideEnd time.Time, tsids []string) {
+	strideStart time.Time, strideEnd time.Time, tsids []lib.TsId) {
 	c.tsids = tsids
 	c.strideStartTimes[strideCounter] = strideStart.UTC().Format("20060102150405")
 	c.strideEndTimes[strideCounter] = strideEnd.UTC().Format("20060102150405")
@@ -44,7 +45,7 @@ func (c *CsvReporter) Initialize(config settings.CorrjoinSettings, strideCounter
 	defer file.Close()
 	writer := csv.NewWriter(file)
 	for i, tsid := range tsids {
-		record := []string{fmt.Sprintf("%d", i), tsid}
+		record := []string{fmt.Sprintf("%d", i), tsid.MetricName}
 		err = writer.Write(record)
 		if err != nil {
 			log.Printf("failed to write record: %e\n", err)

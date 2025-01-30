@@ -1,6 +1,7 @@
 package reporter
 
 import (
+	"github.com/kpaschen/corrjoin/lib"
 	"github.com/kpaschen/corrjoin/lib/datatypes"
 	"github.com/kpaschen/corrjoin/lib/settings"
 	"time"
@@ -8,7 +9,7 @@ import (
 
 type Reporter interface {
 	Initialize(config settings.CorrjoinSettings, strideCounter int,
-		startTime time.Time, endTime time.Time, tsids []string)
+		startTime time.Time, endTime time.Time, tsids []lib.TsId)
 
 	AddCorrelatedPairs(datatypes.CorrjoinResult) error
 

@@ -80,9 +80,10 @@ func (t *tsProcessor) observeTs(req *prompb.WriteRequest) error {
 		sampleCounter := 0
 		for _, s := range ts.Samples {
 			t.observationQueue <- &corrjoin.Observation{
-				MetricName: metricName,
-				Value:      s.Value,
-				Timestamp:  time.Unix(s.Timestamp/1000, 0).UTC(),
+				MetricFingerprint: (uint64)(metric.Fingerprint()),
+				MetricName:        metricName,
+				Value:             s.Value,
+				Timestamp:         time.Unix(s.Timestamp/1000, 0).UTC(),
 			}
 			sampleCounter++
 		}

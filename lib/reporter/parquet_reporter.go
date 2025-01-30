@@ -3,6 +3,7 @@ package reporter
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/kpaschen/corrjoin/lib"
 	"github.com/kpaschen/corrjoin/lib/datatypes"
 	"github.com/kpaschen/corrjoin/lib/settings"
 	"github.com/parquet-go/parquet-go"
@@ -29,7 +30,7 @@ type Timeseries struct {
 
 type ParquetReporter struct {
 	filenameBase     string
-	tsids            []string
+	tsids            []lib.TsId
 	strideStartTimes map[int]string
 	strideEndTimes   map[int]string
 	writer           *parquet.SortingWriter[Timeseries]
@@ -48,7 +49,7 @@ func NewParquetReporter(filenameBase string) *ParquetReporter {
 
 // TODO: unused parameter config
 func (r *ParquetReporter) Initialize(config settings.CorrjoinSettings, strideCounter int,
-	strideStart time.Time, strideEnd time.Time, tsids []string) {
+	strideStart time.Time, strideEnd time.Time, tsids []lib.TsId) {
 	r.tsids = tsids
 	r.strideStartTimes[strideCounter] = strideStart.UTC().Format("20060102150405")
 	r.strideEndTimes[strideCounter] = strideEnd.UTC().Format("20060102150405")
@@ -87,9 +88,9 @@ func (r *ParquetReporter) Initialize(config settings.CorrjoinSettings, strideCou
 
 		// This copies tsid. It might be more efficient to store byte slices
 		// in the tsids array instead?
-		err := json.Unmarshal(([]byte)(tsid), &metricModel)
+		err := json.Unmarshal(([]byte)(tsid.MetricName), &metricModel)
 		if err != nil {
-			log.Printf("failed to unmarshal tsid %s: %e\n", tsid, err)
+			log.Printf("failed to unmarshal tsid %s: %e\n", tsid.MetricName, err)
 			return
 		}
 		row := Timeseries{

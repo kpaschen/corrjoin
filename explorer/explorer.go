@@ -352,6 +352,8 @@ func (c *CorrelationExplorer) findReadyStrides() error {
 func (c *CorrelationExplorer) ExploreByName(w http.ResponseWriter, r *http.Request) {
 	params := r.URL.Query()
 	fmt.Printf("got params: %+v\n", params)
+	// example: got params: map[name:[{__name__="process_cpu_seconds_total", container="receiver", endpoint="metrics", instance="10.100.1.8:9203", job="correlation-service", namespace="default", pod="correlation-processor-75b6d895df-xps42", service="correlation-service"}]]
+
 }
 
 func (c *CorrelationExplorer) ExploreTimeseries(w http.ResponseWriter, r *http.Request) {
