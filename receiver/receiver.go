@@ -59,6 +59,7 @@ type tsProcessor struct {
 	accumulator      *corrjoin.TimeseriesAccumulator
 	settings         *settings.CorrjoinSettings
 	window           *corrjoin.TimeseriesWindow
+	observationQueue chan (*corrjoin.Observation)
 	resultsChannel   chan (*datatypes.CorrjoinResult)
 	bufferChannel    chan (*corrjoin.ObservationResult)
 	comparer         comparisons.Engine
@@ -78,13 +79,12 @@ func (t *tsProcessor) observeTs(req *prompb.WriteRequest) error {
 		metricName := string(mjson)
 		sampleCounter := 0
 		for _, s := range ts.Samples {
-			observation := &corrjoin.Observation{
+			t.observationQueue <- &corrjoin.Observation{
 				MetricFingerprint: (uint64)(metric.Fingerprint()),
 				MetricName:        metricName,
 				Value:             s.Value,
 				Timestamp:         time.Unix(s.Timestamp/1000, 0).UTC(),
 			}
-			t.accumulator.AddObservation(observation)
 			sampleCounter++
 		}
 		receivedSamples.Add(float64(sampleCounter))
@@ -115,13 +115,15 @@ func (t *tsProcessor) ReceivePrometheusData(w http.ResponseWriter, r *http.Reque
 func NewTsProcessor(corrjoinConfig settings.CorrjoinSettings, strideLength int,
 	reporter *reporter.ParquetReporter) *tsProcessor {
 
+	// The observation queue is how we hand timeseries data to the accumulator.
+	observationQueue := make(chan *corrjoin.Observation, 1)
+
 	// The buffer channel is how the accumulator lets us know there are enough
 	// timeseries data in the buffer for a stride.
 	bufferChannel := make(chan *corrjoin.ObservationResult, 1)
 
 	// The results channel is where we hear about correlated timeseries.
 	resultsChannel := make(chan *datatypes.CorrjoinResult, 1)
-	//defer close(resultsChannel)
 
 	comparer := &comparisons.InProcessComparer{}
 	comparer.Initialize(corrjoinConfig, resultsChannel)
@@ -130,12 +132,23 @@ func NewTsProcessor(corrjoinConfig settings.CorrjoinSettings, strideLength int,
 		accumulator: corrjoin.NewTimeseriesAccumulator(strideLength, time.Now().UTC(),
 			corrjoinConfig.SampleInterval, bufferChannel),
 		settings:         &corrjoinConfig,
+		observationQueue: observationQueue,
 		window:           corrjoin.NewTimeseriesWindow(corrjoinConfig, comparer),
 		resultsChannel:   resultsChannel,
 		bufferChannel:    bufferChannel,
 		comparer:         comparer,
 		strideStartTimes: make(map[int]time.Time),
 	}
+
+	go func() {
+		log.Println("watching observation queue")
+		for {
+			select {
+			case observation := <-observationQueue:
+				processor.accumulator.AddObservation(observation)
+			}
+		}
+	}()
 
 	go func() {
 		log.Println("waiting for buffers")
@@ -149,23 +162,23 @@ func NewTsProcessor(corrjoinConfig settings.CorrjoinSettings, strideLength int,
 					reporter.Flush()
 					requestedCorrelationBatches.Inc()
 					requestStart := time.Now()
-					// TODO: this is a hack because ShiftBuffer only returns after the window
-					// is done processing. Fix this when I add the lock to the window.
-					// TODO: should the window call the reporter?
 					processor.strideStartTimes[processor.window.StrideCounter+1] = requestStart
-					reporter.Initialize(processor.window.StrideCounter+1,
-						processor.accumulator.CurrentStrideStartTs,
-						processor.accumulator.CurrentStrideMaxTs,
-						processor.accumulator.Tsids)
-					// TODO: this has to return quickly.
 
-					err := processor.window.ShiftBuffer(observationResult.Buffers)
+					err, hasRunComputation := processor.window.ShiftBuffer(observationResult.Buffers)
+
 					// TODO: check for error type.
 					// If window is busy, hold the observationResult
 					if err != nil {
 						log.Printf("failed to process window: %v", err)
+						if hasRunComputation {
+							log.Printf("finished processing stride %d\n", processor.window.StrideCounter)
+							reporter.Initialize(processor.window.StrideCounter+1,
+								processor.accumulator.CurrentStrideStartTs,
+								processor.accumulator.CurrentStrideMaxTs,
+								processor.accumulator.Tsids)
+							reporter.AddConstantRows(processor.window.ConstantRows)
+						}
 					}
-					reporter.AddConstantRows(processor.window.ConstantRows)
 				}
 			case <-time.After(10 * time.Minute):
 				log.Printf("got no timeseries data for 10 minutes")

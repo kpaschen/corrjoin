@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/kpaschen/corrjoin/lib"
 	"github.com/kpaschen/corrjoin/lib/datatypes"
+	"github.com/kpaschen/corrjoin/lib/utils"
 	"github.com/parquet-go/parquet-go"
 	"github.com/prometheus/common/model"
 	"log"
@@ -97,6 +98,7 @@ func (r *ParquetReporter) Initialize(strideCounter int,
 		metadataRows[i] = row
 	}
 	r.writer.Write(metadataRows)
+	utils.ReportMemory("parquet writer after initialization")
 }
 
 func extractRowsFromResult(result datatypes.CorrjoinResult) []Timeseries {
@@ -137,9 +139,7 @@ func (r *ParquetReporter) AddConstantRows(constantRows []bool) error {
 		}
 	}
 	n, err := r.writer.Write(newRows)
-	if err != nil {
-		log.Printf("constant rows writer returned %d\n", n)
-	}
+	log.Printf("constant rows writer returned %d and error %e\n", n, err)
 	return err
 }
 
@@ -151,9 +151,8 @@ func (r *ParquetReporter) AddCorrelatedPairs(result datatypes.CorrjoinResult) er
 	rows := extractRowsFromResult(result)
 
 	n, err := r.writer.Write(rows)
-	if err != nil {
-		log.Printf("correlated pairs writer returned %d\n", n)
-	}
+	log.Printf("correlated pairs writer returned %d and err %e\n", n, err)
+	utils.ReportMemory("parquet writer after writing rows")
 
 	return err
 }

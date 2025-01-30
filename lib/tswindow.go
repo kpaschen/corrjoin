@@ -112,7 +112,8 @@ func (w *TimeseriesWindow) shiftBufferIntoWindow(buffer [][]float64) (bool, erro
 
 // shift _buffer_ into _w_ from the right, displacing the first buffer.width columns
 // of w.
-func (w *TimeseriesWindow) ShiftBuffer(buffer [][]float64) error {
+// Returns true if computation was performed, false if there was nothing to do.
+func (w *TimeseriesWindow) ShiftBuffer(buffer [][]float64) (error, bool) {
 
 	// TODO: make an error type so I can signal whether the window
 	// is busy vs. a different kind of error.
@@ -120,10 +121,10 @@ func (w *TimeseriesWindow) ShiftBuffer(buffer [][]float64) error {
 
 	newStride, err := w.shiftBufferIntoWindow(buffer)
 	if err != nil {
-		return err
+		return err, false
 	}
 	if !newStride {
-		return nil
+		return nil, false
 	}
 
 	w.StrideCounter++
@@ -148,10 +149,10 @@ func (w *TimeseriesWindow) ShiftBuffer(buffer [][]float64) error {
 		err = fmt.Errorf("unsupported algorithm choice %s", w.settings.Algorithm)
 	}
 	if err != nil {
-		return err
+		return err, true
 	}
 
-	return nil
+	return nil, true
 }
 
 // This could be computed incrementally.
