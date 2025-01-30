@@ -159,7 +159,10 @@ func NewTsProcessor(corrjoinConfig settings.CorrjoinSettings, strideLength int,
 					log.Printf("failed to process window: %v", observationResult.Err)
 				} else {
 					log.Printf("got an observation request\n")
-					reporter.Flush()
+					err := reporter.Flush()
+					if err != nil {
+						log.Printf("error flushing results reporter: %e\n", err)
+					}
 					requestedCorrelationBatches.Inc()
 					requestStart := time.Now()
 					processor.strideStartTimes[processor.window.StrideCounter+1] = requestStart
@@ -204,7 +207,10 @@ func NewTsProcessor(corrjoinConfig settings.CorrjoinSettings, strideLength int,
 						correlationDuration.Set(float64(elapsed.Milliseconds()))
 						log.Printf("correlation batch processed in %d milliseconds\n", elapsed.Milliseconds())
 					}
-					reporter.Flush()
+					err := reporter.Flush()
+					if err != nil {
+						log.Printf("failed to flush results writer: %e\n", err)
+					}
 				} else {
 					err := reporter.AddCorrelatedPairs(*correlationResult)
 					if err != nil {
