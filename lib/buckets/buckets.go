@@ -166,7 +166,7 @@ func (s *BucketingScheme) candidatesForBucket(bucket *Bucket) error {
 
 	neighbourCount := 0
 	for otherName, otherBucket := range s.buckets {
-		if isNeighbour(bucket.coordinates, otherBucket.coordinates) {
+		if isLeftNeighbour(bucket.coordinates, otherBucket.coordinates) {
 			neighbourCount++
 			for _, r1 := range bucket.members {
 				for _, r2 := range otherBucket.members {
@@ -174,13 +174,9 @@ func (s *BucketingScheme) candidatesForBucket(bucket *Bucket) error {
 						return fmt.Errorf("element %d is in buckets %s and %s", r1,
 							BucketName(bucket.coordinates), otherName)
 					}
-					// The neighbour relationship is symmetric. It would be more efficient to compute neighbours
-					// so the relationship is not symmetric, but much harder.
-					if r1 < r2 {
-						err := s.comparer.Compare(r1, r2)
-						if err != nil {
-							return err
-						}
+					err := s.comparer.Compare(r1, r2)
+					if err != nil {
+						return err
 					}
 				}
 			}
@@ -190,7 +186,10 @@ func (s *BucketingScheme) candidatesForBucket(bucket *Bucket) error {
 	return nil
 }
 
-func isNeighbour(input []int, maybeNeighbour []int) bool {
+// A bucket is a "left" neighbour of another bucket if it is a neighbour along any dimension,
+// and if its string representation is alphabetically smaller than the other bucket's.
+// So for instance [0,0,1] is a left neighbour of [0,1,1] but not a left neighbour of [0,0,0].
+func isLeftNeighbour(input []int, maybeNeighbour []int) bool {
 	if len(input) != len(maybeNeighbour) {
 		return false
 	}
@@ -200,6 +199,9 @@ func isNeighbour(input []int, maybeNeighbour []int) bool {
 		neighbourCoordinate := maybeNeighbour[i]
 		diff := inputCoordinate - neighbourCoordinate
 		if diff > 1 || diff < -1 {
+			return false
+		}
+		if !oneDiffFound && diff > 0 {
 			return false
 		}
 		if diff != 0 {

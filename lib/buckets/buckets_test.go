@@ -70,28 +70,30 @@ func TestNeighbourCoordinates(t *testing.T) {
 	}
 }
 
-func TestIsNeighbour(t *testing.T) {
-	n := isNeighbour([]int{1, 2, 3}, []int{1, 2, 3})
+func TestIsLeftNeighbour(t *testing.T) {
+	n := isLeftNeighbour([]int{1, 2, 3}, []int{1, 2, 3})
 	if n {
 		t.Errorf("a bucket cannot be its own neighbour")
 	}
-	n = isNeighbour([]int{1, 2, 3}, []int{1, 2, 3, 4})
+	n = isLeftNeighbour([]int{1, 2, 3}, []int{1, 2, 3, 4})
 	if n {
 		t.Errorf("buckets of different length cannot be neighbours")
 	}
-	n = isNeighbour([]int{1, 2, 3}, []int{1, 2, 5})
+	n = isLeftNeighbour([]int{1, 2, 3}, []int{1, 2, 5})
 	if n {
 		t.Errorf("buckets this far apart cannot be neighbours")
 	}
-	n = isNeighbour([]int{1, 2, 3}, []int{1, -2, 3})
+	n = isLeftNeighbour([]int{1, 2, 3}, []int{1, -2, 3})
 	if n {
 		t.Errorf("buckets this far apart cannot be neighbours")
 	}
-	for _, x := range neighbourCoordinates([]int{1, 2, 3}) {
-		n = isNeighbour([]int{1, 2, 3}, x)
-		if !n {
-			t.Errorf("%v should have been a neighbour", x)
-		}
+	n = isLeftNeighbour([]int{2, 2, 3}, []int{1, 2, 3})
+	if n {
+		t.Errorf("not a left neighbour")
+	}
+	n = isLeftNeighbour([]int{1, 2, 3}, []int{2, 2, 3})
+	if !n {
+		t.Errorf("missed a left neighbour")
 	}
 }
 
