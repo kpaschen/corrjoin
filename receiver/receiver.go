@@ -168,7 +168,7 @@ func NewTsProcessor(corrjoinConfig settings.CorrjoinSettings, strideLength int,
 					// is done processing. Fix this when I add the lock to the window.
 					// TODO: make the processor call the reporter
 					processor.strideStartTimes[processor.window.StrideCounter+1] = requestStart
-					reporter.Initialize(corrjoinConfig, processor.window.StrideCounter+1,
+					reporter.Initialize(processor.window.StrideCounter+1,
 						processor.accumulator.CurrentStrideStartTs,
 						processor.accumulator.CurrentStrideMaxTs,
 						processor.accumulator.Tsids)

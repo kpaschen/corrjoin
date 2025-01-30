@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/kpaschen/corrjoin/lib"
 	"github.com/kpaschen/corrjoin/lib/datatypes"
-	"github.com/kpaschen/corrjoin/lib/settings"
 	"github.com/parquet-go/parquet-go"
 	"github.com/prometheus/common/model"
 	"log"
@@ -15,9 +14,10 @@ import (
 )
 
 type Timeseries struct {
-	ID     int               `parquet:"id"`
-	Metric string            `parquet:"metric,optional,zstd"`
-	Labels map[string]string `parquet:"labels,optional"`
+	ID                int               `parquet:"id"`
+	Metric            string            `parquet:"metric,optional,zstd"`
+	MetricFingerprint uint64            `parquet:"metricFingerprint,optional"`
+	Labels            map[string]string `parquet:"labels,optional"`
 
 	// Cannot make this optional, as then '0' will be written as null.
 	// Instead, when you want to say "no correlation information", leave the Pearson
@@ -33,8 +33,9 @@ type ParquetReporter struct {
 	tsids            []lib.TsId
 	strideStartTimes map[int]string
 	strideEndTimes   map[int]string
-	writer           *parquet.SortingWriter[Timeseries]
-	filepath         string
+	// I tried a SortingWriter but it used too much memory.
+	writer   *parquet.GenericWriter[Timeseries]
+	filepath string
 }
 
 func NewParquetReporter(filenameBase string) *ParquetReporter {
@@ -47,8 +48,7 @@ func NewParquetReporter(filenameBase string) *ParquetReporter {
 	}
 }
 
-// TODO: unused parameter config
-func (r *ParquetReporter) Initialize(config settings.CorrjoinSettings, strideCounter int,
+func (r *ParquetReporter) Initialize(strideCounter int,
 	strideStart time.Time, strideEnd time.Time, tsids []lib.TsId) {
 	r.tsids = tsids
 	r.strideStartTimes[strideCounter] = strideStart.UTC().Format("20060102150405")
@@ -68,19 +68,7 @@ func (r *ParquetReporter) Initialize(config settings.CorrjoinSettings, strideCou
 		return
 	}
 
-	// The second parameter is the sortRowCount
-	// The writer cannot create more than 32k temporary row groups
-	// for the sorted row chunks. So if you expect n rows in total,
-	// I think you need n / sortRowCount < 32k.
-	// We expect around 200 million rows, which means sortRowCount must
-	// be at least 6250.
-	r.writer = parquet.NewSortingWriter[Timeseries](file, 7000,
-		parquet.SortingWriterConfig(
-			parquet.SortingColumns(
-				parquet.Ascending("id"),
-			),
-		),
-	)
+	r.writer = parquet.NewGenericWriter[Timeseries](file)
 
 	metadataRows := make([]Timeseries, len(tsids), len(tsids))
 	for i, tsid := range tsids {
@@ -94,10 +82,11 @@ func (r *ParquetReporter) Initialize(config settings.CorrjoinSettings, strideCou
 			return
 		}
 		row := Timeseries{
-			ID:         i,
-			Correlated: i, // See above, this field is not optional.
-			Metric:     string(metricModel["__name__"]),
-			Labels:     make(map[string]string),
+			ID:                i,
+			Correlated:        i, // See above, this field is not optional.
+			Metric:            string(metricModel["__name__"]),
+			Labels:            make(map[string]string),
+			MetricFingerprint: (uint64)(metricModel.Fingerprint()),
 		}
 		for key, value := range metricModel {
 			if key == "__name__" {

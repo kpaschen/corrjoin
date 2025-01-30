@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/kpaschen/corrjoin/lib"
 	"github.com/kpaschen/corrjoin/lib/datatypes"
-	"github.com/kpaschen/corrjoin/lib/settings"
 	"log"
 	"os"
 	"path/filepath"
@@ -27,8 +26,8 @@ func NewCsvReporter(filenameBase string) *CsvReporter {
 	}
 }
 
-func (c *CsvReporter) Initialize(config settings.CorrjoinSettings, strideCounter int,
-	strideStart time.Time, strideEnd time.Time, tsids []lib.TsId) {
+func (c *CsvReporter) Initialize(strideCounter int, strideStart time.Time, strideEnd time.Time,
+	tsids []lib.TsId) {
 	c.tsids = tsids
 	c.strideStartTimes[strideCounter] = strideStart.UTC().Format("20060102150405")
 	c.strideEndTimes[strideCounter] = strideEnd.UTC().Format("20060102150405")

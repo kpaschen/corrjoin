@@ -5,7 +5,6 @@ import (
 	"errors"
 	"github.com/kpaschen/corrjoin/lib"
 	"github.com/kpaschen/corrjoin/lib/datatypes"
-	"github.com/kpaschen/corrjoin/lib/settings"
 	"github.com/parquet-go/parquet-go"
 	"github.com/prometheus/common/model"
 	"io"
@@ -39,13 +38,6 @@ func TestInitialize(t *testing.T) {
 		t.Errorf("failed to marshal sample metric")
 	}
 
-	settings := settings.CorrjoinSettings{
-		SvdDimensions:        3,
-		EuclidDimensions:     2,
-		CorrelationThreshold: 0.9,
-		WindowSize:           3,
-		SvdOutputDimensions:  2,
-	}.ComputeSettingsFields()
 	tsid1 := lib.TsId{
 		MetricName:        string(sampleMetricString),
 		MetricFingerprint: uint64(1),
@@ -54,7 +46,7 @@ func TestInitialize(t *testing.T) {
 		MetricName:        string(sampleMetricString2),
 		MetricFingerprint: uint64(2),
 	}
-	rep.Initialize(settings, 1, time.Now(), time.Now(), []lib.TsId{tsid1, tsid2})
+	rep.Initialize(1, time.Now(), time.Now(), []lib.TsId{tsid1, tsid2})
 
 	rep.Flush()
 }
@@ -83,13 +75,6 @@ func TestAddCorrelatedPairs(t *testing.T) {
 		t.Errorf("failed to marshal sample metric")
 	}
 
-	settings := settings.CorrjoinSettings{
-		SvdDimensions:        3,
-		EuclidDimensions:     2,
-		CorrelationThreshold: 0.9,
-		WindowSize:           3,
-		SvdOutputDimensions:  2,
-	}.ComputeSettingsFields()
 	tsid1 := lib.TsId{
 		MetricName:        string(sampleMetricString),
 		MetricFingerprint: uint64(1),
@@ -98,7 +83,7 @@ func TestAddCorrelatedPairs(t *testing.T) {
 		MetricName:        string(sampleMetricString2),
 		MetricFingerprint: uint64(2),
 	}
-	rep.Initialize(settings, 1, time.Now(), time.Now(), []lib.TsId{tsid1, tsid2})
+	rep.Initialize(1, time.Now(), time.Now(), []lib.TsId{tsid1, tsid2})
 
 	results1 := datatypes.CorrjoinResult{
 		CorrelatedPairs: make(map[datatypes.RowPair]float64),
