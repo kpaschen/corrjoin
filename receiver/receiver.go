@@ -165,19 +165,19 @@ func NewTsProcessor(corrjoinConfig settings.CorrjoinSettings, strideLength int,
 					processor.strideStartTimes[processor.window.StrideCounter+1] = requestStart
 
 					err, hasRunComputation := processor.window.ShiftBuffer(observationResult.Buffers)
+					reporter.Initialize(processor.window.StrideCounter+1,
+						processor.accumulator.CurrentStrideStartTs,
+						processor.accumulator.CurrentStrideMaxTs,
+						processor.accumulator.Tsids)
 
 					// TODO: check for error type.
 					// If window is busy, hold the observationResult
 					if err != nil {
 						log.Printf("failed to process window: %v", err)
-						if hasRunComputation {
-							log.Printf("finished processing stride %d\n", processor.window.StrideCounter)
-							reporter.Initialize(processor.window.StrideCounter+1,
-								processor.accumulator.CurrentStrideStartTs,
-								processor.accumulator.CurrentStrideMaxTs,
-								processor.accumulator.Tsids)
-							reporter.AddConstantRows(processor.window.ConstantRows)
-						}
+					}
+					if err == nil && hasRunComputation {
+						log.Printf("finished processing stride %d\n", processor.window.StrideCounter)
+						reporter.AddConstantRows(processor.window.ConstantRows)
 					}
 				}
 			case <-time.After(10 * time.Minute):

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/kpaschen/corrjoin/lib"
 	"github.com/kpaschen/corrjoin/lib/datatypes"
-	"github.com/kpaschen/corrjoin/lib/utils"
 	"github.com/parquet-go/parquet-go"
 	"github.com/prometheus/common/model"
 	"log"
@@ -69,7 +68,7 @@ func (r *ParquetReporter) Initialize(strideCounter int,
 		return
 	}
 
-	r.writer = parquet.NewGenericWriter[Timeseries](file)
+	r.writer = parquet.NewGenericWriter[Timeseries](file, parquet.MaxRowsPerRowGroup(10000))
 
 	metadataRows := make([]Timeseries, len(tsids), len(tsids))
 	for i, tsid := range tsids {
@@ -98,7 +97,6 @@ func (r *ParquetReporter) Initialize(strideCounter int,
 		metadataRows[i] = row
 	}
 	r.writer.Write(metadataRows)
-	utils.ReportMemory("parquet writer after initialization")
 }
 
 func extractRowsFromResult(result datatypes.CorrjoinResult) []Timeseries {
@@ -150,9 +148,8 @@ func (r *ParquetReporter) AddCorrelatedPairs(result datatypes.CorrjoinResult) er
 
 	rows := extractRowsFromResult(result)
 
-	n, err := r.writer.Write(rows)
-	log.Printf("correlated pairs writer returned %d and err %e\n", n, err)
-	utils.ReportMemory("parquet writer after writing rows")
+	_, err := r.writer.Write(rows)
+	//log.Printf("correlated pairs writer returned %d and err %e\n", n, err)
 
 	return err
 }
