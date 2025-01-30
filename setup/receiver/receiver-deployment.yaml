@@ -25,9 +25,9 @@ spec:
       containers:
       - name: receiver
         image: localhost:5001/receiver:v0.1
-        #imagePullPolicy: Always
+        imagePullPolicy: Always
         #image: ghcr.io/kpaschen/corrjoin:cluster-explorer
-        imagePullPolicy: IfNotPresent
+        #imagePullPolicy: IfNotPresent
         command: ["/webroot/app"]
         args: ["-svdDimensions", "7", 
            "-windowSize", "100", "-stride", "50", 

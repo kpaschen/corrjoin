@@ -80,9 +80,10 @@ func (t *tsProcessor) observeTs(req *prompb.WriteRequest) error {
 		sampleCounter := 0
 		for _, s := range ts.Samples {
 			t.observationQueue <- &corrjoin.Observation{
-				MetricName: metricName,
-				Value:      s.Value,
-				Timestamp:  time.Unix(s.Timestamp/1000, 0).UTC(),
+				MetricFingerprint: (uint64)(metric.Fingerprint()),
+				MetricName:        metricName,
+				Value:             s.Value,
+				Timestamp:         time.Unix(s.Timestamp/1000, 0).UTC(),
 			}
 			sampleCounter++
 		}
@@ -112,11 +113,10 @@ func (t *tsProcessor) ReceivePrometheusData(w http.ResponseWriter, r *http.Reque
 }
 
 func NewTsProcessor(corrjoinConfig settings.CorrjoinSettings, strideLength int,
-	reporter reporter.Reporter) *tsProcessor {
+	reporter *reporter.ParquetReporter) *tsProcessor {
 
 	// The observation queue is how we hand timeseries data to the accumulator.
 	observationQueue := make(chan *corrjoin.Observation, 1)
-	//defer close(observationQueue)
 
 	// The buffer channel is how the accumulator lets us know there are enough
 	// timeseries data in the buffer for a stride.
@@ -124,7 +124,6 @@ func NewTsProcessor(corrjoinConfig settings.CorrjoinSettings, strideLength int,
 
 	// The results channel is where we hear about correlated timeseries.
 	resultsChannel := make(chan *datatypes.CorrjoinResult, 1)
-	//defer close(resultsChannel)
 
 	comparer := &comparisons.InProcessComparer{}
 	comparer.Initialize(corrjoinConfig, resultsChannel)
@@ -133,8 +132,8 @@ func NewTsProcessor(corrjoinConfig settings.CorrjoinSettings, strideLength int,
 		accumulator: corrjoin.NewTimeseriesAccumulator(strideLength, time.Now().UTC(),
 			corrjoinConfig.SampleInterval, bufferChannel),
 		settings:         &corrjoinConfig,
-		window:           corrjoin.NewTimeseriesWindow(corrjoinConfig, comparer),
 		observationQueue: observationQueue,
+		window:           corrjoin.NewTimeseriesWindow(corrjoinConfig, comparer),
 		resultsChannel:   resultsChannel,
 		bufferChannel:    bufferChannel,
 		comparer:         comparer,
@@ -160,22 +159,28 @@ func NewTsProcessor(corrjoinConfig settings.CorrjoinSettings, strideLength int,
 					log.Printf("failed to process window: %v", observationResult.Err)
 				} else {
 					log.Printf("got an observation request\n")
+					err := reporter.Flush()
+					if err != nil {
+						log.Printf("error flushing results reporter: %e\n", err)
+					}
 					requestedCorrelationBatches.Inc()
 					requestStart := time.Now()
-					// TODO: this is a hack because ShiftBuffer only returns after the window
-					// is done processing. Fix this when I add the lock to the window.
 					processor.strideStartTimes[processor.window.StrideCounter+1] = requestStart
-					reporter.Initialize(corrjoinConfig, processor.window.StrideCounter+1,
+
+					err, hasRunComputation := processor.window.ShiftBuffer(observationResult.Buffers)
+					reporter.Initialize(processor.window.StrideCounter+1,
 						processor.accumulator.CurrentStrideStartTs,
 						processor.accumulator.CurrentStrideMaxTs,
 						processor.accumulator.Tsids)
-					// TODO: this has to return quickly.
 
-					err := processor.window.ShiftBuffer(observationResult.Buffers)
 					// TODO: check for error type.
 					// If window is busy, hold the observationResult
 					if err != nil {
 						log.Printf("failed to process window: %v", err)
+					}
+					if err == nil && hasRunComputation {
+						log.Printf("finished processing stride %d\n", processor.window.StrideCounter)
+						reporter.AddConstantRows(processor.window.ConstantRows)
 					}
 				}
 			case <-time.After(10 * time.Minute):
@@ -202,7 +207,10 @@ func NewTsProcessor(corrjoinConfig settings.CorrjoinSettings, strideLength int,
 						correlationDuration.Set(float64(elapsed.Milliseconds()))
 						log.Printf("correlation batch processed in %d milliseconds\n", elapsed.Milliseconds())
 					}
-					reporter.Flush()
+					err := reporter.Flush()
+					if err != nil {
+						log.Printf("failed to flush results writer: %e\n", err)
+					}
 				} else {
 					err := reporter.AddCorrelatedPairs(*correlationResult)
 					if err != nil {

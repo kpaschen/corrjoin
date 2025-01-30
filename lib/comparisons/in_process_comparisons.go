@@ -40,8 +40,9 @@ func (s *InProcessComparer) StartStride(normalizedMatrix [][]float64, constantRo
 	}
 	if s.baseComparer == nil {
 		s.baseComparer = &BaseComparer{
-			paa2:  make(map[int][]float64),
-			stats: StrideStats{},
+			paa2:             make(map[int][]float64),
+			constantPostPaa2: make(map[int]bool),
+			stats:            StrideStats{},
 		}
 	}
 	s.strideCounter = strideCounter

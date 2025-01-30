@@ -164,32 +164,51 @@ func (s *BucketingScheme) candidatesForBucket(bucket *Bucket) error {
 		}
 	}
 
-	n := neighbourCoordinates(bucket.coordinates)
-	log.Printf("bucket %s has %d neighbours\n", BucketName(bucket.coordinates), len(n))
-	for _, d := range n {
-		name := BucketName(d)
-		neighbour, exists := s.buckets[name]
-		if exists {
+	neighbourCount := 0
+	for otherName, otherBucket := range s.buckets {
+		if isLeftNeighbour(bucket.coordinates, otherBucket.coordinates) {
+			neighbourCount++
 			for _, r1 := range bucket.members {
-				for _, r2 := range neighbour.members {
+				for _, r2 := range otherBucket.members {
 					if r1 == r2 {
 						return fmt.Errorf("element %d is in buckets %s and %s", r1,
-							BucketName(bucket.coordinates), name)
+							BucketName(bucket.coordinates), otherName)
 					}
-					// The neighbour relationship is symmetric. It would be more efficient to compute neighbours
-					// so the relationship is not symmetric, but much harder.
-					if r1 < r2 {
-						err := s.comparer.Compare(r1, r2)
-						if err != nil {
-							return err
-						}
+					err := s.comparer.Compare(r1, r2)
+					if err != nil {
+						return err
 					}
 				}
 			}
 		}
 	}
-	log.Printf("done with bucket %s\n", BucketName(bucket.coordinates))
+	log.Printf("bucket %s has been compared to %d neighbours\n", BucketName(bucket.coordinates), neighbourCount)
 	return nil
+}
+
+// A bucket is a "left" neighbour of another bucket if it is a neighbour along any dimension,
+// and if its string representation is alphabetically smaller than the other bucket's.
+// So for instance [0,0,1] is a left neighbour of [0,1,1] but not a left neighbour of [0,0,0].
+func isLeftNeighbour(input []int, maybeNeighbour []int) bool {
+	if len(input) != len(maybeNeighbour) {
+		return false
+	}
+
+	oneDiffFound := false
+	for i, inputCoordinate := range input {
+		neighbourCoordinate := maybeNeighbour[i]
+		diff := inputCoordinate - neighbourCoordinate
+		if diff > 1 || diff < -1 {
+			return false
+		}
+		if !oneDiffFound && diff > 0 {
+			return false
+		}
+		if diff != 0 {
+			oneDiffFound = true
+		}
+	}
+	return oneDiffFound
 }
 
 func neighbourCoordinates(input []int) [][]int {
