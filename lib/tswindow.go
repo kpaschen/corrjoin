@@ -28,7 +28,7 @@ type TimeseriesWindow struct {
 	// normalization factor and the avg of the previous stride
 	normalized [][]float64
 
-	constantRows []bool
+	ConstantRows []bool
 
 	postPAA [][]float64
 
@@ -130,7 +130,7 @@ func (w *TimeseriesWindow) ShiftBuffer(buffer [][]float64) error {
 
 	w.normalizeWindow()
 	log.Printf("starting a run of %v on %d rows\n", w.settings.Algorithm, len(w.normalized))
-	err = w.comparer.StartStride(w.normalized, w.constantRows, w.StrideCounter)
+	err = w.comparer.StartStride(w.normalized, w.ConstantRows, w.StrideCounter)
 	if err != nil {
 		// This could get a 'repeated start stride'
 		log.Printf("failed to start stride %d: %v", w.StrideCounter, err)
@@ -160,8 +160,8 @@ func (w *TimeseriesWindow) normalizeWindow() *TimeseriesWindow {
 	if len(w.normalized) < len(w.buffers) {
 		w.normalized = slices.Grow(w.normalized, len(w.buffers)-len(w.normalized))
 	}
-	if len(w.constantRows) < len(w.buffers) {
-		w.constantRows = slices.Grow(w.constantRows, len(w.buffers)-len(w.constantRows))
+	if len(w.ConstantRows) < len(w.buffers) {
+		w.ConstantRows = slices.Grow(w.ConstantRows, len(w.buffers)-len(w.ConstantRows))
 	}
 	constantRowCounter := 0
 	for i, b := range w.buffers {
@@ -170,12 +170,12 @@ func (w *TimeseriesWindow) normalizeWindow() *TimeseriesWindow {
 		} else {
 			w.normalized[i] = slices.Clone(b)
 		}
-		if i >= len(w.constantRows) {
-			w.constantRows = append(w.constantRows, paa.NormalizeSlice(w.normalized[i]))
+		if i >= len(w.ConstantRows) {
+			w.ConstantRows = append(w.ConstantRows, paa.NormalizeSlice(w.normalized[i]))
 		} else {
-			w.constantRows[i] = paa.NormalizeSlice(w.normalized[i])
+			w.ConstantRows[i] = paa.NormalizeSlice(w.normalized[i])
 		}
-		if w.constantRows[i] {
+		if w.ConstantRows[i] {
 			constantRowCounter++
 		}
 	}
@@ -193,7 +193,7 @@ func (w *TimeseriesWindow) pAA() *TimeseriesWindow {
 	for i, b := range w.normalized {
 		// TODO: skip constantRows during PAA?
 		paaResults, constant := paa.PAA(b, w.settings.SvdDimensions)
-		if constant && !w.constantRows[i] {
+		if constant && !w.ConstantRows[i] {
 			constantCounter++
 		}
 		if i >= len(w.postPAA) {
@@ -212,7 +212,7 @@ func (w *TimeseriesWindow) correlationPairs() error {
 		return fmt.Errorf("you must run SVD before you can get correlation pairs")
 	}
 
-	scheme := buckets.NewBucketingScheme(w.normalized, w.postSVD, w.constantRows,
+	scheme := buckets.NewBucketingScheme(w.normalized, w.postSVD, w.ConstantRows,
 		w.settings, w.StrideCounter, w.comparer)
 	utils.ReportMemory("created scheme")
 	err := scheme.Initialize()
@@ -256,7 +256,7 @@ func (w *TimeseriesWindow) sVD() (*TimeseriesWindow, error) {
 	}
 	for i, r := range w.postPAA {
 		fullData = append(fullData, r...)
-		if svdRowCount < w.settings.MaxRowsForSvd && (len(w.constantRows) <= i || !w.constantRows[i]) {
+		if svdRowCount < w.settings.MaxRowsForSvd && (len(w.ConstantRows) <= i || !w.ConstantRows[i]) {
 			// TODO: check if r is constant
 			if i%modulus == 0 {
 				svdData = append(svdData, r...)

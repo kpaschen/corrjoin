@@ -237,7 +237,7 @@ func TestCorrelationPairs(t *testing.T) {
 	}
 	tswindow.normalizeWindow()
 	tswindow.postSVD = tswindow.normalized
-	comparer.StartStride(tswindow.normalized, tswindow.constantRows, tswindow.StrideCounter)
+	comparer.StartStride(tswindow.normalized, tswindow.ConstantRows, tswindow.StrideCounter)
 	found := false
 	go func() {
 		for true {

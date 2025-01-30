@@ -125,6 +125,24 @@ func extractRowsFromResult(result datatypes.CorrjoinResult) []Timeseries {
 	return ret
 }
 
+func (r *ParquetReporter) AddConstantRows(constantRows []bool) error {
+	newRows := make([]Timeseries, 0, int(len(constantRows)/10))
+	for rowid, isConstant := range constantRows {
+		if isConstant {
+			newRows = append(newRows, Timeseries{
+				ID:         rowid,
+				Correlated: rowid,
+				Constant:   isConstant,
+			})
+		}
+	}
+	n, err := r.writer.Write(newRows)
+	if err != nil {
+		log.Printf("constant rows writer returned %d\n", n)
+	}
+	return err
+}
+
 func (r *ParquetReporter) AddCorrelatedPairs(result datatypes.CorrjoinResult) error {
 	if r.writer == nil {
 		return fmt.Errorf("missing writer for timeseries")

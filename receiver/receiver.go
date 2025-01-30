@@ -59,7 +59,6 @@ type tsProcessor struct {
 	accumulator      *corrjoin.TimeseriesAccumulator
 	settings         *settings.CorrjoinSettings
 	window           *corrjoin.TimeseriesWindow
-	observationQueue chan (*corrjoin.Observation)
 	resultsChannel   chan (*datatypes.CorrjoinResult)
 	bufferChannel    chan (*corrjoin.ObservationResult)
 	comparer         comparisons.Engine
@@ -79,12 +78,13 @@ func (t *tsProcessor) observeTs(req *prompb.WriteRequest) error {
 		metricName := string(mjson)
 		sampleCounter := 0
 		for _, s := range ts.Samples {
-			t.observationQueue <- &corrjoin.Observation{
+			observation := &corrjoin.Observation{
 				MetricFingerprint: (uint64)(metric.Fingerprint()),
 				MetricName:        metricName,
 				Value:             s.Value,
 				Timestamp:         time.Unix(s.Timestamp/1000, 0).UTC(),
 			}
+			t.accumulator.AddObservation(observation)
 			sampleCounter++
 		}
 		receivedSamples.Add(float64(sampleCounter))
@@ -113,11 +113,7 @@ func (t *tsProcessor) ReceivePrometheusData(w http.ResponseWriter, r *http.Reque
 }
 
 func NewTsProcessor(corrjoinConfig settings.CorrjoinSettings, strideLength int,
-	reporter reporter.Reporter) *tsProcessor {
-
-	// The observation queue is how we hand timeseries data to the accumulator.
-	observationQueue := make(chan *corrjoin.Observation, 1)
-	//defer close(observationQueue)
+	reporter *reporter.ParquetReporter) *tsProcessor {
 
 	// The buffer channel is how the accumulator lets us know there are enough
 	// timeseries data in the buffer for a stride.
@@ -135,22 +131,11 @@ func NewTsProcessor(corrjoinConfig settings.CorrjoinSettings, strideLength int,
 			corrjoinConfig.SampleInterval, bufferChannel),
 		settings:         &corrjoinConfig,
 		window:           corrjoin.NewTimeseriesWindow(corrjoinConfig, comparer),
-		observationQueue: observationQueue,
 		resultsChannel:   resultsChannel,
 		bufferChannel:    bufferChannel,
 		comparer:         comparer,
 		strideStartTimes: make(map[int]time.Time),
 	}
-
-	go func() {
-		log.Println("watching observation queue")
-		for {
-			select {
-			case observation := <-observationQueue:
-				processor.accumulator.AddObservation(observation)
-			}
-		}
-	}()
 
 	go func() {
 		log.Println("waiting for buffers")
@@ -166,7 +151,7 @@ func NewTsProcessor(corrjoinConfig settings.CorrjoinSettings, strideLength int,
 					requestStart := time.Now()
 					// TODO: this is a hack because ShiftBuffer only returns after the window
 					// is done processing. Fix this when I add the lock to the window.
-					// TODO: make the processor call the reporter
+					// TODO: should the window call the reporter?
 					processor.strideStartTimes[processor.window.StrideCounter+1] = requestStart
 					reporter.Initialize(processor.window.StrideCounter+1,
 						processor.accumulator.CurrentStrideStartTs,
@@ -180,6 +165,7 @@ func NewTsProcessor(corrjoinConfig settings.CorrjoinSettings, strideLength int,
 					if err != nil {
 						log.Printf("failed to process window: %v", err)
 					}
+					reporter.AddConstantRows(processor.window.ConstantRows)
 				}
 			case <-time.After(10 * time.Minute):
 				log.Printf("got no timeseries data for 10 minutes")
