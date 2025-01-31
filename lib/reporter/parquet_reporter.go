@@ -68,6 +68,7 @@ func (r *ParquetReporter) Initialize(strideCounter int,
 		return
 	}
 
+	// max rows per row group 10k is good for memory use but the files are about 3.5G per stride.
 	r.writer = parquet.NewGenericWriter[Timeseries](file, parquet.MaxRowsPerRowGroup(10000))
 
 	metadataRows := make([]Timeseries, len(tsids), len(tsids))
