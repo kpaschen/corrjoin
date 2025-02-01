@@ -18,7 +18,7 @@ const (
 )
 
 type CorrelationExplorer struct {
-	filenameBase        string
+	FilenameBase        string
 	strideCache         []*Stride
 	metricsCache        map[uint64](*explorerlib.Metric)
 	metricsCacheByRowId map[int](*explorerlib.Metric)
@@ -44,10 +44,7 @@ func (c *CorrelationExplorer) Initialize() error {
 		for {
 			select {
 			case _ = <-c.ticker.C:
-				err := c.scanResultFiles()
-				if err != nil {
-					log.Printf("Error scanning result files: %e\n", err)
-				}
+				c.scanResultFiles()
 			}
 		}
 	}()
@@ -55,9 +52,8 @@ func (c *CorrelationExplorer) Initialize() error {
 }
 
 func (c *CorrelationExplorer) scanResultFiles() error {
-	entries, err := os.ReadDir(c.filenameBase)
+	entries, err := os.ReadDir(c.FilenameBase)
 	if err != nil {
-		log.Printf("Failed to get list of stride results from %s: %v\n", c.filenameBase, err)
 		return err
 	}
 	sort.Slice(entries, func(i, j int) bool {
@@ -163,7 +159,7 @@ func (c *CorrelationExplorer) addStrideCacheEntry(stride *Stride) {
 }
 
 func (c *CorrelationExplorer) readResultFile(filename string) error {
-	parquetExplorer := explorerlib.NewParquetExplorer(c.filenameBase)
+	parquetExplorer := explorerlib.NewParquetExplorer(c.FilenameBase)
 	err := parquetExplorer.Initialize(filename)
 	if err != nil {
 		return err
@@ -181,17 +177,22 @@ func (c *CorrelationExplorer) readResultFile(filename string) error {
 // TODO: another endpoint for nodes/edges data for the development over time
 func (c *CorrelationExplorer) ExploreByName(w http.ResponseWriter, r *http.Request) {
 	params := r.URL.Query()
-	fmt.Printf("got params: %+v\n", params)
-	// example: got params: map[name:[{__name__="process_cpu_seconds_total", container="receiver", endpoint="metrics", instance="10.100.1.8:9203", job="correlation-service", namespace="default", pod="correlation-processor-75b6d895df-xps42", service="correlation-service"}]]
+  var timeTo int64
+  n, err := fmt.Sscanf(params["timeTo"][0], "%d", &timeTo)
+  if n != 1 || err != nil {
+		http.Error(w, fmt.Sprintf("failed to parse time out of %s\n", params["timeTo"][0]), http.StatusBadRequest)
+    return
+  }
 	var metric model.Metric
-	err := json.Unmarshal(([]byte)(params["ts"][0]), &metric)
+	err = json.Unmarshal(([]byte)(params["ts"][0]), &metric)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("failed to parse timeseries out of %s\n", params["ts"]), http.StatusBadRequest)
+		http.Error(w, fmt.Sprintf("failed to parse timeseries out of %s because %v\n", params["ts"][0], err), http.StatusBadRequest)
 		return
 	}
 	fp := uint64(metric.Fingerprint())
 	cachedMetric, found := c.metricsCache[fp]
 	if !found {
+    log.Printf("metric not found\n")
 		http.Error(w, fmt.Sprintf("metric %s not found\n", params["ts"]), http.StatusNotFound)
 		return
 	}
@@ -213,7 +214,7 @@ func (c *CorrelationExplorer) ExploreTimeseries(w http.ResponseWriter, r *http.R
 		http.Error(w, fmt.Sprintf("Stride %s not known\n", strideKey), http.StatusBadRequest)
 		return
 	}
-	file, err := os.Open(filepath.Join(c.filenameBase, strideKey))
+	file, err := os.Open(filepath.Join(c.FilenameBase, strideKey))
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Missing data file for cluster %s\n", strideKey), http.StatusBadRequest)
 		return
@@ -225,7 +226,7 @@ func (c *CorrelationExplorer) ExploreTimeseries(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	file, err = os.Open(filepath.Join(c.filenameBase, stride.idsFile))
+	file, err = os.Open(filepath.Join(c.FilenameBase, stride.idsFile))
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Missing ids file for cluster %s\n", strideKey), http.StatusBadRequest)
 		return

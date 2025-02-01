@@ -1,40 +1,28 @@
-# Default values for kube-prometheus-stack.
-# This is a YAML-formatted file.
-# Declare variables to be passed into your templates.
-
 ## Provide a name in place of kube-prometheus-stack for `app:` labels
-##
 nameOverride: ""
 
 ## Override the deployment namespace
-##
 namespaceOverride: "monitoring"
 
 ## Provide a k8s version to auto dashboard import script example: kubeTargetVersionOverride: 1.26.6
-##
 kubeTargetVersionOverride: ""
 
 ## Allow kubeVersion to be overridden while creating the ingress
-##
 kubeVersionOverride: ""
 
 ## Provide a name to substitute for the full names of resources
-##
 fullnameOverride: ""
 
 ## Labels to apply to all resources
-##
 commonLabels: {}
 # scmhash: abc123
 # myLabel: aakkmd
 
 ## Install Prometheus Operator CRDs
-##
 crds:
   enabled: true
 
 ## custom Rules to override "for" and "severity" in defaultRules
-##
 customRules: {}
   # AlertmanagerFailedReload:
   #   for: 3m
@@ -178,26 +166,6 @@ defaultRules:
   disabled: {}
   # KubeAPIDown: true
   # NodeRAIDDegraded: true
-
-## Deprecated way to provide custom recording or alerting rules to be deployed into the cluster.
-##
-# additionalPrometheusRules: []
-#  - name: my-rule-file
-#    groups:
-#      - name: my_group
-#        rules:
-#        - record: my_record
-#          expr: 100 * my_record
-
-## Provide custom recording or alerting rules to be deployed into the cluster.
-##
-additionalPrometheusRulesMap: {}
-#  rule-name:
-#    groups:
-#    - name: my_group
-#      rules:
-#      - record: my_record
-#        expr: 100 * my_record
 
 ##
 global:
@@ -389,42 +357,6 @@ alertmanager:
   ingress:
     enabled: false
 
-    # For Kubernetes >= 1.18 you should specify the ingress-controller via the field ingressClassName
-    # See https://kubernetes.io/blog/2020/04/02/improvements-to-the-ingress-api-in-kubernetes-1.18/#specifying-the-class-of-an-ingress
-    # ingressClassName: nginx
-
-    annotations: {}
-
-    labels: {}
-
-    ## Override ingress to a different defined port on the service
-    # servicePort: 8081
-    ## Override ingress to a different service then the default, this is useful if you need to
-    ## point to a specific instance of the alertmanager (eg kube-prometheus-stack-alertmanager-0)
-    # serviceName: kube-prometheus-stack-alertmanager-0
-
-    ## Hosts must be provided if Ingress is enabled.
-    ##
-    hosts: []
-      # - alertmanager.domain.com
-
-    ## Paths to use for ingress rules - one path should match the alertmanagerSpec.routePrefix
-    ##
-    paths: []
-    # - /
-
-    ## For Kubernetes >= 1.18 you should specify the pathType (determines how Ingress paths should be matched)
-    ## See https://kubernetes.io/blog/2020/04/02/improvements-to-the-ingress-api-in-kubernetes-1.18/#better-path-matching-with-path-types
-    # pathType: ImplementationSpecific
-
-    ## TLS configuration for Alertmanager Ingress
-    ## Secret must be manually created in the namespace
-    ##
-    tls: []
-    # - secretName: alertmanager-general-tls
-    #   hosts:
-    #   - alertmanager.example.com
-
   ## Configuration for Alertmanager secret
   ##
   secret:
@@ -435,44 +367,6 @@ alertmanager:
   ##
   ingressPerReplica:
     enabled: false
-
-    # For Kubernetes >= 1.18 you should specify the ingress-controller via the field ingressClassName
-    # See https://kubernetes.io/blog/2020/04/02/improvements-to-the-ingress-api-in-kubernetes-1.18/#specifying-the-class-of-an-ingress
-    # ingressClassName: nginx
-
-    annotations: {}
-    labels: {}
-
-    ## Final form of the hostname for each per replica ingress is
-    ## {{ ingressPerReplica.hostPrefix }}-{{ $replicaNumber }}.{{ ingressPerReplica.hostDomain }}
-    ##
-    ## Prefix for the per replica ingress that will have `-$replicaNumber`
-    ## appended to the end
-    hostPrefix: ""
-    ## Domain that will be used for the per replica ingress
-    hostDomain: ""
-
-    ## Paths to use for ingress rules
-    ##
-    paths: []
-    # - /
-
-    ## For Kubernetes >= 1.18 you should specify the pathType (determines how Ingress paths should be matched)
-    ## See https://kubernetes.io/blog/2020/04/02/improvements-to-the-ingress-api-in-kubernetes-1.18/#better-path-matching-with-path-types
-    # pathType: ImplementationSpecific
-
-    ## Secret name containing the TLS certificate for alertmanager per replica ingress
-    ## Secret must be manually created in the namespace
-    tlsSecretName: ""
-
-    ## Separated secret for each per replica Ingress. Can be used together with cert-manager
-    ##
-    tlsSecretPerReplica:
-      enabled: false
-      ## Final form of the secret for each per replica ingress is
-      ## {{ tlsSecretPerReplica.prefix }}-{{ $replicaNumber }}
-      ##
-      prefix: "alertmanager"
 
   ## Configuration for Alertmanager service
   ##
@@ -814,15 +708,6 @@ alertmanager:
     ## ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/
     ##
     affinity: {}
-    # nodeAffinity:
-    #   requiredDuringSchedulingIgnoredDuringExecution:
-    #     nodeSelectorTerms:
-    #     - matchExpressions:
-    #       - key: kubernetes.io/e2e-az-name
-    #         operator: In
-    #         values:
-    #         - e2e-az1
-    #         - e2e-az2
 
     ## If specified, the pod's tolerations.
     ## ref: https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/
@@ -837,12 +722,6 @@ alertmanager:
     ## ref: https://kubernetes.io/docs/concepts/workloads/pods/pod-topology-spread-constraints/
     ##
     topologySpreadConstraints: []
-    # - maxSkew: 1
-    #   topologyKey: topology.kubernetes.io/zone
-    #   whenUnsatisfiable: DoNotSchedule
-    #   labelSelector:
-    #     matchLabels:
-    #       app: alertmanager
 
     ## SecurityContext holds pod-level security attributes and common container settings.
     ## This defaults to non root user with uid 1000 and gid 2000. *v1.PodSecurityContext  false
@@ -864,22 +743,6 @@ alertmanager:
     ## Containers allows injecting additional containers. This is meant to allow adding an authentication proxy to an Alertmanager pod.
     ##
     containers: []
-    # containers:
-    # - name: oauth-proxy
-    #   image: quay.io/oauth2-proxy/oauth2-proxy:v7.5.1
-    #   args:
-    #   - --upstream=http://127.0.0.1:9093
-    #   - --http-address=0.0.0.0:8081
-    #   - --metrics-address=0.0.0.0:8082
-    #   - ...
-    #   ports:
-    #   - containerPort: 8081
-    #     name: oauth-proxy
-    #     protocol: TCP
-    #   - containerPort: 8082
-    #     name: oauth-metrics
-    #     protocol: TCP
-    #   resources: {}
 
     # Additional volumes on the output StatefulSet definition.
     volumes: []
@@ -955,6 +818,23 @@ grafana:
   plugins:
   - yesoreyeram-infinity-datasource
 
+  datasources:
+    datasources.yaml:
+       datasources:
+         - id: 4
+           uid: "bebrqu5r2he68d"
+           orgId: 1
+           name: "yesoreyeram-infinity-datasource"
+           type: "yesoreyeram-infinity-datasource"
+           url: ""
+           basicAuth: false
+           basicAuthUser: ""
+           isDefault: false
+           jsonData:
+             global_queries: []
+           readOnly: false
+           apiVersion: ""
+
   ## ForceDeployDatasources Create datasource configmap even if grafana deployment has been disabled
   ##
   forceDeployDatasources: false
@@ -978,6 +858,12 @@ grafana:
 
   # EDITME
   adminPassword: prom-operator
+
+  # TODO:
+  # admin:
+  #   existingSecret: ""
+  #   userKey: admin-user
+  #   passwordKey: admin-password
 
   rbac:
     ## If true, Grafana PSPs will be created
@@ -1157,10 +1043,10 @@ grafana:
 
     # Scrape interval. If not set, the Prometheus default scrape interval is used.
     #
-    interval: "15s"
+    interval: 15s
     scheme: http
     tlsConfig: {}
-    scrapeTimeout: 30s
+    scrapeTimeout: 15s
 
     ## RelabelConfigs to apply to samples before scraping
     ## ref: https://github.com/prometheus-operator/prometheus-operator/blob/main/Documentation/api.md#relabelconfig
@@ -3417,11 +3303,11 @@ prometheus:
     ## Defaults to 30s.
     ## ref: https://github.com/prometheus-operator/prometheus-operator/blob/release-0.44/pkg/prometheus/promcfg.go#L180-L183
     ##
-    scrapeInterval: "20s"
+    scrapeInterval: 20s
 
     ## Number of seconds to wait for target to respond before erroring
     ##
-    scrapeTimeout: ""
+    scrapeTimeout: 20s
 
     ## List of scrape classes to expose to scraping objects such as
     ## PodMonitors, ServiceMonitors, Probes and ScrapeConfigs.
@@ -3435,7 +3321,7 @@ prometheus:
 
     ## Interval between consecutive evaluations.
     ##
-    evaluationInterval: "20s"
+    evaluationInterval: 20s
 
     ## ListenLocal makes the Prometheus server listen on loopback, so that it does not bind against the Pod IP.
     ##
@@ -3457,7 +3343,7 @@ prometheus:
 
     ## Exemplars related settings that are runtime reloadable.
     ## It requires to enable the exemplar storage feature to be effective.
-    exemplars: ""
+    exemplars: {}
       ## Maximum number of exemplars stored in memory for all series.
       ## If not set, Prometheus uses its default value.
       ## A value of zero or less than zero disables the storage.
@@ -3776,16 +3662,18 @@ prometheus:
     - url: http://correlation-service.default:9201/api/v1/write
       writeRelabelConfigs:
       - sourceLabels: ["__name__"]
-        regex: "correlated_timeseries|node_os_|node_network_iface_|node_network_info|node_network_name_|prometheus_operator_build_info|ALERTS|etcd_request_duration_seconds_.*|_bucket$"
+        regex: "node_os_|node_network_iface_|node_network_info|node_network_name_|prometheus_operator_build_info|ALERTS|etcd_request_duration_seconds_.*|_bucket$"
         action: Drop
       - regex: "instance|job|prometheus|service|prometheus_replica"
         action: LabelDrop
+      queueConfig:
+         sampleAgeLimit: 500s
 
     ## additionalRemoteWrite is appended to remoteWrite
     additionalRemoteWrite: []
 
     ## Enable/Disable Grafana dashboards provisioning for prometheus remote write feature
-    remoteWriteDashboards: false
+    remoteWriteDashboards: true
 
     ## Resource limits & requests
     ##

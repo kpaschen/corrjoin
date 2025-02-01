@@ -77,7 +77,9 @@ func main() {
 	}
 	corrjoinConfig = corrjoinConfig.ComputeSettingsFields()
 
-	expl := &explorer.CorrelationExplorer{}
+	expl := &explorer.CorrelationExplorer{
+     FilenameBase: resultsDirectory,
+  }
 	err := expl.Initialize()
 	if err != nil {
 		log.Printf("failed to initialize explorer: %v\n", err)

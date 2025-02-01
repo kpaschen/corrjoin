@@ -7,7 +7,7 @@ import (
 
 func TestScanResultFiles(t *testing.T) {
 	explorer := CorrelationExplorer{
-		filenameBase:         ".",
+		FilenameBase:         ".",
 		strideCache:          make([]*Stride, STRIDE_CACHE_SIZE, STRIDE_CACHE_SIZE),
 		metricsCache:         make(map[uint64](*explorerlib.Metric)),
 		metricsCacheByRowId:  make(map[int](*explorerlib.Metric)),
