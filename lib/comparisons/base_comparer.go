@@ -15,7 +15,7 @@ type StrideStats struct {
 type BaseComparer struct {
 	config settings.CorrjoinSettings
 
-	// For legacy use cases, you can use a full matrix here.
+	// Can use either normalizedMatrix or normalizedRows.
 	normalizedMatrix [][]float64
 	normalizedRows   map[int][]float64
 	strideCounter    int

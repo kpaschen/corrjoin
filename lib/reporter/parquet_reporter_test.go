@@ -20,7 +20,7 @@ func TestInitialize(t *testing.T) {
 		t.Errorf("failed to create temp dir")
 	}
 	defer os.RemoveAll(tempdir)
-	rep := NewParquetReporter(tempdir)
+	rep := NewParquetReporter(tempdir, 100000)
 
 	sampleMetric := model.Metric{}
 	sampleMetric[model.LabelName("__name__")] = model.LabelValue("myMetric")
@@ -57,7 +57,7 @@ func TestAddCorrelatedPairs(t *testing.T) {
 		t.Errorf("failed to create temp dir")
 	}
 	defer os.RemoveAll(tempdir)
-	rep := NewParquetReporter(tempdir)
+	rep := NewParquetReporter(tempdir, 1000)
 
 	sampleMetric := model.Metric{}
 	sampleMetric[model.LabelName("__name__")] = model.LabelValue("myMetric")

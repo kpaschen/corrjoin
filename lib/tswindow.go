@@ -39,15 +39,23 @@ type TimeseriesWindow struct {
 
 	windowSize    int
 	StrideCounter int
+
+	windowLocked chan struct{}
 }
 
 func NewTimeseriesWindow(settings settings.CorrjoinSettings, comparer comparisons.Engine) *TimeseriesWindow {
-	return &TimeseriesWindow{settings: settings, StrideCounter: 0, comparer: comparer}
+	return &TimeseriesWindow{
+		settings:      settings,
+		StrideCounter: 0,
+		comparer:      comparer,
+		windowLocked:  make(chan struct{}, 1),
+	}
 }
 
 func (w *TimeseriesWindow) shiftBufferIntoWindow(buffer [][]float64) (bool, error) {
 	// Weird but ok?
 	if len(buffer) == 0 {
+		log.Println("got a buffer of length 0 in window")
 		return false, nil
 	}
 	currentRowCount := len(w.buffers)
@@ -115,17 +123,41 @@ func (w *TimeseriesWindow) shiftBufferIntoWindow(buffer [][]float64) (bool, erro
 // Returns true if computation was performed, false if there was nothing to do.
 func (w *TimeseriesWindow) ShiftBuffer(buffer [][]float64) (error, bool) {
 
-	// TODO: make an error type so I can signal whether the window
-	// is busy vs. a different kind of error.
-	// Then the caller can decide what to do.
+	// If the window is currently unlocked, lock it before starting computation.
+	// If the window is currently locked, reject the request.
+	select {
+	case w.windowLocked <- struct{}{}:
+		log.Println("window is now locked")
+	default:
+		// TODO: make this a custom error type
+		log.Printf("Rejecting computation request because window is still locked")
+		// TODO: increase metric
+		return fmt.Errorf("stride computation overrun"), false
+	}
 
 	newStride, err := w.shiftBufferIntoWindow(buffer)
 	if err != nil {
+		w.unlockWindow()
 		return err, false
 	}
 	if !newStride {
+		w.unlockWindow()
 		return nil, false
 	}
+
+	go w.runAlgorithm()
+
+	return nil, true
+}
+
+func (w *TimeseriesWindow) unlockWindow() {
+	log.Println("unlocking window")
+	<-w.windowLocked
+}
+
+func (w *TimeseriesWindow) runAlgorithm() {
+	var err error
+	defer w.unlockWindow()
 
 	w.StrideCounter++
 
@@ -136,7 +168,6 @@ func (w *TimeseriesWindow) ShiftBuffer(buffer [][]float64) (error, bool) {
 		// This could get a 'repeated start stride'
 		log.Printf("failed to start stride %d: %v", w.StrideCounter, err)
 	}
-
 	switch w.settings.Algorithm {
 	case settings.ALGO_FULL_PEARSON:
 		err = w.fullPearson()
@@ -149,10 +180,8 @@ func (w *TimeseriesWindow) ShiftBuffer(buffer [][]float64) (error, bool) {
 		err = fmt.Errorf("unsupported algorithm choice %s", w.settings.Algorithm)
 	}
 	if err != nil {
-		return err, true
+		log.Printf("Failed to process window: %v\n", err)
 	}
-
-	return nil, true
 }
 
 // This could be computed incrementally.

@@ -36,15 +36,17 @@ type ParquetReporter struct {
 	// I tried a SortingWriter but it used too much memory.
 	writer   *parquet.GenericWriter[Timeseries]
 	filepath string
+  maxRowsPerRowGroup int64
 }
 
-func NewParquetReporter(filenameBase string) *ParquetReporter {
+func NewParquetReporter(filenameBase string, maxRows int64) *ParquetReporter {
 	return &ParquetReporter{
 		filenameBase:     filenameBase,
 		strideStartTimes: make(map[int]string),
 		strideEndTimes:   make(map[int]string),
 		writer:           nil,
 		filepath:         "",
+    maxRowsPerRowGroup: maxRows,
 	}
 }
 
@@ -69,7 +71,7 @@ func (r *ParquetReporter) Initialize(strideCounter int,
 	}
 
 	// max rows per row group 10k is good for memory use but the files are about 3.5G per stride.
-	r.writer = parquet.NewGenericWriter[Timeseries](file, parquet.MaxRowsPerRowGroup(10000))
+	r.writer = parquet.NewGenericWriter[Timeseries](file, parquet.MaxRowsPerRowGroup(r.maxRowsPerRowGroup))
 
 	metadataRows := make([]Timeseries, len(tsids), len(tsids))
 	for i, tsid := range tsids {

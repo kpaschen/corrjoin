@@ -32,7 +32,8 @@ spec:
         args: ["-svdDimensions", "7", 
            "-windowSize", "100", "-stride", "50", 
            #"-comparer", "inprocess", "-correlationThreshold", "99", "-justExplore" ]
-           "-comparer", "inprocess", "-correlationThreshold", "99" ]
+           "-comparer", "inprocess", "-correlationThreshold", "99",
+           "-parquetMaxRowsPerRowGroup", "100000" ]
         resources:
            limits:
               cpu: "1"

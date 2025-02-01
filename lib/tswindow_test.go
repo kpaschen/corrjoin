@@ -9,23 +9,17 @@ import (
 	"testing"
 )
 
-var (
-	config = settings.CorrjoinSettings{
-		Algorithm: settings.ALGO_NONE,
-	}
-	comparer = &comparisons.InProcessComparer{}
-)
-
 func TestNormalizeWindow(t *testing.T) {
-	config.WindowSize = 3
-	config.MaxRowsForSvd = 2
+	config := settings.CorrjoinSettings{
+		Algorithm:     settings.ALGO_NONE,
+		WindowSize:    3,
+		MaxRowsForSvd: 2,
+	}
+	comparer := &comparisons.InProcessComparer{}
 	results := make(chan *datatypes.CorrjoinResult, 1)
 	defer close(results)
 	comparer.Initialize(config, results)
-	tswindow := &TimeseriesWindow{
-		settings: config,
-		comparer: comparer,
-	}
+	tswindow := NewTimeseriesWindow(config, comparer)
 	bufferWindow := [][]float64{
 		[]float64{0.1, 0.2, 0.3},
 		[]float64{1.1, 1.2, 1.3},
@@ -54,6 +48,7 @@ func TestNormalizeWindow(t *testing.T) {
 		t.Errorf("normalization should have left the raw data alone but bufferWindow is %v and buffers are %v",
 			bufferWindow, tswindow.buffers)
 	}
+	tswindow.unlockWindow()
 }
 
 func matrixEqual(a [][]float64, b [][]float64, epsilon float64) bool {
@@ -74,14 +69,15 @@ func matrixEqual(a [][]float64, b [][]float64, epsilon float64) bool {
 }
 
 func TestShiftBuffer(t *testing.T) {
-	config.WindowSize = 3
+	config := settings.CorrjoinSettings{
+		Algorithm:  settings.ALGO_NONE,
+		WindowSize: 3,
+	}
+	comparer := &comparisons.InProcessComparer{}
 	results := make(chan *datatypes.CorrjoinResult, 1)
 	defer close(results)
 	comparer.Initialize(config, results)
-	tswindow := &TimeseriesWindow{
-		settings: config,
-		comparer: comparer,
-	}
+	tswindow := NewTimeseriesWindow(config, comparer)
 	bufferWindow := [][]float64{
 		[]float64{0.1, 0.2, 0.3},
 		[]float64{1.1, 1.2, 1.3},
@@ -101,6 +97,7 @@ func TestShiftBuffer(t *testing.T) {
 	wrongSizeBuffer := [][]float64{
 		[]float64{0.4, 0.5},
 	}
+	tswindow.unlockWindow()
 	err, _ = tswindow.ShiftBuffer(wrongSizeBuffer)
 	if err == nil {
 		t.Errorf("expected error for mismatched buffer shift")
@@ -128,15 +125,16 @@ func TestShiftBuffer(t *testing.T) {
 }
 
 func TestPAA(t *testing.T) {
-	config.WindowSize = 4
-	config.SvdDimensions = 2
+	config := settings.CorrjoinSettings{
+		Algorithm:     settings.ALGO_NONE,
+		WindowSize:    4,
+		SvdDimensions: 2,
+	}
+	comparer := &comparisons.InProcessComparer{}
 	results := make(chan *datatypes.CorrjoinResult, 1)
 	defer close(results)
 	comparer.Initialize(config, results)
-	tswindow := &TimeseriesWindow{
-		settings: config,
-		comparer: comparer,
-	}
+	tswindow := NewTimeseriesWindow(config, comparer)
 	bufferWindow := [][]float64{
 		[]float64{0.1, 0.2, 0.3, 0.4},
 		[]float64{1.1, 1.2, 1.3, 1.4},
@@ -171,17 +169,18 @@ func TestSVD(t *testing.T) {
 	// Input matrix A has 2 rows, 3 columns
 	// U should be 2x2, V should be 3x3
 	// But we compute ThinV, so V is only 3x2 because there's just 2 nonzero eigenvalues.
-	config.WindowSize = 3
-	config.SvdDimensions = 3
-	config.SvdOutputDimensions = 2
-	config.MaxRowsForSvd = 10000
+	config := settings.CorrjoinSettings{
+		Algorithm:           settings.ALGO_NONE,
+		WindowSize:          3,
+		SvdDimensions:       3,
+		SvdOutputDimensions: 2,
+		MaxRowsForSvd:       10000,
+	}
+	comparer := &comparisons.InProcessComparer{}
 	results := make(chan *datatypes.CorrjoinResult, 1)
 	defer close(results)
 	comparer.Initialize(config, results)
-	tswindow := &TimeseriesWindow{
-		settings: config,
-		comparer: comparer,
-	}
+	tswindow := NewTimeseriesWindow(config, comparer)
 	bufferWindow := [][]float64{
 		[]float64{3.0, 2.0, 2.0},
 		[]float64{2.0, 3.0, -2.0},
@@ -221,20 +220,21 @@ func TestCorrelationPairs(t *testing.T) {
 		[]float64{1.1, 1.2, 1.3, 1.4},
 		[]float64{2.3, -8.2, 1.3, 0.4},
 	}
-	config.WindowSize = 4
-	config.SvdDimensions = 4
-	config.SvdOutputDimensions = 4
-	config.EuclidDimensions = 3
-	config.CorrelationThreshold = 0.9
+	config := settings.CorrjoinSettings{
+		Algorithm:            settings.ALGO_NONE,
+		WindowSize:           4,
+		SvdDimensions:        4,
+		SvdOutputDimensions:  4,
+		EuclidDimensions:     3,
+		CorrelationThreshold: 0.9,
+	}
+	comparer := &comparisons.InProcessComparer{}
 	config.ComputeSettingsFields()
 	results := make(chan *datatypes.CorrjoinResult, 1)
 	defer close(results)
 	comparer.Initialize(config, results)
-	tswindow := &TimeseriesWindow{
-		settings: config,
-		buffers:  initialTsData,
-		comparer: comparer,
-	}
+	tswindow := NewTimeseriesWindow(config, comparer)
+	tswindow.buffers = initialTsData
 	tswindow.normalizeWindow()
 	tswindow.postSVD = tswindow.normalized
 	comparer.StartStride(tswindow.normalized, tswindow.ConstantRows, tswindow.StrideCounter)
