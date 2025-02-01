@@ -35,7 +35,6 @@ func main() {
 	var skipConstantTs bool
 	var compareEngine string
 	var resultsDirectory string
-	var webRoot string
 	var justExplore bool
 
 	flag.StringVar(&metricsAddr, "metrics-address", ":9203", "The address the metrics endpoint binds to.")
@@ -51,8 +50,7 @@ func main() {
 	flag.StringVar(&algorithm, "algorithm", "paa_svd", "Algorithm to use. Possible values: full_pearson, paa_only, paa_svd")
 	flag.BoolVar(&skipConstantTs, "skipConstantTs", true, "Whether to ignore timeseries whose value is constant in the current window")
 	flag.StringVar(&compareEngine, "comparer", "inprocess", "The comparison engine.")
-	flag.StringVar(&resultsDirectory, "resultsDirectory", "/tmp/corrjoinResults", "The directory to write results to.")
-	flag.StringVar(&webRoot, "webRoot", "/webroot", "Web server root")
+	flag.StringVar(&resultsDirectory, "resultsDirectory", "/tmp/corrjoinResults", "The directory with the result files.")
 	flag.BoolVar(&justExplore, "justExplore", false, "If true, launch only the explorer endpoint")
 
 	flag.Parse()
@@ -73,19 +71,13 @@ func main() {
 	}
 	corrjoinConfig = corrjoinConfig.ComputeSettingsFields()
 
-	expl := &explorer.CorrelationExplorer{
-		FilenameBase: resultsDirectory,
-		WebRoot:      webRoot,
-	}
+	expl := &explorer.CorrelationExplorer{}
 	err := expl.Initialize()
 	if err != nil {
 		log.Printf("failed to initialize explorer: %v\n", err)
 	}
 
 	explorerRouter := mux.NewRouter().StrictSlash(true)
-	explorerRouter.HandleFunc("/explore", expl.ExploreCorrelations).Methods("GET")
-	explorerRouter.HandleFunc("/exploreCluster", expl.ExploreCluster).Methods("GET")
-	explorerRouter.HandleFunc("/exploreTimeseries", expl.ExploreTimeseries).Methods("GET")
 	explorerRouter.HandleFunc("/exploreByName", expl.ExploreByName).Methods("GET")
 
 	http.Handle("/metrics", promhttp.Handler())

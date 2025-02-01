@@ -6,6 +6,7 @@ toolchain go1.22.5
 
 require (
 	github.com/gorilla/mux v1.8.1
+	github.com/parquet-go/parquet-go v0.24.0
 	github.com/prometheus/client_golang v1.19.1
 	github.com/prometheus/common v0.53.0
 	github.com/prometheus/prometheus v0.52.0
@@ -45,7 +46,6 @@ require (
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/mwitkow/go-conntrack v0.0.0-20190716064945-2f068394615f // indirect
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
-	github.com/parquet-go/parquet-go v0.24.0 // indirect
 	github.com/pierrec/lz4/v4 v4.1.21 // indirect
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c // indirect
 	github.com/prometheus/client_model v0.6.1 // indirect

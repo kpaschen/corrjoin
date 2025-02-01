@@ -8,6 +8,7 @@ import (
 	"github.com/prometheus/common/model"
 	"io"
 	"log"
+	"net/url"
 	"os"
 	"path/filepath"
 )
@@ -124,7 +125,7 @@ func (p *ParquetExplorer) GetMetrics(cache *map[int]*Metric) error {
 					(*cache)[result.ID] = m
 				}
 				m.Fingerprint = result.MetricFingerprint
-				m.LabelSet[(model.LabelName)("__name__")] = (model.LabelValue)(result.Metric)
+				m.LabelSet["__name__"] = (model.LabelValue)(result.Metric)
 				// TODO: these are currently always on the same row as the metric name, not sure
 				// if that will stay that way.
 				if result.Labels != nil {
@@ -139,7 +140,7 @@ func (p *ParquetExplorer) GetMetrics(cache *map[int]*Metric) error {
 					m = &Metric{
 						RowId:    result.ID,
 						Constant: true,
-						LabelSet: (model.LabelSet)(make(map[model.LabelName]model.LabelValue)),
+						LabelSet: make(map[model.LabelName]model.LabelValue),
 					}
 					(*cache)[result.ID] = m
 				} else {
@@ -148,7 +149,6 @@ func (p *ParquetExplorer) GetMetrics(cache *map[int]*Metric) error {
 			}
 		}
 	}
-
 	return nil
 }
 
@@ -202,4 +202,33 @@ func (p *ParquetExplorer) LookupMetric(timeSeriesId int) (map[string]string, err
 		reader.Close()
 	}
 	return ret, nil
+}
+
+func (m *Metric) computePrometheusGraphURL(prometheusBaseURL string, timeRange string, endTime string) {
+	if len(m.LabelSet) == 0 {
+		m.PrometheusGraphURL = fmt.Sprintf("%s/graph", prometheusBaseURL)
+		return
+	}
+	name := ""
+	attributeString := "{"
+	first := true
+	for key, value := range m.LabelSet {
+		stringv := value
+		if key == "__name__" {
+			name = string(stringv)
+			continue
+		}
+		if first {
+			attributeString = fmt.Sprintf("%s%s=\"%s\"", attributeString, key, string(stringv))
+			first = false
+		} else {
+			attributeString = fmt.Sprintf("%s, %s=\"%s\"", attributeString, key, string(stringv))
+		}
+	}
+	attributeString = attributeString + "}"
+	attributeString = url.QueryEscape(attributeString)
+
+	m.PrometheusGraphURL = fmt.Sprintf("%s/graph?g0.expr=%s%s&g0.tab=0&g0.display_mode=lines&g0.show_exemplars=0&g0.range_input=%s&g0.end_input=%s&g0.moment_input=%s",
+		prometheusBaseURL, name, attributeString, timeRange, url.QueryEscape(endTime),
+		url.QueryEscape(endTime))
 }

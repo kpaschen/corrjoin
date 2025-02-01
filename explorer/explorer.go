@@ -1,11 +1,12 @@
 package explorer
 
 import (
+	"encoding/json"
 	"fmt"
+	explorerlib "github.com/kpaschen/corrjoin/lib/explorer"
+	"github.com/prometheus/common/model"
 	"log"
 	"net/http"
-	//	"net/url"
-	explorerlib "github.com/kpaschen/corrjoin/lib/explorer"
 	"os"
 	"sort"
 	"time"
@@ -170,11 +171,31 @@ func (c *CorrelationExplorer) readResultFile(filename string) error {
 	return parquetExplorer.GetMetrics(&c.metricsCacheByRowId)
 }
 
+// TODO: this also needs the timeframe
+// TODO: this should redirect to a dashboard url and pass information as
+// parameters (probably just url params?):
+// send: stride id, row id, whether this metric was constant during that stride
+// if possible: list of correlated ts row ids and their pearson values
+// TODO:  implement the nodes/edges calls as separate endpoints
+// maybe get the list of correlated ts as another json via another endpoint
+// TODO: another endpoint for nodes/edges data for the development over time
 func (c *CorrelationExplorer) ExploreByName(w http.ResponseWriter, r *http.Request) {
 	params := r.URL.Query()
 	fmt.Printf("got params: %+v\n", params)
 	// example: got params: map[name:[{__name__="process_cpu_seconds_total", container="receiver", endpoint="metrics", instance="10.100.1.8:9203", job="correlation-service", namespace="default", pod="correlation-processor-75b6d895df-xps42", service="correlation-service"}]]
-
+	var metric model.Metric
+	err := json.Unmarshal(([]byte)(params["ts"][0]), &metric)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("failed to parse timeseries out of %s\n", params["ts"]), http.StatusBadRequest)
+		return
+	}
+	fp := uint64(metric.Fingerprint())
+	cachedMetric, found := c.metricsCache[fp]
+	if !found {
+		http.Error(w, fmt.Sprintf("metric %s not found\n", params["ts"]), http.StatusNotFound)
+		return
+	}
+	log.Printf("retrieved %v for metric query %s\n", *cachedMetric, params["ts"])
 }
 
 /*
@@ -224,37 +245,5 @@ func (c *CorrelationExplorer) ExploreTimeseries(w http.ResponseWriter, r *http.R
 		http.Error(w, fmt.Sprintf("Failed to apply template: %v\n", err), http.StatusBadRequest)
 		return
 	}
-}
-*/
-
-// TODO: move to the explorer lib
-/*
-func (m *explorerlib.Metric) computePrometheusGraphURL(prometheusBaseURL string, timeRange string, endTime string) {
-	if len(m.LabelSet) == 0 {
-		m.PrometheusGraphURL = fmt.Sprintf("%s/graph", prometheusBaseURL)
-		return
-	}
-	name := ""
-	attributeString := "{"
-	first := true
-	for key, value := range m.LabelSet {
-		stringv := value
-		if key == "__name__" {
-			name = string(stringv)
-			continue
-		}
-		if first {
-			attributeString = fmt.Sprintf("%s%s=\"%s\"", attributeString, key, string(stringv))
-			first = false
-		} else {
-			attributeString = fmt.Sprintf("%s, %s=\"%s\"", attributeString, key, string(stringv))
-		}
-	}
-	attributeString = attributeString + "}"
-	attributeString = url.QueryEscape(attributeString)
-
-	m.PrometheusGraphURL = fmt.Sprintf("%s/graph?g0.expr=%s%s&g0.tab=0&g0.display_mode=lines&g0.show_exemplars=0&g0.range_input=%s&g0.end_input=%s&g0.moment_input=%s",
-		prometheusBaseURL, name, attributeString, timeRange, url.QueryEscape(endTime),
-		url.QueryEscape(endTime))
 }
 */
