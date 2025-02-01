@@ -34,6 +34,8 @@ func main() {
 	var algorithm string
 	var skipConstantTs bool
 	var compareEngine string
+  var parquetMaxRowsPerRowGroup int
+  var sampleInterval int
 	var resultsDirectory string
 	var justExplore bool
 
@@ -43,6 +45,7 @@ func main() {
 
 	flag.IntVar(&windowSize, "windowSize", 1020, "number of data points to use in determining correlatedness")
 	flag.IntVar(&stride, "stride", 102, "the number of data points to read before computing correlation again")
+  flag.IntVar(&sampleInterval, "sampleInterval", 20, "the time between samples, in seconds. This should be at least the global Prometheus scrape interval")
 	flag.IntVar(&correlationThreshold, "correlationThreshold", 90, "correlation threshold in percent")
 	flag.IntVar(&ks, "ks", 15, "how many columns to reduce the input to in the first PAA step")
 	flag.IntVar(&ke, "ke", 30, "how many columns to reduce the input to in the second PAA step (during bucketing)")
@@ -50,6 +53,7 @@ func main() {
 	flag.StringVar(&algorithm, "algorithm", "paa_svd", "Algorithm to use. Possible values: full_pearson, paa_only, paa_svd")
 	flag.BoolVar(&skipConstantTs, "skipConstantTs", true, "Whether to ignore timeseries whose value is constant in the current window")
 	flag.StringVar(&compareEngine, "comparer", "inprocess", "The comparison engine.")
+  flag.IntVar(&parquetMaxRowsPerRowGroup, "parquetMaxRowsPerRowGroup", 100000, "Number of rows per row group in Parquet. Small numbers reduce memory usage but cost more disk space; large numbers cost more memory but improve compression.")
 	flag.StringVar(&resultsDirectory, "resultsDirectory", "/tmp/corrjoinResults", "The directory with the result files.")
 	flag.BoolVar(&justExplore, "justExplore", false, "If true, launch only the explorer endpoint")
 
@@ -67,7 +71,9 @@ func main() {
 		EuclidDimensions:     ke,
 		CorrelationThreshold: float64(float64(correlationThreshold) / 100.0),
 		WindowSize:           windowSize,
+    SampleInterval:       sampleInterval,
 		Algorithm:            algorithm,
+    MaxRowsPerRowGroup:   parquetMaxRowsPerRowGroup,
 	}
 	corrjoinConfig = corrjoinConfig.ComputeSettingsFields()
 

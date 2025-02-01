@@ -146,8 +146,8 @@ func (s *BucketingScheme) CorrelationCandidates() error {
 
 // candidatesForBucket processes rowPairs for a Bucket and its neighbours.
 func (s *BucketingScheme) candidatesForBucket(bucket *Bucket) error {
-	utils.ReportMemory(fmt.Sprintf("starting on bucket %s with %d members\n",
-		BucketName(bucket.coordinates), len(bucket.members)))
+	//utils.ReportMemory(fmt.Sprintf("starting on bucket %s with %d members\n",
+ //		BucketName(bucket.coordinates), len(bucket.members)))
 	bucketSizeHist.Observe(float64(len(bucket.members)))
 	for i := 0; i < len(bucket.members); i++ {
 		r1 := bucket.members[i]

@@ -976,6 +976,7 @@ grafana:
   ##
   defaultDashboardsEditable: true
 
+  # EDITME
   adminPassword: prom-operator
 
   rbac:
@@ -1156,7 +1157,7 @@ grafana:
 
     # Scrape interval. If not set, the Prometheus default scrape interval is used.
     #
-    interval: "5s"
+    interval: "15s"
     scheme: http
     tlsConfig: {}
     scrapeTimeout: 30s
@@ -3416,7 +3417,7 @@ prometheus:
     ## Defaults to 30s.
     ## ref: https://github.com/prometheus-operator/prometheus-operator/blob/release-0.44/pkg/prometheus/promcfg.go#L180-L183
     ##
-    scrapeInterval: ""
+    scrapeInterval: "20s"
 
     ## Number of seconds to wait for target to respond before erroring
     ##
@@ -3434,7 +3435,7 @@ prometheus:
 
     ## Interval between consecutive evaluations.
     ##
-    evaluationInterval: ""
+    evaluationInterval: "20s"
 
     ## ListenLocal makes the Prometheus server listen on loopback, so that it does not bind against the Pod IP.
     ##

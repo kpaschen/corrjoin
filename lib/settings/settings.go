@@ -41,8 +41,13 @@ type CorrjoinSettings struct {
 	// matrices.
 	MaxRowsForSvd int
 
-	// How often we get new samples, in seconds.
+	// How often we expect new samples, in seconds.
 	SampleInterval int
+
+  // Number of rows per row group in Parquet.
+  // Bigger number mean more memory usage but better compression.
+  // 10000 works but outputs are about twice the size of an equivalent csv file.
+  MaxRowsPerRowGroup int
 
 	Algorithm string
 }
@@ -57,7 +62,10 @@ func (s CorrjoinSettings) ComputeSettingsFields() CorrjoinSettings {
 		s.MaxRowsForSvd = 10000
 	}
 	if s.SampleInterval == 0 {
-		s.SampleInterval = 5
+		s.SampleInterval = 20
 	}
+  if s.MaxRowsPerRowGroup == 0 {
+    s.MaxRowsPerRowGroup = 100000
+  }
 	return s
 }
