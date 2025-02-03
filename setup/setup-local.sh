@@ -67,13 +67,17 @@ fi
 helm repo update
 helm upgrade --install --set args={--kubelet-insecure-tls} metrics-server metrics-server/metrics-server --namespace kube-system
 
-kubectl apply -f monitoring/grafana-secret.yaml
-
-# Start kube-prometheus operator with local values file.
 repo_exists=$(helm repo list -o json | yq '.[] | select(.name == "prometheus-community") .url')
 if [ -z $repo_exists ]; then
    helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
 fi
+
+(
+cd helm/corrjoin &&
+helm upgrade --install corrjoin . -f values-local.yaml
+)
+
+# Start kube-prometheus operator with local values file.
 ns_exists=$(kubectl get namespace -o name | grep monitoring)
 if [ -z $ns_exists ]; then 
    kubectl create ns monitoring
@@ -81,9 +85,5 @@ fi
 helm repo update
 helm upgrade --install prometheus prometheus-community/kube-prometheus-stack -f prometheus-values.yaml
 
-kubectl apply -f receiver/receiver-deployment.yaml
-kubectl apply -f receiver/receiver-results-pv-localstorage.yaml
-kubectl apply -f receiver/receiver-svc.yaml
-kubectl apply -f receiver/receiver-service-monitor.yaml
-
-
+# Install receiver service monitor after the prometheus stack crds are there.
+kubectl apply -f receiver-service-monitor.yaml

@@ -24,16 +24,14 @@ spec:
               claimName: receiver-results
       containers:
       - name: receiver
-        image: localhost:5001/receiver:v0.1
-        imagePullPolicy: Always
-        #image: ghcr.io/kpaschen/corrjoin:cluster-explorer
-        #imagePullPolicy: IfNotPresent
+        image: {{ .Values.image.repository }}/{{ .Values.image.image }}
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
         command: ["/webroot/app"]
         args: ["-svdDimensions", "7", 
            "-windowSize", "100", "-stride", "50", 
-           #"-comparer", "inprocess", "-correlationThreshold", "99", "-justExplore" ]
-           "-comparer", "inprocess", "-correlationThreshold", "99", "-sampleInterval", "5",
-           "-parquetMaxRowsPerRowGroup", "100000" ]
+           "-comparer", "inprocess", "-correlationThreshold", "99", "-justExplore" ]
+           #"-comparer", "inprocess", "-correlationThreshold", "99", "-sampleInterval", "5",
+           #"-parquetMaxRowsPerRowGroup", "100000" ]
         resources:
            limits:
               cpu: "1"

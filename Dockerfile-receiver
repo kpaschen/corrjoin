@@ -13,7 +13,6 @@ FROM gcr.io/distroless/static-debian12:nonroot
 
 WORKDIR /webroot
 COPY --from=build /src/frontend/app .
-COPY --from=build /src/frontend/templates templates
 USER 65532:65532
 CMD ["/webroot/app"]
 

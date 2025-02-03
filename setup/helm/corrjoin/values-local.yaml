@@ -1,0 +1,20 @@
+correlationServiceAddress: "http://correlation-service.default:9205"
+
+image:
+   repository: "localhost:5001"
+   pullPolicy: "Always"
+   image: "receiver:v0.1"
+#   repository: "ghcr.io/kpaschen/corrjoin"
+#  pullPolicy: "IfNotPresent"
+#  image: cluster-explorer
+
+serviceAccount:
+   create: true
+   name: "corrjoin-sa"
+
+grafana:
+   # You probably want to override this on the commandline.
+   password: editme
+
+cni:
+  useCeph: false
