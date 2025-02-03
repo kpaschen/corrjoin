@@ -29,30 +29,33 @@ type Timeseries struct {
 }
 
 type ParquetReporter struct {
-	filenameBase     string
-	tsids            []lib.TsId
+	filenameBase string
+	//	tsids            []lib.TsId
 	strideStartTimes map[int]string
 	strideEndTimes   map[int]string
 	// I tried a SortingWriter but it used too much memory.
-	writer   *parquet.GenericWriter[Timeseries]
-	filepath string
-  maxRowsPerRowGroup int64
+	strideWriters      map[int](*parquet.GenericWriter[Timeseries])
+	maxRowsPerRowGroup int64
 }
 
 func NewParquetReporter(filenameBase string, maxRows int64) *ParquetReporter {
 	return &ParquetReporter{
-		filenameBase:     filenameBase,
-		strideStartTimes: make(map[int]string),
-		strideEndTimes:   make(map[int]string),
-		writer:           nil,
-		filepath:         "",
-    maxRowsPerRowGroup: maxRows,
+		filenameBase:       filenameBase,
+		strideStartTimes:   make(map[int]string),
+		strideEndTimes:     make(map[int]string),
+		strideWriters:      make(map[int]*parquet.GenericWriter[Timeseries]),
+		maxRowsPerRowGroup: maxRows,
 	}
 }
 
-func (r *ParquetReporter) Initialize(strideCounter int,
-	strideStart time.Time, strideEnd time.Time, tsids []lib.TsId) {
-	r.tsids = tsids
+func (r *ParquetReporter) InitializeStride(strideCounter int,
+	strideStart time.Time, strideEnd time.Time) {
+
+	writer, exists := r.strideWriters[strideCounter]
+	if exists && writer != nil {
+		return
+	}
+
 	r.strideStartTimes[strideCounter] = strideStart.UTC().Format("20060102150405")
 	r.strideEndTimes[strideCounter] = strideEnd.UTC().Format("20060102150405")
 	log.Printf("initializing with strideCounter %d, start time %s (%s), end time %s (%s)\n",
@@ -62,44 +65,17 @@ func (r *ParquetReporter) Initialize(strideCounter int,
 	startTime := r.strideStartTimes[strideCounter]
 	endTime := r.strideEndTimes[strideCounter]
 	filename := fmt.Sprintf("correlations_%d_%s-%s.pq", strideCounter, startTime, endTime)
-	r.filepath = filepath.Join(r.filenameBase, filename)
+	path := filepath.Join(r.filenameBase, filename)
 
-	file, err := os.OpenFile(r.filepath, os.O_WRONLY|os.O_CREATE, 0640)
+	file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE, 0640)
 	if err != nil {
 		log.Printf("failed to open ts parquet file: %e\n", err)
 		return
 	}
 
 	// max rows per row group 10k is good for memory use but the files are about 3.5G per stride.
-	r.writer = parquet.NewGenericWriter[Timeseries](file, parquet.MaxRowsPerRowGroup(r.maxRowsPerRowGroup))
+	r.strideWriters[strideCounter] = parquet.NewGenericWriter[Timeseries](file, parquet.MaxRowsPerRowGroup(r.maxRowsPerRowGroup))
 
-	metadataRows := make([]Timeseries, len(tsids), len(tsids))
-	for i, tsid := range tsids {
-		var metricModel model.Metric
-
-		// This copies tsid. It might be more efficient to store byte slices
-		// in the tsids array instead?
-		err := json.Unmarshal(([]byte)(tsid.MetricName), &metricModel)
-		if err != nil {
-			log.Printf("failed to unmarshal tsid %s: %e\n", tsid.MetricName, err)
-			return
-		}
-		row := Timeseries{
-			ID:                i,
-			Correlated:        i, // See above, this field is not optional.
-			Metric:            string(metricModel["__name__"]),
-			Labels:            make(map[string]string),
-			MetricFingerprint: (uint64)(metricModel.Fingerprint()),
-		}
-		for key, value := range metricModel {
-			if key == "__name__" {
-				continue
-			}
-			row.Labels[string(key)] = string(value)
-		}
-		metadataRows[i] = row
-	}
-	r.writer.Write(metadataRows)
 }
 
 func extractRowsFromResult(result datatypes.CorrjoinResult) []Timeseries {
@@ -124,11 +100,51 @@ func extractRowsFromResult(result datatypes.CorrjoinResult) []Timeseries {
 		ret[ctr] = ts2
 		ctr++
 	}
-
 	return ret
 }
 
-func (r *ParquetReporter) AddConstantRows(constantRows []bool) error {
+func (r *ParquetReporter) RecordTimeseriesIds(strideCounter int, tsids []lib.TsId) error {
+	writer, exists := r.strideWriters[strideCounter]
+	if !exists || writer == nil {
+		return fmt.Errorf("missing writer for timeseries")
+	}
+	// r.tsids = tsids
+	metadataRows := make([]Timeseries, len(tsids), len(tsids))
+	for i, tsid := range tsids {
+		var metricModel model.Metric
+
+		// This copies tsid. It might be more efficient to store byte slices
+		// in the tsids array instead?
+		err := json.Unmarshal(([]byte)(tsid.MetricName), &metricModel)
+		if err != nil {
+			log.Printf("failed to unmarshal tsid %s: %e\n", tsid.MetricName, err)
+			return err
+		}
+		row := Timeseries{
+			ID:                i,
+			Correlated:        i, // See above, this field is not optional.
+			Metric:            string(metricModel["__name__"]),
+			Labels:            make(map[string]string),
+			MetricFingerprint: (uint64)(metricModel.Fingerprint()),
+		}
+		for key, value := range metricModel {
+			if key == "__name__" {
+				continue
+			}
+			row.Labels[string(key)] = string(value)
+		}
+		metadataRows[i] = row
+	}
+	n, err := writer.Write(metadataRows)
+	log.Printf("wrote %d timeseries ids for stride %d\n", n, strideCounter)
+	return err
+}
+
+func (r *ParquetReporter) AddConstantRows(strideCounter int, constantRows []bool) error {
+	writer, exists := r.strideWriters[strideCounter]
+	if !exists || writer == nil {
+		return fmt.Errorf("missing writer for timeseries")
+	}
 	newRows := make([]Timeseries, 0, int(len(constantRows)/10))
 	for rowid, isConstant := range constantRows {
 		if isConstant {
@@ -139,28 +155,28 @@ func (r *ParquetReporter) AddConstantRows(constantRows []bool) error {
 			})
 		}
 	}
-	n, err := r.writer.Write(newRows)
-	log.Printf("constant rows writer returned %d and error %e\n", n, err)
+	n, err := writer.Write(newRows)
+	log.Printf("recorded %d constant rows for stride %d\n", n, strideCounter)
 	return err
 }
 
 func (r *ParquetReporter) AddCorrelatedPairs(result datatypes.CorrjoinResult) error {
-	if r.writer == nil {
+	writer, exists := r.strideWriters[result.StrideCounter]
+	if !exists || writer == nil {
 		return fmt.Errorf("missing writer for timeseries")
 	}
 
 	rows := extractRowsFromResult(result)
-
-	_, err := r.writer.Write(rows)
-	//log.Printf("correlated pairs writer returned %d and err %e\n", n, err)
+	_, err := writer.Write(rows)
 
 	return err
 }
 
-func (r *ParquetReporter) Flush() error {
-	if r.writer == nil {
+func (r *ParquetReporter) Flush(strideCounter int) error {
+	writer, exists := r.strideWriters[strideCounter]
+	if !exists || writer == nil {
 		return nil
 	}
-	defer r.writer.Close()
-	return r.writer.Flush()
+	defer writer.Close()
+	return writer.Flush()
 }

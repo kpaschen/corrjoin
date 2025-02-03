@@ -7,10 +7,12 @@ import (
 )
 
 type Reporter interface {
-	Initialize(strideCounter int,
-		startTime time.Time, endTime time.Time, tsids []lib.TsId)
+	InitializeStride(strideCounter int,
+		startTime time.Time, endTime time.Time)
+
+	RecordTimeseriesIds(strideCounter int, tsids []lib.TsId)
 
 	AddCorrelatedPairs(datatypes.CorrjoinResult) error
 
-	Flush() error
+	Flush(strideCounter int) error
 }

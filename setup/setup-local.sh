@@ -67,6 +67,7 @@ fi
 helm repo update
 helm upgrade --install --set args={--kubelet-insecure-tls} metrics-server metrics-server/metrics-server --namespace kube-system
 
+kubectl apply -f monitoring/grafana-secret.yaml
 
 # Start kube-prometheus operator with local values file.
 repo_exists=$(helm repo list -o json | yq '.[] | select(.name == "prometheus-community") .url')

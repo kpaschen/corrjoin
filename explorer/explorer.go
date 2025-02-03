@@ -20,7 +20,7 @@ const (
 type CorrelationExplorer struct {
 	FilenameBase        string
 	strideCache         []*Stride
-	metricsCache        map[uint64](*explorerlib.Metric)
+	metricsCache        map[uint64](int)
 	metricsCacheByRowId map[int](*explorerlib.Metric)
 	prometheusBaseURL   string
 
@@ -35,7 +35,7 @@ type CorrelationExplorer struct {
 func (c *CorrelationExplorer) Initialize() error {
 	c.prometheusBaseURL = "http://localhost:9090"
 	c.strideCache = make([]*Stride, STRIDE_CACHE_SIZE, STRIDE_CACHE_SIZE)
-	c.metricsCache = make(map[uint64](*explorerlib.Metric))
+	c.metricsCache = make(map[uint64]int)
 	c.metricsCacheByRowId = make(map[int](*explorerlib.Metric))
 	c.ticker = time.NewTicker(60 * time.Second)
 	c.nextStrideCacheEntry = 0
@@ -116,13 +116,7 @@ func (c *CorrelationExplorer) convertMetricsCache() {
 			log.Printf("missing metrics fingerprint for row id %d, %v\n", rowid, *m)
 			continue
 		}
-		other, exists := c.metricsCache[m.Fingerprint]
-		if exists {
-			log.Printf("duplicate entry for fingerprint %d: already have %v, trying to insert %v\n",
-				m.Fingerprint, other, *m)
-			continue
-		}
-		c.metricsCache[m.Fingerprint] = m
+		c.metricsCache[m.Fingerprint] = rowid
 	}
 }
 
@@ -177,12 +171,12 @@ func (c *CorrelationExplorer) readResultFile(filename string) error {
 // TODO: another endpoint for nodes/edges data for the development over time
 func (c *CorrelationExplorer) ExploreByName(w http.ResponseWriter, r *http.Request) {
 	params := r.URL.Query()
-  var timeTo int64
-  n, err := fmt.Sscanf(params["timeTo"][0], "%d", &timeTo)
-  if n != 1 || err != nil {
+	var timeTo int64
+	n, err := fmt.Sscanf(params["timeTo"][0], "%d", &timeTo)
+	if n != 1 || err != nil {
 		http.Error(w, fmt.Sprintf("failed to parse time out of %s\n", params["timeTo"][0]), http.StatusBadRequest)
-    return
-  }
+		return
+	}
 	var metric model.Metric
 	err = json.Unmarshal(([]byte)(params["ts"][0]), &metric)
 	if err != nil {
@@ -190,13 +184,13 @@ func (c *CorrelationExplorer) ExploreByName(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	fp := uint64(metric.Fingerprint())
-	cachedMetric, found := c.metricsCache[fp]
+	cachedMetricRowId, found := c.metricsCache[fp]
 	if !found {
-    log.Printf("metric not found\n")
+		log.Printf("metric not found\n")
 		http.Error(w, fmt.Sprintf("metric %s not found\n", params["ts"]), http.StatusNotFound)
 		return
 	}
-	log.Printf("retrieved %v for metric query %s\n", *cachedMetric, params["ts"])
+	log.Printf("retrieved %d for metric query %s\n", cachedMetricRowId, params["ts"])
 }
 
 /*

@@ -47,9 +47,11 @@ type CorrjoinSettings struct {
 	// Number of rows per row group in Parquet.
 	// Bigger number mean more memory usage but better compression.
 	// 10000 works but outputs are about twice the size of an equivalent csv file.
-  // This is an int64 because the parquet library takes that type, not because I think
-  // anything > maxint32 is a good choice.
+	// This is an int64 because the parquet library takes that type, not because I think
+	// anything > maxint32 is a good choice.
 	MaxRowsPerRowGroup int64
+
+	ResultsDirectory string
 
 	Algorithm string
 }

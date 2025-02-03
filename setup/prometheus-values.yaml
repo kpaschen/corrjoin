@@ -857,13 +857,12 @@ grafana:
   defaultDashboardsEditable: true
 
   # EDITME
-  adminPassword: prom-operator
+  # adminPassword: prom-operator
 
-  # TODO:
-  # admin:
-  #   existingSecret: ""
-  #   userKey: admin-user
-  #   passwordKey: admin-password
+  admin:
+    existingSecret: grafana-admin
+    userKey: username
+    passwordKey: password
 
   rbac:
     ## If true, Grafana PSPs will be created

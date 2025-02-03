@@ -5,7 +5,6 @@ import (
 	"flag"
 	"github.com/gorilla/mux"
 	"github.com/kpaschen/corrjoin/explorer"
-	"github.com/kpaschen/corrjoin/lib/reporter"
 	"github.com/kpaschen/corrjoin/lib/settings"
 	"github.com/kpaschen/corrjoin/receiver"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -74,12 +73,13 @@ func main() {
 		SampleInterval:       sampleInterval,
 		Algorithm:            algorithm,
 		MaxRowsPerRowGroup:   int64(parquetMaxRowsPerRowGroup),
+		ResultsDirectory:     resultsDirectory,
 	}
 	corrjoinConfig = corrjoinConfig.ComputeSettingsFields()
 
 	expl := &explorer.CorrelationExplorer{
-     FilenameBase: resultsDirectory,
-  }
+		FilenameBase: resultsDirectory,
+	}
 	err := expl.Initialize()
 	if err != nil {
 		log.Printf("failed to initialize explorer: %v\n", err)
@@ -97,8 +97,7 @@ func main() {
 	var prometheusServer *http.Server
 
 	if !justExplore {
-		correlationReporter := reporter.NewParquetReporter(resultsDirectory, corrjoinConfig.MaxRowsPerRowGroup)
-		processor := receiver.NewTsProcessor(corrjoinConfig, stride, correlationReporter)
+		processor := receiver.NewTsProcessor(corrjoinConfig, stride)
 		prometheusRouter := mux.NewRouter().StrictSlash(true)
 		prometheusRouter.HandleFunc("/api/v1/write", processor.ReceivePrometheusData)
 		prometheusServer = &http.Server{

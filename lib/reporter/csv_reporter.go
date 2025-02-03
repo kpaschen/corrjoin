@@ -26,7 +26,7 @@ func NewCsvReporter(filenameBase string) *CsvReporter {
 	}
 }
 
-func (c *CsvReporter) Initialize(strideCounter int, strideStart time.Time, strideEnd time.Time,
+func (c *CsvReporter) InitializeStride(strideCounter int, strideStart time.Time, strideEnd time.Time,
 	tsids []lib.TsId) {
 	c.tsids = tsids
 	c.strideStartTimes[strideCounter] = strideStart.UTC().Format("20060102150405")
@@ -34,6 +34,9 @@ func (c *CsvReporter) Initialize(strideCounter int, strideStart time.Time, strid
 	log.Printf("initializing with strideCounter %d, start time %s (%s), end time %s (%s)\n",
 		strideCounter, c.strideStartTimes[strideCounter], strideStart.UTC().String(),
 		c.strideEndTimes[strideCounter], strideEnd.UTC().String())
+}
+
+func (c *CsvReporter) RecordTimeseriesIds(strideCounter int, tsids []lib.TsId) {
 	idsfile := filepath.Join(c.filenameBase, fmt.Sprintf("tsids_%d_%s.csv", strideCounter,
 		c.strideStartTimes[strideCounter]))
 	file, err := os.OpenFile(idsfile, os.O_WRONLY|os.O_CREATE, 0640)
@@ -102,7 +105,7 @@ func (c *CsvReporter) AddCorrelatedPairs(result datatypes.CorrjoinResult) error 
 	return err
 }
 
-func (c *CsvReporter) Flush() error {
+func (c *CsvReporter) Flush(_ int) error {
 	// This reporter does no internal buffering, so Flush is a noop.
 	return nil
 }
