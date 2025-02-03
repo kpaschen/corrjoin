@@ -43,6 +43,12 @@ type TimeseriesWindow struct {
 	windowLocked chan struct{}
 }
 
+type WindowIsBusyError struct{}
+
+func (w WindowIsBusyError) Error() string {
+	return fmt.Sprintf("the timeseries processing window is currently busy")
+}
+
 func NewTimeseriesWindow(settings settings.CorrjoinSettings, comparer comparisons.Engine) *TimeseriesWindow {
 	return &TimeseriesWindow{
 		settings:      settings,
@@ -129,10 +135,8 @@ func (w *TimeseriesWindow) ShiftBuffer(buffer [][]float64) (error, bool) {
 	case w.windowLocked <- struct{}{}:
 		log.Println("window is now locked")
 	default:
-		// TODO: make this a custom error type
 		log.Printf("Rejecting computation request because window is still locked")
-		// TODO: increase metric
-		return fmt.Errorf("stride computation overrun"), false
+		return WindowIsBusyError{}, false
 	}
 
 	newStride, err := w.shiftBufferIntoWindow(buffer)
@@ -145,6 +149,7 @@ func (w *TimeseriesWindow) ShiftBuffer(buffer [][]float64) (error, bool) {
 		return nil, false
 	}
 
+	w.StrideCounter++
 	go w.runAlgorithm()
 
 	return nil, true
@@ -158,8 +163,6 @@ func (w *TimeseriesWindow) unlockWindow() {
 func (w *TimeseriesWindow) runAlgorithm() {
 	var err error
 	defer w.unlockWindow()
-
-	w.StrideCounter++
 
 	w.normalizeWindow()
 	log.Printf("starting a run of %v on %d rows\n", w.settings.Algorithm, len(w.normalized))

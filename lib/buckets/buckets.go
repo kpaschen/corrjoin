@@ -182,7 +182,8 @@ func (s *BucketingScheme) candidatesForBucket(bucket *Bucket) error {
 			}
 		}
 	}
-	log.Printf("bucket %s has been compared to %d neighbours\n", BucketName(bucket.coordinates), neighbourCount)
+	log.Printf("bucket %s of size %d has been compared to %d neighbours\n",
+		BucketName(bucket.coordinates), len(bucket.members), neighbourCount)
 	return nil
 }
 

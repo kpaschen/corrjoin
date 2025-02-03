@@ -46,6 +46,13 @@ var (
 			Help: "Duration of correlation computation calls.",
 		},
 	)
+
+	strideOverruns = prometheus.NewCounter(
+		prometheus.CounterOpts{
+			Name: "stride_computation_overruns",
+			Help: "Number of times a correlation stride computation has overrun",
+		},
+	)
 )
 
 func init() {
@@ -53,6 +60,7 @@ func init() {
 	prometheus.MustRegister(requestedCorrelationBatches)
 	prometheus.MustRegister(correlationDurationHist)
 	prometheus.MustRegister(correlationDuration)
+	prometheus.MustRegister(strideOverruns)
 }
 
 type tsProcessor struct {
@@ -175,10 +183,15 @@ func NewTsProcessor(corrjoinConfig settings.CorrjoinSettings, strideLength int) 
 
 					err, willRunComputation := processor.window.ShiftBuffer(observationResult.Buffers)
 
-					// TODO: check for error type.
-					// If window is busy, hold the observationResult
 					if err != nil {
-						log.Printf("failed to process window: %v", err)
+						// TODO: if window is busy, hold the observationResult
+						switch err.(type) {
+						case corrjoin.WindowIsBusyError:
+							strideOverruns.Inc()
+							log.Printf("computation time overrun on stride %d\n", processor.window.StrideCounter)
+						default:
+							log.Printf("failed to process window: %v", err)
+						}
 					}
 					if err == nil && willRunComputation {
 						log.Printf("started processing stride %d\n", processor.window.StrideCounter)
@@ -190,7 +203,7 @@ func NewTsProcessor(corrjoinConfig settings.CorrjoinSettings, strideLength int) 
 		}
 	}()
 
-  // All writing to the reporter happens from this goroutine.
+	// All writing to the reporter happens from this goroutine.
 	go func() {
 		log.Println("waiting for correlation results")
 		for {
@@ -209,7 +222,7 @@ func NewTsProcessor(corrjoinConfig settings.CorrjoinSettings, strideLength int) 
 						correlationDuration.Set(float64(elapsed.Milliseconds()))
 						log.Printf("correlation batch processed in %d milliseconds\n", elapsed.Milliseconds())
 					}
-          stride := correlationResult.StrideCounter
+					stride := correlationResult.StrideCounter
 					processor.reporter.RecordTimeseriesIds(stride, processor.accumulator.Tsids)
 					processor.reporter.AddConstantRows(stride, processor.window.ConstantRows)
 					err := processor.reporter.Flush(stride)
