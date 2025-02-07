@@ -11,3 +11,11 @@ type Metric struct {
 	PrometheusGraphURL string // computed on demand
 	Constant           bool
 }
+
+type SubgraphMemberships struct {
+	// Rows maps timeseries ids to subgraph ids
+	Rows map[int]int
+	// Sizes holds the size of each subgraph
+	Sizes          map[int]int
+	nextSubgraphId int
+}

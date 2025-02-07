@@ -86,7 +86,12 @@ func main() {
 	}
 
 	explorerRouter := mux.NewRouter().StrictSlash(true)
-	explorerRouter.HandleFunc("/exploreByName", expl.ExploreByName).Methods("GET")
+	explorerRouter.HandleFunc("/getTimeseriesId", expl.GetTimeseriesId).Methods("GET")
+	explorerRouter.HandleFunc("/getStrides", expl.GetStrides).Methods("GET")
+	explorerRouter.HandleFunc("/getSubgraphs", expl.GetSubgraphs).Methods("GET")
+	explorerRouter.HandleFunc("/getSubgraphNodes", expl.GetSubgraphNodes).Methods("GET")
+	explorerRouter.HandleFunc("/getSubgraphEdges", expl.GetSubgraphEdges).Methods("GET")
+	explorerRouter.HandleFunc("/getCorrelatedSeries", expl.GetCorrelatedSeries).Methods("GET")
 
 	http.Handle("/metrics", promhttp.Handler())
 	go http.ListenAndServe(cfg.metricsAddress, nil)

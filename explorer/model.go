@@ -1,5 +1,33 @@
 package explorer
 
+import (
+	explorerlib "github.com/kpaschen/corrjoin/lib/explorer"
+)
+
+type StrideState int
+
+const (
+	StrideExists = iota
+	StrideRead
+	StrideProcessed
+	StrideRetrying
+	StrideError
+	StrideDeleted
+)
+
+var strideStateName = map[StrideState]string{
+	StrideExists:    "exists",
+	StrideRead:      "read",
+	StrideProcessed: "processed",
+	StrideRetrying:  "retrying",
+	StrideError:     "error",
+	StrideDeleted:   "deleted",
+}
+
+func (s StrideState) String() string {
+	return strideStateName[s]
+}
+
 // Stride collects metadata about a stride.
 type Stride struct {
 	ID              int
@@ -7,14 +35,7 @@ type Stride struct {
 	EndTime         int64
 	StartTimeString string
 	EndTimeString   string
-	Status          string
+	Status          StrideState
 	Filename        string
-}
-
-type SubgraphMemberships struct {
-	// Rows maps timeseries ids to subgraph ids
-	Rows map[int64]int
-	// Sizes holds the size of each subgraph
-	Sizes          map[int]int
-	nextSubgraphId int
+	Subgraphs       *explorerlib.SubgraphMemberships
 }

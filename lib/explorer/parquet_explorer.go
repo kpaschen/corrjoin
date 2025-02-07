@@ -152,6 +152,90 @@ func (p *ParquetExplorer) GetMetrics(cache *map[int]*Metric) error {
 	return nil
 }
 
+func (s *SubgraphMemberships) addPair(row1 int, row2 int) {
+	c1, have1 := s.Rows[row1]
+	c2, have2 := s.Rows[row2]
+
+	// Case 1: neither row has a graph yet -> add them both to a new graph.
+	if !have1 && !have2 {
+		s.Rows[row1] = s.nextSubgraphId
+		s.Rows[row2] = s.nextSubgraphId
+		s.Sizes[s.nextSubgraphId] += 2
+		s.nextSubgraphId++
+		return
+	}
+
+	// Case 2: only one row has a graph id
+	if !have2 {
+		s.Rows[row2] = c1
+		s.Sizes[c1]++
+		return
+	}
+
+	if !have1 {
+		s.Rows[row1] = c2
+		s.Sizes[c2]++
+		return
+	}
+
+	// Case 2: both rows have a graph id. Nothing to do if they match,
+	// otherwise merge.
+	if c1 == c2 {
+		return
+	}
+
+	// Always merge into the lower-numbered graph.
+	if c1 < c2 {
+		for row, graph := range s.Rows {
+			if graph == c2 {
+				s.Rows[row] = c1
+				s.Sizes[c1]++
+			}
+		}
+	} else {
+		for row, graph := range s.Rows {
+			if graph == c1 {
+				s.Rows[row] = c2
+				s.Sizes[c2]++
+			}
+		}
+	}
+}
+
+// Read subgraph information from a parquet file.
+func (p *ParquetExplorer) GetSubgraphs() (*SubgraphMemberships, error) {
+	reader := parquet.NewGenericReader[reporter.Timeseries](p.file)
+	results := make([]reporter.Timeseries, 2000)
+	subgraphs := &SubgraphMemberships{
+		Rows:           make(map[int]int),
+		Sizes:          make(map[int]int),
+		nextSubgraphId: 0,
+	}
+	for done := false; !done; {
+		numRead, err := reader.Read(results)
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				done = true
+			} else {
+				return nil, err
+			}
+		}
+		for i, result := range results {
+			if i >= numRead {
+				break
+			}
+			if result.Constant {
+				continue
+			}
+			if !(result.Pearson > 0.0) {
+				continue
+			}
+			subgraphs.addPair(result.ID, result.Correlated)
+		}
+	}
+	return subgraphs, nil
+}
+
 // TODO: parse into Metric
 func (p *ParquetExplorer) LookupMetric(timeSeriesId int) (map[string]string, error) {
 	if p.file == nil {
