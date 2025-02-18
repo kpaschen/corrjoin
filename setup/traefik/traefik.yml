@@ -1,0 +1,26 @@
+api:
+  insecure: true
+  dashboard: true
+
+providers:
+  file:
+    directory: /etc/traefik/config
+    watch: true
+
+log:
+  level: DEBUG
+  format: common
+
+entryPoints:
+  corrjoin:
+    address: ":443"
+  corrjoininsecure:
+    address: ":80"
+
+certificatesResolvers:
+  myresolver:
+    acme:
+      email: postmaster@nephometrics.com
+      storage: /letsencrypt/acme.json
+      tlschallenge: {}
+

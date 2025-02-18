@@ -1,12 +1,25 @@
 #!/bin/sh
 
 # Set up rook-ceph
-helm repo add rook-release https://charts.rook.io/release
-helm install --create-namespace --namespace rook-ceph rook-ceph rook-release/rook-ceph -f rook-values.yaml
+# Skip this and set up local-storage instead if you are short on cpu.
+# rook/ceph will request about 2 cores per node.
+#helm repo add rook-release https://charts.rook.io/release
+#helm install --create-namespace --namespace rook-ceph rook-ceph rook-release/rook-ceph -f rook/rook-values.yaml
 
 # You need to have created a volume before running this.
 # The ceph-values.yaml file here will only use a volume /dev/sdb on a node called 'node4'
-helm install --create-namespace --namespace rook-ceph rook-ceph-cluster rook-release/rook-ceph-cluster -f ceph-values.yaml
+#helm install --create-namespace --namespace rook-ceph rook-ceph-cluster rook-release/rook-ceph-cluster -f rook/ceph-values.yaml
+
+# If using local-storage, need to pepare local storage volumes.
+# On each node, either:
+# mkdir /mnt/disks/$vol
+# mount -t tmpfs -o size=5G $vol /mnt/disks/$vol
+# or:
+# mkdir /mnt/disks/ssd1
+# mount /dev/sdb /mnt/disks/ssd1
+# more reading: https://github.com/kubernetes-retired/external-storage/tree/master/local-volume
+
+kubectl label node node2 resultsVolumeMounted=true
 
 # There is a secret in this chart that has the grafana admin password, that's why I install
 # this chart before the prometheus operator.
@@ -27,7 +40,12 @@ if [ -z $ns_exists ]; then
 fi
 helm upgrade --install prometheus prometheus-community/kube-prometheus-stack -f prometheus-values.yaml
 
-kubectl apply -f receiver/receiver-service-monitor.yaml
+kubectl apply -f receiver-service-monitor.yaml
 
+# Set up traefik
+tar czf traefik.tgz traefik
+scp traefik.tgz ubuntu@$BASTION:/home/ubuntu
 
+# Login to BASTION, unpack traefik.tgz and run start-traefik.sh
+#  Make sure port 443 is open in the security rules for the bastion
 

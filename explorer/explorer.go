@@ -31,13 +31,14 @@ type subgraphListResponse struct {
 }
 
 type TimeseriesResponse struct {
-	Rowid   int               `json:"rowid"`
-	Labels  map[string]string `json:"labels"`
-	Pearson float32           `json:"pearson"`
+	Rowid   int                                  `json:"rowid"`
+	Labels  map[model.LabelName]model.LabelValue `json:"labels"`
+	Pearson float32                              `json:"pearson"`
 }
 
 type correlatedTimeseriesResponse struct {
 	Correlates []TimeseriesResponse `json:"correlates"`
+	Constant   bool                 `json:"bool"`
 }
 
 type subgraphNodeResponse struct {
@@ -144,11 +145,17 @@ func (c *CorrelationExplorer) GetSubgraphNodes(w http.ResponseWriter, r *http.Re
 
 	for row, graphId := range subgraphs.Rows {
 		if graphId == subgraphId {
+			metric, exists := c.metricsCacheByRowId[row]
+			if !exists {
+				log.Printf("row %d is missing from the metrics cache\n", row)
+				continue
+			}
+			metric.ComputePrometheusGraphURL(c.prometheusBaseURL, c.TimeRange, stride.EndTimeString)
 			r := subgraphNodeResponse{
 				Id:    row,
 				Title: fmt.Sprintf("%d", row),
-				// TODO: retrieve the metric from the cache so we can print the metric name
-				// and the labels here
+				// TODO: make this a link to a grafana dashboard
+				SubTitle: metric.PrometheusGraphURL,
 			}
 			resp.Nodes = append(resp.Nodes, r)
 		}
@@ -182,31 +189,31 @@ func (c *CorrelationExplorer) GetSubgraphEdges(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	size, ok := subgraphs.Sizes[subgraphId]
+	_, ok := subgraphs.Sizes[subgraphId]
+	if !ok {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+
+	edges, err := c.retrieveEdges(stride, subgraphId)
 	if !ok {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
 
 	resp := subgraphEdgesResponse{
-		Edges: make([]subgraphEdgeResponse, 0, size),
+		Edges: make([]subgraphEdgeResponse, len(edges), len(edges)),
 	}
 
-	/*
-	   // TODO: read the correlation information
-	     counter := 0
-	     for row, graphId := range subgraphs.Rows {
-	        if graphId == subgraphId {
-	           e := subgraphEdgeResponse{
-	              Id: counter,
-	              Source:
-	              Target:
-	           }
-	           resp.Edges = append(resp.Edges, e)
-	           counter++
-	        }
-	     }
-	*/
+	for i, e := range edges {
+		resp.Edges = append(resp.Edges, subgraphEdgeResponse{
+			Id:       i,
+			Source:   e.Source,
+			Target:   e.Target,
+			Mainstat: fmt.Sprintf("%f", e.Pearson),
+		})
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(resp)
@@ -297,35 +304,6 @@ func (c *CorrelationExplorer) getMetric(params url.Values, strideId int) (int, e
 	return rowid, nil
 }
 
-func (c *CorrelationExplorer) GetTimeseriesId(w http.ResponseWriter, r *http.Request) {
-	params := r.URL.Query()
-	strideId, err := c.getStride(params)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	if strideId == -1 {
-		http.Error(w, fmt.Sprintf("no stride found for time"), http.StatusNotFound)
-		return
-	}
-
-	metricRowId, err := c.getMetric(params, strideId)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	if metricRowId == -1 {
-		http.Error(w, fmt.Sprintf("no metric found for ts %s", params["ts"][0]), http.StatusNotFound)
-		return
-	}
-
-	// return json for metric row id
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(timeseriesIdResponse{Rowid: metricRowId})
-}
-
 func (c *CorrelationExplorer) GetCorrelatedSeries(w http.ResponseWriter, r *http.Request) {
 	params := r.URL.Query()
 	strideId, err := c.getStride(params)
@@ -349,8 +327,69 @@ func (c *CorrelationExplorer) GetCorrelatedSeries(w http.ResponseWriter, r *http
 		return
 	}
 
-	// TODO: look up this metric and retrieve everything correlated with it
+	stride := c.strideCache[strideId]
+	subgraphs := stride.Subgraphs
+	if subgraphs == nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+
+	metric, exists := c.metricsCacheByRowId[metricRowId]
+	if !exists {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+	if metric.Constant {
+		resp := correlatedTimeseriesResponse{
+			Correlates: make([]TimeseriesResponse, 0),
+			Constant:   true,
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(resp)
+		return
+	}
+
+	graphId, exists := subgraphs.Rows[metricRowId]
+	if !exists {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+
+	edges, err := c.retrieveEdges(stride, graphId)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+
+	resp := correlatedTimeseriesResponse{
+		Correlates: make([]TimeseriesResponse, 0, len(edges)),
+		Constant:   false,
+	}
+
+	for _, e := range edges {
+		if e.Pearson > 0 && (e.Source == metricRowId || e.Target == metricRowId) {
+			var otherRowId int
+			if e.Source == metricRowId {
+				otherRowId = e.Target
+			} else {
+				otherRowId = e.Source
+			}
+			otherMetric, exists := c.metricsCacheByRowId[metricRowId]
+			if !exists {
+				log.Printf("ts %d is allegedly correlated with %d but that does not exist\n", metricRowId, otherRowId)
+				http.Error(w, err.Error(), http.StatusNotFound)
+				return
+			}
+			resp.Correlates = append(resp.Correlates, TimeseriesResponse{
+				Rowid:   otherRowId,
+				Labels:  map[model.LabelName]model.LabelValue(otherMetric.LabelSet),
+				Pearson: e.Pearson,
+			})
+		}
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(timeseriesIdResponse{Rowid: metricRowId})
+	json.NewEncoder(w).Encode(resp)
 }

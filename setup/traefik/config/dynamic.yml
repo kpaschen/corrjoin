@@ -1,0 +1,18 @@
+http:
+  routers:
+    raggedright:
+      entrypoints:
+        - "corrjoin"
+      rule: "Host(`corrjoin.nephometrics.com`)" 
+      tls:
+        certResolver: myresolver
+      service: corrjoin
+  services:
+    corrjoin:
+      loadBalancer:
+        servers:
+# This has to contain the ip address of at least one node.
+        - url: "http://10.10.0.228:30030"
+        - url: "http://10.10.0.98:30030"
+        - url: "http://10.10.0.242:30030"
+

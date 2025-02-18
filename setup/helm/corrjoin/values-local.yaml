@@ -3,10 +3,8 @@ correlationServiceAddress: "http://correlation-service.default:9205"
 image:
    repository: "localhost:5001"
    pullPolicy: "Always"
-   image: "receiver:v0.1"
-#   repository: "ghcr.io/kpaschen/corrjoin"
-#  pullPolicy: "IfNotPresent"
-#  image: cluster-explorer
+   image: "receiver"
+   version: "v0.1"
 
 serviceAccount:
    create: true
@@ -18,3 +16,4 @@ grafana:
 
 cni:
   useCeph: false
+  createPv: true

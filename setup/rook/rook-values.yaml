@@ -25,7 +25,7 @@ resources:
   limits:
     memory: 512Mi
   requests:
-    cpu: 200m
+#    cpu: 200m
     memory: 128Mi
 
 # -- Kubernetes [`nodeSelector`](https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#nodeselector) to add to the Deployment.
@@ -78,7 +78,7 @@ allowLoopDevices: false
 # needed
 csi:
   # -- Enable Ceph CSI RBD driver
-  enableRbdDriver: true
+  enableRbdDriver: false
   # -- Enable Ceph CSI CephFS driver
   enableCephfsDriver: true
   # -- Disable the CSI driver.
@@ -91,9 +91,9 @@ csi:
   # -- Enable Snapshotter in CephFS provisioner pod
   enableCephfsSnapshotter: true
   # -- Enable Snapshotter in NFS provisioner pod
-  enableNFSSnapshotter: true
+  enableNFSSnapshotter: false
   # -- Enable Snapshotter in RBD provisioner pod
-  enableRBDSnapshotter: true
+  enableRBDSnapshotter: false
   # -- Enable Host mount for `/etc/selinux` directory for Ceph CSI nodeplugins
   enablePluginSelinuxHostMount: false
   # -- Enable Ceph CSI PVC encryption support

@@ -86,7 +86,6 @@ func main() {
 	}
 
 	explorerRouter := mux.NewRouter().StrictSlash(true)
-	explorerRouter.HandleFunc("/getTimeseriesId", expl.GetTimeseriesId).Methods("GET")
 	explorerRouter.HandleFunc("/getStrides", expl.GetStrides).Methods("GET")
 	explorerRouter.HandleFunc("/getSubgraphs", expl.GetSubgraphs).Methods("GET")
 	explorerRouter.HandleFunc("/getSubgraphNodes", expl.GetSubgraphNodes).Methods("GET")

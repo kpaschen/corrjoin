@@ -19,3 +19,9 @@ type SubgraphMemberships struct {
 	Sizes          map[int]int
 	nextSubgraphId int
 }
+
+type Edge struct {
+	Source  int
+	Target  int
+	Pearson float32
+}

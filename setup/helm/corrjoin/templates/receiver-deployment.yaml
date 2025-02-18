@@ -24,18 +24,18 @@ spec:
               claimName: receiver-results
       containers:
       - name: receiver
-        image: {{ .Values.image.repository }}/{{ .Values.image.image }}
+        image: {{ .Values.image.repository }}/{{ .Values.image.image }}:{{ .Values.image.version }}
         imagePullPolicy: {{ .Values.image.pullPolicy }}
         command: ["/webroot/app"]
-        args: ["-svdDimensions", "7", 
+        args: ["-svdDimensions", "5", 
            "-windowSize", "100", "-stride", "50", 
-           # "-comparer", "inprocess", "-correlationThreshold", "99", "-justExplore" ]
-           "-comparer", "inprocess", "-correlationThreshold", "99", "-sampleInterval", "5",
-           "-parquetMaxRowsPerRowGroup", "100000" ]
+           #"-comparer", "inprocess", "-correlationThreshold", "99", "-justExplore", 
+           "-comparer", "inprocess", "-correlationThreshold", "99", "-sampleInterval", "10",
+           "-parquetMaxRowsPerRowGroup", "10000" ]
         resources:
            limits:
               cpu: "1"
-              memory: "4Gi"
+              memory: "6Gi"
            requests:
               cpu: "1"
               memory: "4Gi"

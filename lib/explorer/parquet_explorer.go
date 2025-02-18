@@ -202,6 +202,17 @@ func (s *SubgraphMemberships) addPair(row1 int, row2 int) {
 	}
 }
 
+func (s *SubgraphMemberships) GetGraphId(rowId int) int {
+	if s.Rows == nil {
+		return -1
+	}
+	graphId, ok := s.Rows[rowId]
+	if !ok {
+		return -1
+	}
+	return graphId
+}
+
 // Read subgraph information from a parquet file.
 func (p *ParquetExplorer) GetSubgraphs() (*SubgraphMemberships, error) {
 	reader := parquet.NewGenericReader[reporter.Timeseries](p.file)
@@ -234,6 +245,47 @@ func (p *ParquetExplorer) GetSubgraphs() (*SubgraphMemberships, error) {
 		}
 	}
 	return subgraphs, nil
+}
+
+func (p *ParquetExplorer) GetEdges(edgeChan chan<- []*Edge) error {
+	defer close(edgeChan)
+	if p.file == nil {
+		return fmt.Errorf("parquet explorer has no parquet file")
+	}
+	reader := parquet.NewGenericReader[reporter.Timeseries](p.file)
+	results := make([]reporter.Timeseries, 2000)
+	for done := false; !done; {
+		numRead, err := reader.Read(results)
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				done = true
+			} else {
+				return err
+			}
+		}
+		edgeBuf := make([]*Edge, numRead, numRead)
+		for i, result := range results {
+			if i >= numRead {
+				break
+			}
+			if result.Constant {
+				continue
+			}
+			if !(result.Pearson > 0.0) {
+				continue
+			}
+			if result.ID >= result.Correlated {
+				continue
+			}
+			edgeBuf[i] = &Edge{
+				Source:  result.ID,
+				Target:  result.Correlated,
+				Pearson: result.Pearson,
+			}
+		}
+		edgeChan <- edgeBuf
+	}
+	return nil
 }
 
 // TODO: parse into Metric
@@ -288,7 +340,7 @@ func (p *ParquetExplorer) LookupMetric(timeSeriesId int) (map[string]string, err
 	return ret, nil
 }
 
-func (m *Metric) computePrometheusGraphURL(prometheusBaseURL string, timeRange string, endTime string) {
+func (m *Metric) ComputePrometheusGraphURL(prometheusBaseURL string, timeRange string, endTime string) {
 	if len(m.LabelSet) == 0 {
 		m.PrometheusGraphURL = fmt.Sprintf("%s/graph", prometheusBaseURL)
 		return

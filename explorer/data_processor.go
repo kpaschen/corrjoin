@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	explorerlib "github.com/kpaschen/corrjoin/lib/explorer"
+	"io/ioutil"
 	"log"
 	"os"
 	"sort"
@@ -62,6 +63,19 @@ func (c *CorrelationExplorer) scanResultFiles() error {
 		return t1.ModTime().Unix() > t2.ModTime().Unix()
 	})
 	for _, e := range entries {
+		if !e.IsDir() {
+			_, err = parseStrideFromFilename(e.Name())
+			if err != nil {
+				// This is not a stride file.
+				continue
+			}
+		} else {
+			_, err = parseStrideFromDirname(e.Name())
+			if err != nil {
+				// This is not a stride directory.
+				continue
+			}
+		}
 		// See if this stride is already in the cache
 		var stride *Stride
 		for _, s := range c.strideCache {
@@ -130,8 +144,6 @@ func (c *CorrelationExplorer) scanResultFiles() error {
 					stride.Status = StrideError
 					continue
 				}
-				// TODO: first see if we can recover the stride info from dirname
-
 				err = c.readResultFile(e.Name(), stride)
 				if err != nil {
 					log.Printf("failed to parse result file %s because %v\n", e.Name(), err)
@@ -160,7 +172,13 @@ func (c *CorrelationExplorer) scanResultFiles() error {
 				continue
 			}
 			if stride.Status == StrideRead {
-				// TODO: extract graph nodes and edges and write them to directory
+				log.Printf("ready to extract graph edges for stride %+v\n", *stride)
+				err = c.extractEdges(stride)
+				if err != nil {
+					log.Printf("failed to extract edges: %v\n", err)
+					stride.Status = StrideError
+					break
+				}
 			} else {
 				continue
 			}
@@ -184,6 +202,19 @@ func (c *CorrelationExplorer) convertMetricsCache() {
 		}
 		c.metricsCache[m.Fingerprint] = rowid
 	}
+}
+
+func parseStrideFromDirname(dirname string) (*Stride, error) {
+	var strideCounter int
+	var startTime int
+	n, err := fmt.Sscanf(dirname, "stride_%d_%d", &strideCounter, &startTime)
+	if n != 2 || err != nil {
+		return nil, fmt.Errorf("failed to parse stride information out of dirname %s", dirname)
+	}
+	return &Stride{
+		ID:        strideCounter,
+		StartTime: int64(startTime),
+	}, nil
 }
 
 func parseStrideFromFilename(filename string) (*Stride, error) {
@@ -213,6 +244,92 @@ func parseStrideFromFilename(filename string) (*Stride, error) {
 	}, nil
 }
 
+func (c *CorrelationExplorer) retrieveEdges(stride *Stride, graphId int) ([]explorerlib.Edge, error) {
+	dirname := directoryNameForStride(*stride)
+	fullDirname := fmt.Sprintf("%s/%s", c.FilenameBase, dirname)
+	edgeFile, err := os.Open(fmt.Sprintf("%s/edges_%d.json", fullDirname, graphId))
+	if err != nil {
+		return nil, fmt.Errorf("failed to open edges file for graph id %d and stride %d: %v",
+			graphId, stride.ID, err)
+	}
+	edgeContents, _ := ioutil.ReadAll(edgeFile)
+	var results []explorerlib.Edge
+	json.Unmarshal(edgeContents, &results)
+	return results, nil
+}
+
+func (c *CorrelationExplorer) extractEdges(stride *Stride) error {
+	if stride == nil || stride.Subgraphs == nil {
+		return fmt.Errorf("need a stride with subgraphs to get the edges")
+	}
+	parquetExplorer := explorerlib.NewParquetExplorer(c.FilenameBase)
+	err := parquetExplorer.Initialize(stride.Filename)
+	if err != nil {
+		return err
+	}
+	subgraphs := stride.Subgraphs
+	if subgraphs == nil {
+		return fmt.Errorf("missing subgraphs for stride %d\n", stride.ID)
+	}
+	dirname := directoryNameForStride(*stride)
+	fullDirname := fmt.Sprintf("%s/%s", c.FilenameBase, dirname)
+	edgeFiles := make(map[int]*os.File)
+	previousEdgeEntries := make(map[int]bool)
+	defer terminateEdgeFiles(edgeFiles)
+	edgeChan := make(chan []*explorerlib.Edge, 1)
+	go parquetExplorer.GetEdges(edgeChan)
+	for edges := range edgeChan {
+		for _, e := range edges {
+			if e == nil {
+				continue
+			}
+			graphId := subgraphs.GetGraphId(e.Source)
+			if graphId == -1 {
+				return fmt.Errorf("missing graph id for for %d\n", e.Source)
+			}
+			edgeFile, exists := edgeFiles[graphId]
+			if !exists {
+				edgeFile, err = os.OpenFile(fmt.Sprintf("%s/edges_%d.json", fullDirname, graphId),
+					os.O_WRONLY|os.O_CREATE, 0640)
+				if err != nil {
+					return fmt.Errorf("failed to create edge file %d: %v", graphId, err)
+				}
+				edgeFiles[graphId] = edgeFile
+				edgeFile.Write([]byte("["))
+			}
+			_, exists = previousEdgeEntries[graphId]
+			if exists {
+				edgeFile.Write([]byte(","))
+			} else {
+				previousEdgeEntries[graphId] = true
+			}
+			edgeSerialized, err := json.Marshal(e)
+			if err != nil {
+				return err
+			}
+			_, err = edgeFile.Write(edgeSerialized)
+			if err != nil {
+				return fmt.Errorf("failed to write %T to edge file: %v", edgeSerialized, err)
+			}
+		}
+	}
+	return nil
+}
+
+func terminateEdgeFiles(files map[int]*os.File) {
+	for _, f := range files {
+		if f == nil {
+			continue
+		}
+		_, err := f.Write([]byte("]"))
+		if err != nil {
+			log.Printf("failed to write closing ] to file %s: %v\n", f.Name(), err)
+			continue
+		}
+		f.Close()
+	}
+}
+
 func (c *CorrelationExplorer) readAndCacheSubgraphs(filename string, stride *Stride) error {
 	if stride.Subgraphs == nil {
 		log.Printf("requesting subgraphs for stride %d\n", stride.ID)
@@ -238,7 +355,7 @@ func (c *CorrelationExplorer) materializeStrideData(stride *Stride) error {
 	if err != nil {
 		return err
 	}
-	file, err := os.Create(fmt.Sprintf("%s/%s/subgraphs", c.FilenameBase, dirname))
+	file, err := os.Create(fmt.Sprintf("%s/%s/subgraphs.json", c.FilenameBase, dirname))
 	if err != nil {
 		return err
 	}
