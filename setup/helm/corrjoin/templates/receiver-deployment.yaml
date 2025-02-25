@@ -31,6 +31,7 @@ spec:
            "-windowSize", "100", "-stride", "50", 
             "-comparer", "inprocess", "-correlationThreshold", "99", "-justExplore", 
             #"-comparer", "inprocess", "-correlationThreshold", "99", "-sampleInterval", "10",
+           "-prometheusURL", {{ .Values.prometheusURL }},
            "-parquetMaxRowsPerRowGroup", "10000" ]
         resources:
            limits:

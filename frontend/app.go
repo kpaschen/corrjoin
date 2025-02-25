@@ -37,6 +37,7 @@ func main() {
 	var sampleInterval int
 	var resultsDirectory string
 	var justExplore bool
+	var prometheusURL string
 
 	flag.StringVar(&metricsAddr, "metrics-address", ":9203", "The address the metrics endpoint binds to.")
 	flag.StringVar(&prometheusAddr, "listen-address", ":9201", "The address that the storage endpoint binds to.")
@@ -55,6 +56,7 @@ func main() {
 	flag.IntVar(&parquetMaxRowsPerRowGroup, "parquetMaxRowsPerRowGroup", 100000, "Number of rows per row group in Parquet. Small numbers reduce memory usage but cost more disk space; large numbers cost more memory but improve compression.")
 	flag.StringVar(&resultsDirectory, "resultsDirectory", "/tmp/corrjoinResults", "The directory with the result files.")
 	flag.BoolVar(&justExplore, "justExplore", false, "If true, launch only the explorer endpoint")
+	flag.StringVar(&prometheusURL, "prometheusURL", "", "A URL for the prometheus service")
 
 	flag.Parse()
 
@@ -80,7 +82,7 @@ func main() {
 	expl := &explorer.CorrelationExplorer{
 		FilenameBase: resultsDirectory,
 	}
-	err := expl.Initialize()
+	err := expl.Initialize(prometheusURL)
 	if err != nil {
 		log.Printf("failed to initialize explorer: %v\n", err)
 	}
@@ -91,6 +93,8 @@ func main() {
 	explorerRouter.HandleFunc("/getSubgraphNodes", expl.GetSubgraphNodes).Methods("GET")
 	explorerRouter.HandleFunc("/getSubgraphEdges", expl.GetSubgraphEdges).Methods("GET")
 	explorerRouter.HandleFunc("/getCorrelatedSeries", expl.GetCorrelatedSeries).Methods("GET")
+	explorerRouter.HandleFunc("/getTimeseries", expl.GetTimeseries).Methods("GET")
+	explorerRouter.HandleFunc("/getTimeline", expl.GetTimeline).Methods("GET")
 
 	http.Handle("/metrics", promhttp.Handler())
 	go http.ListenAndServe(cfg.metricsAddress, nil)

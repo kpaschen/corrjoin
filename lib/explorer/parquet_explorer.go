@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+  "sort"
 )
 
 type ParquetExplorer struct {
@@ -345,6 +346,14 @@ func (m *Metric) ComputePrometheusGraphURL(prometheusBaseURL string, timeRange s
 		m.PrometheusGraphURL = fmt.Sprintf("%s/graph", prometheusBaseURL)
 		return
 	}
+	queryString := m.ComputePrometheusQuery()
+
+	m.PrometheusGraphURL = fmt.Sprintf("%s/graph?g0.expr=%s&g0.tab=0&g0.display_mode=lines&g0.show_exemplars=0&g0.range_input=%s&g0.end_input=%s&g0.moment_input=%s",
+		prometheusBaseURL, queryString, timeRange, url.QueryEscape(endTime),
+		url.QueryEscape(endTime))
+}
+
+func (m *Metric) ComputePrometheusQuery() string {
 	name := ""
 	attributeString := "{"
 	first := true
@@ -363,25 +372,28 @@ func (m *Metric) ComputePrometheusGraphURL(prometheusBaseURL string, timeRange s
 	}
 	attributeString = attributeString + "}"
 	attributeString = url.QueryEscape(attributeString)
-
-	m.PrometheusGraphURL = fmt.Sprintf("%s/graph?g0.expr=%s%s&g0.tab=0&g0.display_mode=lines&g0.show_exemplars=0&g0.range_input=%s&g0.end_input=%s&g0.moment_input=%s",
-		prometheusBaseURL, name, attributeString, timeRange, url.QueryEscape(endTime),
-		url.QueryEscape(endTime))
+	return fmt.Sprintf("%s%s", name, attributeString)
 }
 
 func (m *Metric) MetricString() string {
-	attributeString := "{"
-	first := true
-	for key, value := range m.LabelSet {
+  labelNames := make([]string, 0, len(m.LabelSet))
+	for key := range m.LabelSet {
 		if key == "__name__" {
 			continue
 		}
-		stringv := value
+    labelNames  = append(labelNames, string(key))
+  }
+  sort.Strings(labelNames)
+	first := true
+	attributeString := "{"
+  for _, labelName := range labelNames {
+    value, ok := m.LabelSet[model.LabelName(labelName)]
+    if !ok { continue }
 		if first {
-			attributeString = fmt.Sprintf("%s%s=\"%s\"", attributeString, key, string(stringv))
+			attributeString = fmt.Sprintf("%s%s=\"%s\"", attributeString, labelName, string(value))
 			first = false
 		} else {
-			attributeString = fmt.Sprintf("%s, %s=\"%s\"", attributeString, key, string(stringv))
+			attributeString = fmt.Sprintf("%s, %s=\"%s\"", attributeString, labelName, string(value))
 		}
 	}
 	attributeString = attributeString + "}"

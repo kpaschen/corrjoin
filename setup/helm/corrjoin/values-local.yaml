@@ -17,3 +17,5 @@ grafana:
 cni:
   useCeph: false
   createPv: true
+
+prometheusURL: "http://prometheus-kube-prometheus-prometheus.monitoring:9090"

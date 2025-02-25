@@ -33,8 +33,8 @@ type CorrelationExplorer struct {
 	nextStrideCacheEntry int
 }
 
-func (c *CorrelationExplorer) Initialize() error {
-	c.prometheusBaseURL = "http://localhost:9090"
+func (c *CorrelationExplorer) Initialize(baseUrl string) error {
+	c.prometheusBaseURL = baseUrl
 	c.strideCache = make([]*Stride, STRIDE_CACHE_SIZE, STRIDE_CACHE_SIZE)
 	c.metricsCache = make(map[uint64]int)
 	c.metricsCacheByRowId = make(map[int](*explorerlib.Metric))
@@ -242,9 +242,9 @@ func parseStrideFromFilename(filename string) (*Stride, error) {
 	return &Stride{
 		ID:              strideCounter,
 		StartTime:       startT.UTC().Unix(),
-		StartTimeString: startT.UTC().Format("2006-01-02 15:04:05"),
+		StartTimeString: startT.UTC().Format("2006-01-02T15:04:05.000Z"),
 		EndTime:         endT.UTC().Unix(),
-		EndTimeString:   endT.UTC().Format("2006-01-02 15:04:05"),
+		EndTimeString:   endT.UTC().Format("2006-01-02T15:04:05.000Z"),
 		Status:          StrideExists,
 		Filename:        filename,
 	}, nil

@@ -40,3 +40,21 @@ type Stride struct {
 	Filename        string
 	subgraphs       *explorerlib.SubgraphMemberships
 }
+
+type PromQueryResponse struct {
+  Status string `json:"status"`
+  Data   Data   `json:"data"`
+}
+
+// Data contains the result type and the actual result.
+type Data struct {
+  ResultType string   `json:"resultType"`
+  Result     []Result `json:"result"`
+}
+
+// Result represents each time series in the response.
+type Result struct {
+  Metric map[string]string `json:"metric"`
+  Values [][]interface{}   `json:"values"`
+}
+
