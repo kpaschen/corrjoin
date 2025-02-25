@@ -93,8 +93,10 @@ func (w *TimeseriesWindow) shiftBufferIntoWindow(buffer [][]float64) (bool, erro
 
 	oldColumnCount := len(w.buffers[0])
 	sliceLengthToDelete := oldColumnCount + newColumnCount - w.settings.WindowSize
+	startComputation := true
 	if sliceLengthToDelete < 0 {
 		sliceLengthToDelete = 0
+		startComputation = false
 	}
 	log.Printf("shifting %d columns into window; shifting %d columns out of window\n",
 		newColumnCount, sliceLengthToDelete)
@@ -121,7 +123,7 @@ func (w *TimeseriesWindow) shiftBufferIntoWindow(buffer [][]float64) (bool, erro
 			w.buffers = append(w.buffers, row)
 		}
 	}
-	return sliceLengthToDelete > 0, nil
+	return startComputation, nil
 }
 
 // shift _buffer_ into _w_ from the right, displacing the first buffer.width columns

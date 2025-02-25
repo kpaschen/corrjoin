@@ -263,7 +263,7 @@ func (p *ParquetExplorer) GetEdges(edgeChan chan<- []*Edge) error {
 				return err
 			}
 		}
-		edgeBuf := make([]*Edge, numRead, numRead)
+		edgeBuf := make([]*Edge, 0, numRead)
 		for i, result := range results {
 			if i >= numRead {
 				break
@@ -277,11 +277,11 @@ func (p *ParquetExplorer) GetEdges(edgeChan chan<- []*Edge) error {
 			if result.ID >= result.Correlated {
 				continue
 			}
-			edgeBuf[i] = &Edge{
+			edgeBuf = append(edgeBuf, &Edge{
 				Source:  result.ID,
 				Target:  result.Correlated,
 				Pearson: result.Pearson,
-			}
+			})
 		}
 		edgeChan <- edgeBuf
 	}
@@ -367,4 +367,23 @@ func (m *Metric) ComputePrometheusGraphURL(prometheusBaseURL string, timeRange s
 	m.PrometheusGraphURL = fmt.Sprintf("%s/graph?g0.expr=%s%s&g0.tab=0&g0.display_mode=lines&g0.show_exemplars=0&g0.range_input=%s&g0.end_input=%s&g0.moment_input=%s",
 		prometheusBaseURL, name, attributeString, timeRange, url.QueryEscape(endTime),
 		url.QueryEscape(endTime))
+}
+
+func (m *Metric) MetricString() string {
+	attributeString := "{"
+	first := true
+	for key, value := range m.LabelSet {
+		if key == "__name__" {
+			continue
+		}
+		stringv := value
+		if first {
+			attributeString = fmt.Sprintf("%s%s=\"%s\"", attributeString, key, string(stringv))
+			first = false
+		} else {
+			attributeString = fmt.Sprintf("%s, %s=\"%s\"", attributeString, key, string(stringv))
+		}
+	}
+	attributeString = attributeString + "}"
+	return attributeString
 }

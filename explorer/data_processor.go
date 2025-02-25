@@ -136,6 +136,10 @@ func (c *CorrelationExplorer) scanResultFiles() error {
 				continue
 			case StrideRead:
 				continue
+			case StrideProcessing:
+				continue
+			case StrideProcessed:
+				continue
 			default: // Retrying or Exists
 				dirname := directoryNameForStride(*stride)
 				err = os.Mkdir(fmt.Sprintf("%s/%s", c.FilenameBase, dirname), 0750)
@@ -173,12 +177,14 @@ func (c *CorrelationExplorer) scanResultFiles() error {
 			}
 			if stride.Status == StrideRead {
 				log.Printf("ready to extract graph edges for stride %+v\n", *stride)
+				stride.Status = StrideProcessing
 				err = c.extractEdges(stride)
 				if err != nil {
 					log.Printf("failed to extract edges: %v\n", err)
 					stride.Status = StrideError
 					break
 				}
+				stride.Status = StrideProcessed
 			} else {
 				continue
 			}
@@ -259,7 +265,7 @@ func (c *CorrelationExplorer) retrieveEdges(stride *Stride, graphId int) ([]expl
 }
 
 func (c *CorrelationExplorer) extractEdges(stride *Stride) error {
-	if stride == nil || stride.Subgraphs == nil {
+	if stride == nil || stride.subgraphs == nil {
 		return fmt.Errorf("need a stride with subgraphs to get the edges")
 	}
 	parquetExplorer := explorerlib.NewParquetExplorer(c.FilenameBase)
@@ -267,7 +273,7 @@ func (c *CorrelationExplorer) extractEdges(stride *Stride) error {
 	if err != nil {
 		return err
 	}
-	subgraphs := stride.Subgraphs
+	subgraphs := stride.subgraphs
 	if subgraphs == nil {
 		return fmt.Errorf("missing subgraphs for stride %d\n", stride.ID)
 	}
@@ -331,7 +337,7 @@ func terminateEdgeFiles(files map[int]*os.File) {
 }
 
 func (c *CorrelationExplorer) readAndCacheSubgraphs(filename string, stride *Stride) error {
-	if stride.Subgraphs == nil {
+	if stride.subgraphs == nil {
 		log.Printf("requesting subgraphs for stride %d\n", stride.ID)
 		parquetExplorer := explorerlib.NewParquetExplorer(c.FilenameBase)
 		err := parquetExplorer.Initialize(stride.Filename)
@@ -343,7 +349,7 @@ func (c *CorrelationExplorer) readAndCacheSubgraphs(filename string, stride *Str
 		if err != nil {
 			return err
 		}
-		stride.Subgraphs = subgraphs
+		stride.subgraphs = subgraphs
 		log.Printf("obtained subgraphs for stride %d\n", stride.ID)
 	}
 	return nil
@@ -351,7 +357,7 @@ func (c *CorrelationExplorer) readAndCacheSubgraphs(filename string, stride *Str
 
 func (c *CorrelationExplorer) materializeStrideData(stride *Stride) error {
 	dirname := directoryNameForStride(*stride)
-	subgraphsSerialized, err := json.Marshal(*(stride.Subgraphs))
+	subgraphsSerialized, err := json.Marshal(*(stride.subgraphs))
 	if err != nil {
 		return err
 	}

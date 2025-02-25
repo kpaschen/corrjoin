@@ -9,6 +9,7 @@ type StrideState int
 const (
 	StrideExists = iota
 	StrideRead
+	StrideProcessing
 	StrideProcessed
 	StrideRetrying
 	StrideError
@@ -37,5 +38,5 @@ type Stride struct {
 	EndTimeString   string
 	Status          StrideState
 	Filename        string
-	Subgraphs       *explorerlib.SubgraphMemberships
+	subgraphs       *explorerlib.SubgraphMemberships
 }

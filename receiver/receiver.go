@@ -175,8 +175,8 @@ func NewTsProcessor(corrjoinConfig settings.CorrjoinSettings, strideLength int) 
 
 					// This creates the output file for this stride.
 					processor.reporter.InitializeStride(stride,
-						processor.accumulator.CurrentStrideStartTs,
-						processor.accumulator.CurrentStrideMaxTs)
+						observationResult.CurrentStrideStartTs,
+						observationResult.CurrentStrideMaxTs)
 
 					// This is when we started processing the stride.
 					processor.strideStartTimes[stride] = requestStart
@@ -198,7 +198,7 @@ func NewTsProcessor(corrjoinConfig settings.CorrjoinSettings, strideLength int) 
 					}
 				}
 			case <-time.After(10 * time.Minute):
-				log.Printf("got no timeseries data for 10 minutes")
+				log.Printf("got no stride data for 10 minutes")
 			}
 		}
 	}()

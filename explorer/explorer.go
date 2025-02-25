@@ -12,22 +12,18 @@ import (
 	"time"
 )
 
+const (
+	MAX_GRAPH_SIZE = 1500
+)
+
 // Types for the REST API
 type timeseriesIdResponse struct {
 	Rowid int `json:"rowid"`
 }
 
-type strideListResponse struct {
-	Strides []Stride `json:"strides"`
-}
-
 type subgraphResponse struct {
 	Id   int `json:"id"`
 	Size int `json:"size"`
-}
-
-type subgraphListResponse struct {
-	Subgraphs []subgraphResponse `json:"subgraphs"`
 }
 
 type TimeseriesResponse struct {
@@ -45,6 +41,7 @@ type subgraphNodeResponse struct {
 	Id       int    `json:"id"`
 	Title    string `json:"title"`
 	SubTitle string `json:"subtitle,optional"`
+	MainStat string `json:"mainstat,optional"`
 }
 
 type subgraphEdgeResponse struct {
@@ -55,23 +52,13 @@ type subgraphEdgeResponse struct {
 	Mainstat  string `json:"mainstat,optional"`
 }
 
-type subgraphNodesResponse struct {
-	Nodes []subgraphNodeResponse `json:"nodes"`
-}
-
-type subgraphEdgesResponse struct {
-	Edges []subgraphEdgeResponse `json:"edges"`
-}
-
 func (c *CorrelationExplorer) GetStrides(w http.ResponseWriter, r *http.Request) {
-	ret := strideListResponse{
-		Strides: make([]Stride, 0, STRIDE_CACHE_SIZE),
-	}
+	ret := make([]Stride, 0, STRIDE_CACHE_SIZE)
 	for _, stride := range c.strideCache {
 		if stride == nil {
 			continue
 		}
-		ret.Strides = append(ret.Strides, *stride)
+		ret = append(ret, *stride)
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
@@ -90,18 +77,15 @@ func (c *CorrelationExplorer) GetSubgraphs(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	stride := c.strideCache[strideId]
-	subgraphs := stride.Subgraphs
+	subgraphs := stride.subgraphs
 	if subgraphs == nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
 
-	resp := subgraphListResponse{
-		Subgraphs: make([]subgraphResponse, 0, len(subgraphs.Sizes)),
-	}
+	resp := make([]subgraphResponse, 0, len(subgraphs.Sizes))
 	for graphId, graphSize := range subgraphs.Sizes {
-		resp.Subgraphs = append(resp.Subgraphs,
-			subgraphResponse{Id: graphId, Size: graphSize})
+		resp = append(resp, subgraphResponse{Id: graphId, Size: graphSize})
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -114,34 +98,46 @@ func (c *CorrelationExplorer) GetSubgraphNodes(w http.ResponseWriter, r *http.Re
 	params := r.URL.Query()
 	strideId, err := c.getStride(params)
 	if err != nil {
+    log.Printf("error %v retrieving stride %d\n", err, strideId)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 	if strideId == -1 {
+    log.Printf("stride %d not found\n", strideId)
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
 	stride := c.strideCache[strideId]
-	subgraphs := stride.Subgraphs
+	subgraphs := stride.subgraphs
 	if subgraphs == nil {
+    log.Printf("stride %d has no subgraphs\n", strideId)
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
 	subgraphId, err := c.getSubgraphId(params)
 	if err != nil {
+    log.Printf("error %v getting subgraph id from params\n", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
 	size, ok := subgraphs.Sizes[subgraphId]
 	if !ok {
+    log.Printf("no subgraph with id %d\n", subgraphId)
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
 
-	resp := subgraphNodesResponse{
-		Nodes: make([]subgraphNodeResponse, 0, size),
+	// Grafana will run out of memory trying to render large graphs. Worst case, this makes
+	// the browser tab crash as well.
+	// Truncating the nodes list like this will make the graph not render in grafana because
+	// there will be orphaned edges.
+	if size > MAX_GRAPH_SIZE {
+		log.Printf("truncating graph %d from %d to %d nodes\n", subgraphId, size, MAX_GRAPH_SIZE)
+		size = MAX_GRAPH_SIZE
 	}
+
+	resp := make([]subgraphNodeResponse, 0, size)
 
 	for row, graphId := range subgraphs.Rows {
 		if graphId == subgraphId {
@@ -150,16 +146,18 @@ func (c *CorrelationExplorer) GetSubgraphNodes(w http.ResponseWriter, r *http.Re
 				log.Printf("row %d is missing from the metrics cache\n", row)
 				continue
 			}
-			metric.ComputePrometheusGraphURL(c.prometheusBaseURL, c.TimeRange, stride.EndTimeString)
 			r := subgraphNodeResponse{
-				Id:    row,
-				Title: fmt.Sprintf("%d", row),
-				// TODO: make this a link to a grafana dashboard
-				SubTitle: metric.PrometheusGraphURL,
+				Id:       row,
+				Title: string(metric.LabelSet["__name__"]),
+				MainStat: metric.MetricString(),
 			}
-			resp.Nodes = append(resp.Nodes, r)
+			resp = append(resp, r)
+			if len(resp) >= size {
+				break
+			}
 		}
 	}
+  log.Printf("returning nodes for graph %d\n", subgraphId)
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(resp)
@@ -178,7 +176,7 @@ func (c *CorrelationExplorer) GetSubgraphEdges(w http.ResponseWriter, r *http.Re
 		return
 	}
 	stride := c.strideCache[strideId]
-	subgraphs := stride.Subgraphs
+	subgraphs := stride.subgraphs
 	if subgraphs == nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
@@ -201,17 +199,15 @@ func (c *CorrelationExplorer) GetSubgraphEdges(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	resp := subgraphEdgesResponse{
-		Edges: make([]subgraphEdgeResponse, len(edges), len(edges)),
-	}
+	resp := make([]subgraphEdgeResponse, len(edges), len(edges))
 
 	for i, e := range edges {
-		resp.Edges = append(resp.Edges, subgraphEdgeResponse{
+		resp[i] = subgraphEdgeResponse{
 			Id:       i,
 			Source:   e.Source,
 			Target:   e.Target,
 			Mainstat: fmt.Sprintf("%f", e.Pearson),
-		})
+		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -232,6 +228,22 @@ func (c *CorrelationExplorer) getSubgraphId(params url.Values) (int, error) {
 }
 
 func (c *CorrelationExplorer) getStride(params url.Values) (int, error) {
+	strideId, ok := params["strideId"]
+	if ok {
+		s, err := strconv.ParseInt(strings.TrimSpace(strideId[0]), 10, 32)
+		if err != nil {
+			return -1, nil
+		}
+		for i, stride := range c.strideCache {
+			if stride == nil {
+				continue
+			}
+			if stride.ID == int(s) {
+				return i, nil
+			}
+		}
+		return -1, nil
+	}
 	timeToString, ok := params["timeTo"]
 	if !ok {
 		// If there is no timeTo parameter, just return the latest stride.
@@ -328,7 +340,7 @@ func (c *CorrelationExplorer) GetCorrelatedSeries(w http.ResponseWriter, r *http
 	}
 
 	stride := c.strideCache[strideId]
-	subgraphs := stride.Subgraphs
+	subgraphs := stride.subgraphs
 	if subgraphs == nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return

@@ -29,8 +29,8 @@ spec:
         command: ["/webroot/app"]
         args: ["-svdDimensions", "5", 
            "-windowSize", "100", "-stride", "50", 
-           #"-comparer", "inprocess", "-correlationThreshold", "99", "-justExplore", 
-           "-comparer", "inprocess", "-correlationThreshold", "99", "-sampleInterval", "10",
+            "-comparer", "inprocess", "-correlationThreshold", "99", "-justExplore", 
+            #"-comparer", "inprocess", "-correlationThreshold", "99", "-sampleInterval", "10",
            "-parquetMaxRowsPerRowGroup", "10000" ]
         resources:
            limits:
