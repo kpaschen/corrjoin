@@ -25,6 +25,9 @@ type CorrjoinSettings struct {
 	// Equals the window size.
 	WindowSize int // also OriginalColumnCount
 
+	// The number of columns in a stride.
+	StrideLength int
+
 	// The number of dimensions to choose from the output of SVD (aka kb)
 	SvdOutputDimensions int // == Dimensions
 

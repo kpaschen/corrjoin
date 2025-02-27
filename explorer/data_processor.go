@@ -17,13 +17,9 @@ const (
 )
 
 type CorrelationExplorer struct {
-	FilenameBase string
-	strideCache  []*Stride
-	// We assume that the rowids are stable, which is not the case after a restart.
-	// TODO: move the metrics cache to be a field on Stride
-	metricsCache        map[uint64](int)
-	metricsCacheByRowId map[int](*explorerlib.Metric)
-	prometheusBaseURL   string
+	FilenameBase      string
+	strideCache       []*Stride
+	prometheusBaseURL string
 
 	maxAgeSeconds        int
 	ticker               *time.Ticker
@@ -34,8 +30,6 @@ func (c *CorrelationExplorer) Initialize(baseUrl string, maxAgeSeconds int) erro
 	c.prometheusBaseURL = baseUrl
 	c.maxAgeSeconds = maxAgeSeconds
 	c.strideCache = make([]*Stride, STRIDE_CACHE_SIZE, STRIDE_CACHE_SIZE)
-	c.metricsCache = make(map[uint64]int)
-	c.metricsCacheByRowId = make(map[int](*explorerlib.Metric))
 	c.ticker = time.NewTicker(60 * time.Second)
 	c.nextStrideCacheEntry = 0
 
@@ -99,7 +93,9 @@ func (c *CorrelationExplorer) scanResultFiles() error {
 				log.Printf("failed to remove %s: %v\n", fullPath, err)
 				continue
 			}
-			stride.Status = StrideDeleted
+			if stride != nil {
+				stride.Status = StrideDeleted
+			}
 			continue
 		}
 
@@ -134,7 +130,6 @@ func (c *CorrelationExplorer) scanResultFiles() error {
 				log.Printf("created stride\n")
 				c.addStrideCacheEntry(stride)
 			}
-			log.Printf("stride %d in status %v\n", stride.ID, stride.Status)
 			switch stride.Status {
 			case StrideError:
 				continue
@@ -166,8 +161,8 @@ func (c *CorrelationExplorer) scanResultFiles() error {
 					}
 					break
 				}
-				c.convertMetricsCache()
-				log.Printf("added stride %+v with %d timeseries", *stride, len(c.metricsCache))
+				stride.convertMetricsCache()
+				log.Printf("added stride %d with %d timeseries", stride.ID, len(stride.metricsCache))
 				err = c.materializeStrideData(stride)
 				if err != nil {
 					log.Printf("failed to materialize stride data: %v\n", err)
@@ -182,7 +177,7 @@ func (c *CorrelationExplorer) scanResultFiles() error {
 				continue
 			}
 			if stride.Status == StrideRead {
-				log.Printf("ready to extract graph edges for stride %+v\n", *stride)
+				log.Printf("ready to extract graph edges for stride %d\n", stride.ID)
 				stride.Status = StrideProcessing
 				err = c.extractEdges(stride)
 				if err != nil {
@@ -206,13 +201,13 @@ func directoryNameForStride(stride Stride) string {
 	return fmt.Sprintf("stride_%d_%d", stride.ID, stride.StartTime)
 }
 
-func (c *CorrelationExplorer) convertMetricsCache() {
-	for rowid, m := range c.metricsCacheByRowId {
+func (s *Stride) convertMetricsCache() {
+	for rowid, m := range s.metricsCacheByRowId {
 		if m.Fingerprint == 0 {
 			log.Printf("missing metrics fingerprint for row id %d, %v\n", rowid, *m)
 			continue
 		}
-		c.metricsCache[m.Fingerprint] = rowid
+		s.metricsCache[m.Fingerprint] = rowid
 	}
 }
 
@@ -246,13 +241,15 @@ func parseStrideFromFilename(filename string) (*Stride, error) {
 		return nil, err
 	}
 	return &Stride{
-		ID:              strideCounter,
-		StartTime:       startT.UTC().Unix(),
-		StartTimeString: startT.UTC().Format("2006-01-02T15:04:05.000Z"),
-		EndTime:         endT.UTC().Unix(),
-		EndTimeString:   endT.UTC().Format("2006-01-02T15:04:05.000Z"),
-		Status:          StrideExists,
-		Filename:        filename,
+		ID:                  strideCounter,
+		StartTime:           startT.UTC().Unix(),
+		StartTimeString:     startT.UTC().Format("2006-01-02T15:04:05.000Z"),
+		EndTime:             endT.UTC().Unix(),
+		EndTimeString:       endT.UTC().Format("2006-01-02T15:04:05.000Z"),
+		Status:              StrideExists,
+		Filename:            filename,
+		metricsCache:        make(map[uint64]int),
+		metricsCacheByRowId: make(map[int](*explorerlib.Metric)),
 	}, nil
 }
 
@@ -264,7 +261,7 @@ func (c *CorrelationExplorer) retrieveCorrelatedTimeseries(stride *Stride, tsRow
 
 	ret := make(map[int]float32)
 
-	metric, exists := c.metricsCacheByRowId[tsRowId]
+	metric, exists := stride.metricsCacheByRowId[tsRowId]
 	if !exists {
 		return ret, fmt.Errorf("no metric with id %d", tsRowId)
 	}
@@ -430,7 +427,7 @@ func (c *CorrelationExplorer) readResultFile(filename string, stride *Stride) er
 		return err
 	}
 	log.Printf("reading metrics from %s\n", filename)
-	err = parquetExplorer.GetMetrics(&c.metricsCacheByRowId)
+	err = parquetExplorer.GetMetrics(&stride.metricsCacheByRowId)
 	if err != nil {
 		return err
 	}

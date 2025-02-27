@@ -74,6 +74,7 @@ func main() {
 		EuclidDimensions:     ke,
 		CorrelationThreshold: float64(float64(correlationThreshold) / 100.0),
 		WindowSize:           windowSize,
+		StrideLength:         stride,
 		SampleInterval:       sampleInterval,
 		Algorithm:            algorithm,
 		MaxRowsPerRowGroup:   int64(parquetMaxRowsPerRowGroup),
@@ -107,7 +108,7 @@ func main() {
 	var prometheusServer *http.Server
 
 	if !justExplore {
-		processor := receiver.NewTsProcessor(corrjoinConfig, stride)
+		processor := receiver.NewTsProcessor(corrjoinConfig)
 		prometheusRouter := mux.NewRouter().StrictSlash(true)
 		prometheusRouter.HandleFunc("/api/v1/write", processor.ReceivePrometheusData)
 		prometheusServer = &http.Server{

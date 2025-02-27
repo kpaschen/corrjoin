@@ -37,7 +37,7 @@ type TimeseriesWindow struct {
 	settings settings.CorrjoinSettings
 	comparer comparisons.Engine
 
-	windowSize    int
+	// This is the number of strides that have been shifted into this window.
 	StrideCounter int
 
 	windowLocked chan struct{}
@@ -81,7 +81,7 @@ func (w *TimeseriesWindow) shiftBufferIntoWindow(buffer [][]float64) (bool, erro
 
 	// This is a new ts window receiving its first stride.
 	if currentRowCount == 0 {
-		// Stride should really always be < windowsize, but check here to be sure.
+		// Stride length should really always be < windowsize, but check here to be sure.
 		if newColumnCount <= w.settings.WindowSize {
 			w.buffers = buffer
 			return newColumnCount == w.settings.WindowSize, nil
@@ -141,17 +141,17 @@ func (w *TimeseriesWindow) ShiftBuffer(buffer [][]float64) (error, bool) {
 		return WindowIsBusyError{}, false
 	}
 
-	newStride, err := w.shiftBufferIntoWindow(buffer)
+	w.StrideCounter++
+	startComputation, err := w.shiftBufferIntoWindow(buffer)
 	if err != nil {
 		w.unlockWindow()
 		return err, false
 	}
-	if !newStride {
+	if !startComputation {
 		w.unlockWindow()
 		return nil, false
 	}
 
-	w.StrideCounter++
 	go w.runAlgorithm()
 
 	return nil, true

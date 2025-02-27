@@ -2,7 +2,6 @@ package explorer
 
 import (
 	"fmt"
-	explorerlib "github.com/kpaschen/corrjoin/lib/explorer"
 	"testing"
 	"time"
 )
@@ -11,8 +10,6 @@ func TestScanResultFiles(t *testing.T) {
 	explorer := CorrelationExplorer{
 		FilenameBase:         "./testdata",
 		strideCache:          make([]*Stride, STRIDE_CACHE_SIZE, STRIDE_CACHE_SIZE),
-		metricsCache:         make(map[uint64]int),
-		metricsCacheByRowId:  make(map[int](*explorerlib.Metric)),
 		nextStrideCacheEntry: 0,
 	}
 
@@ -21,25 +18,41 @@ func TestScanResultFiles(t *testing.T) {
 		t.Errorf("unexpected: %e", err)
 	}
 
-	entries := len(explorer.metricsCacheByRowId)
-	if entries == 0 {
-		t.Errorf("no entries in cache")
+	strideCount := len(explorer.strideCache)
+	if strideCount == 0 {
+		t.Errorf("no strides")
 	}
-	fpEntries := len(explorer.metricsCache)
-	if fpEntries == 0 {
-		t.Errorf("no entries in cache by fp")
+
+	allStridesAreNil := true
+	for strideId, stride := range explorer.strideCache {
+		if stride == nil {
+			continue
+		}
+		allStridesAreNil = false
+		entries := len(stride.metricsCacheByRowId)
+		if entries == 0 {
+			t.Errorf("no metrics for stride %d", strideId)
+		}
+		fpEntries := len(stride.metricsCache)
+		if fpEntries == 0 {
+			t.Errorf("no entries in cache by fp")
+		}
+		if fpEntries != entries {
+			t.Errorf("cache count mismatch: %d in cache by rowid vs %d in cache by fp", entries, fpEntries)
+		}
+
 	}
-	if fpEntries != entries {
-		t.Errorf("cache count mismatch: %d in cache by rowid vs %d in cache by fp", entries, fpEntries)
+
+	if allStridesAreNil {
+		t.Errorf("all strides are nil")
 	}
+
 }
 
 func TestScanStrideAgain(t *testing.T) {
 	explorer := CorrelationExplorer{
 		FilenameBase:         "./testdata",
 		strideCache:          make([]*Stride, STRIDE_CACHE_SIZE, STRIDE_CACHE_SIZE),
-		metricsCache:         make(map[uint64]int),
-		metricsCacheByRowId:  make(map[int](*explorerlib.Metric)),
 		nextStrideCacheEntry: 0,
 	}
 
@@ -60,14 +73,17 @@ func TestGetTimeseriesById(t *testing.T) {
 		// FilenameBase:         "/tmp/corrjoinResults",
 		FilenameBase:         "./testdata",
 		strideCache:          make([]*Stride, STRIDE_CACHE_SIZE, STRIDE_CACHE_SIZE),
-		metricsCache:         make(map[uint64]int),
-		metricsCacheByRowId:  make(map[int](*explorerlib.Metric)),
 		nextStrideCacheEntry: 0,
 	}
 
 	err := explorer.scanResultFiles()
 	if err != nil {
 		t.Errorf("unexpected: %e", err)
+	}
+
+	stride := explorer.strideCache[0]
+	if stride == nil {
+		t.Fatalf("no stride")
 	}
 
 	params := make(map[string]([]string))
@@ -79,7 +95,7 @@ func TestGetTimeseriesById(t *testing.T) {
 		t.Errorf("expected error but got rowid %d", rowid)
 	}
 
-	sampleEntry, ok := explorer.metricsCacheByRowId[10]
+	sampleEntry, ok := stride.metricsCacheByRowId[10]
 	if !ok {
 		t.Errorf("entry rowid 10 is missing")
 	}
@@ -91,8 +107,6 @@ func TestGetTimeOverride(t *testing.T) {
 	explorer := CorrelationExplorer{
 		FilenameBase:         "./tmp",
 		strideCache:          make([]*Stride, STRIDE_CACHE_SIZE, STRIDE_CACHE_SIZE),
-		metricsCache:         make(map[uint64]int),
-		metricsCacheByRowId:  make(map[int](*explorerlib.Metric)),
 		nextStrideCacheEntry: 0,
 	}
 	params := make(map[string]([]string))

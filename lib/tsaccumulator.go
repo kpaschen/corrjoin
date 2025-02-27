@@ -137,6 +137,9 @@ func (a *TimeseriesAccumulator) AddObservation(observation *Observation) {
 		return
 	}
 	if slot < 0 {
+		// observation.Timestamp is after the end of the current stride. Send
+		// data for the current stride for processing and start collecting data
+		// for the next stride.
 		a.completeRows()
 
 		log.Printf("publish %d rows to channel\n", len(a.buffers))
@@ -159,7 +162,7 @@ func (a *TimeseriesAccumulator) AddObservation(observation *Observation) {
 	}
 
 	rowid, ok := a.rowmap[observation.MetricFingerprint]
-	if !ok {
+	if !ok && a.maxRow < 100 {
 		rowid = a.maxRow
 		a.rowmap[observation.MetricFingerprint] = rowid
 		a.buffers[rowid] = make([]float64, 0, colcount)

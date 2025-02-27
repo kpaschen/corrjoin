@@ -64,15 +64,16 @@ func init() {
 }
 
 type tsProcessor struct {
-	accumulator      *corrjoin.TimeseriesAccumulator
-	settings         *settings.CorrjoinSettings
-	window           *corrjoin.TimeseriesWindow
-	observationQueue chan (*corrjoin.Observation)
-	resultsChannel   chan (*datatypes.CorrjoinResult)
-	bufferChannel    chan (*corrjoin.ObservationResult)
-	comparer         comparisons.Engine
-	strideStartTimes map[int]time.Time
-	reporter         *reporter.ParquetReporter
+	accumulator                 *corrjoin.TimeseriesAccumulator
+	settings                    *settings.CorrjoinSettings
+	window                      *corrjoin.TimeseriesWindow
+	observationQueue            chan (*corrjoin.Observation)
+	resultsChannel              chan (*datatypes.CorrjoinResult)
+	bufferChannel               chan (*corrjoin.ObservationResult)
+	comparer                    comparisons.Engine
+	requestProcessingStartTimes map[int]time.Time
+	strideStartTimes            map[int]time.Time
+	reporter                    *reporter.ParquetReporter
 }
 
 func (t *tsProcessor) observeTs(req *prompb.WriteRequest) error {
@@ -121,7 +122,7 @@ func (t *tsProcessor) ReceivePrometheusData(w http.ResponseWriter, r *http.Reque
 	w.WriteHeader(http.StatusOK)
 }
 
-func NewTsProcessor(corrjoinConfig settings.CorrjoinSettings, strideLength int) *tsProcessor {
+func NewTsProcessor(corrjoinConfig settings.CorrjoinSettings) *tsProcessor {
 
 	// The observation queue is how we hand timeseries data to the accumulator.
 	observationQueue := make(chan *corrjoin.Observation, 1)
@@ -137,15 +138,16 @@ func NewTsProcessor(corrjoinConfig settings.CorrjoinSettings, strideLength int) 
 	comparer.Initialize(corrjoinConfig, resultsChannel)
 
 	processor := &tsProcessor{
-		accumulator: corrjoin.NewTimeseriesAccumulator(strideLength, time.Now().UTC(),
-			corrjoinConfig.SampleInterval, bufferChannel),
-		settings:         &corrjoinConfig,
-		observationQueue: observationQueue,
-		window:           corrjoin.NewTimeseriesWindow(corrjoinConfig, comparer),
-		resultsChannel:   resultsChannel,
-		bufferChannel:    bufferChannel,
-		comparer:         comparer,
-		strideStartTimes: make(map[int]time.Time),
+		accumulator: corrjoin.NewTimeseriesAccumulator(corrjoinConfig.StrideLength,
+			time.Now().UTC(), corrjoinConfig.SampleInterval, bufferChannel),
+		settings:                    &corrjoinConfig,
+		observationQueue:            observationQueue,
+		window:                      corrjoin.NewTimeseriesWindow(corrjoinConfig, comparer),
+		resultsChannel:              resultsChannel,
+		bufferChannel:               bufferChannel,
+		comparer:                    comparer,
+		strideStartTimes:            make(map[int]time.Time),
+		requestProcessingStartTimes: make(map[int]time.Time),
 		reporter: reporter.NewParquetReporter(
 			corrjoinConfig.ResultsDirectory, corrjoinConfig.MaxRowsPerRowGroup),
 	}
@@ -173,13 +175,26 @@ func NewTsProcessor(corrjoinConfig settings.CorrjoinSettings, strideLength int) 
 					requestStart := time.Now()
 					stride := processor.window.StrideCounter + 1
 
-					// This creates the output file for this stride.
-					processor.reporter.InitializeStride(stride,
-						observationResult.CurrentStrideStartTs,
-						observationResult.CurrentStrideMaxTs)
+					processor.strideStartTimes[stride] = observationResult.CurrentStrideStartTs
 
-					// This is when we started processing the stride.
-					processor.strideStartTimes[stride] = requestStart
+					stridesPerWindow := processor.settings.WindowSize / processor.settings.StrideLength
+					if stride < stridesPerWindow {
+						log.Printf("got data for stride %d but that is not enough for filling the window\n", stride)
+					} else {
+						firstStride := stride - stridesPerWindow + 1
+						log.Printf("got a result for stride %d. There are %d strides per window, so I think the first stride for this window should be %d\n", stride, stridesPerWindow, firstStride)
+
+						windowStart := processor.strideStartTimes[firstStride]
+						windowEnd := observationResult.CurrentStrideMaxTs
+
+						log.Printf("that gives us a window span from %v to %v aka %s to %s\n",
+							windowStart, windowEnd,
+							windowStart.UTC().Format("20060102150405"),
+							windowEnd.UTC().Format("20060102150405"))
+
+						// This creates the output file for an entire window, not just for the stride.
+						processor.reporter.InitializeStride(stride, windowStart, windowEnd)
+					}
 
 					err, willRunComputation := processor.window.ShiftBuffer(observationResult.Buffers)
 
@@ -194,6 +209,7 @@ func NewTsProcessor(corrjoinConfig settings.CorrjoinSettings, strideLength int) 
 						}
 					}
 					if err == nil && willRunComputation {
+						processor.requestProcessingStartTimes[stride] = requestStart
 						log.Printf("started processing stride %d\n", processor.window.StrideCounter)
 					}
 				}
@@ -213,7 +229,7 @@ func NewTsProcessor(corrjoinConfig settings.CorrjoinSettings, strideLength int) 
 					log.Printf("empty correlation result, done with stride %d\n",
 						correlationResult.StrideCounter)
 					requestEnd := time.Now()
-					requestStart, ok := processor.strideStartTimes[correlationResult.StrideCounter]
+					requestStart, ok := processor.requestProcessingStartTimes[correlationResult.StrideCounter]
 					if !ok {
 						log.Printf("missing start time for stride %d?\n", correlationResult.StrideCounter)
 					} else {
@@ -229,7 +245,9 @@ func NewTsProcessor(corrjoinConfig settings.CorrjoinSettings, strideLength int) 
 					if err != nil {
 						log.Printf("failed to flush results writer: %e\n", err)
 					}
+					log.Printf("finished recording data for stride %d\n", stride)
 				} else {
+					log.Printf("adding correlated pairs for stride %d\n", correlationResult.StrideCounter)
 					err := processor.reporter.AddCorrelatedPairs(*correlationResult)
 					if err != nil {
 						log.Printf("failed to log results: %v\n", err)
