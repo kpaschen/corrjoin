@@ -193,6 +193,7 @@ func (s *SubgraphMemberships) addPair(row1 int, row2 int) {
 				s.Sizes[c1]++
 			}
 		}
+		s.Sizes[c2] = 0
 	} else {
 		for row, graph := range s.Rows {
 			if graph == c1 {
@@ -200,6 +201,7 @@ func (s *SubgraphMemberships) addPair(row1 int, row2 int) {
 				s.Sizes[c2]++
 			}
 		}
+		s.Sizes[c1] = 0
 	}
 }
 

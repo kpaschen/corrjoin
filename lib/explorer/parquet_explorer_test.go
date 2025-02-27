@@ -1,6 +1,7 @@
 package explorer
 
 import (
+	"fmt"
 	"github.com/prometheus/common/model"
 	"testing"
 )
@@ -26,5 +27,32 @@ func TestComputePrometheusGraphURL(t *testing.T) {
 	m.ComputePrometheusGraphURL("http://localhost:9090", "10m", "2024-09-24 08:52:15")
 	if m.PrometheusGraphURL != targetURL && m.PrometheusGraphURL != targetURL2 {
 		t.Errorf("expected %s but got %s\n", targetURL, m.PrometheusGraphURL)
+	}
+}
+
+func TestGetSubgraphs(t *testing.T) {
+	explorer := NewParquetExplorer("./testdata")
+	err := explorer.Initialize("correlations_4_20250227153854-20250227155533.pq")
+	if err != nil {
+		t.Fatalf("failed to read parquet file: %v", err)
+	}
+
+	subgraphs, err := explorer.GetSubgraphs()
+	if err != nil {
+		t.Fatalf("failed to get subgraphs: %v", err)
+	}
+
+	fmt.Printf("got subgraphs: %+v\n", *subgraphs)
+	// Verify that the sizes are correct.
+	for graphId, size := range subgraphs.Sizes {
+		counter := 0
+		for _, g := range subgraphs.Rows {
+			if g == graphId {
+				counter++
+			}
+		}
+		if counter != size {
+			t.Errorf("wrong count for subgraph %d: size should be %d but count is %d\n", graphId, size, counter)
+		}
 	}
 }

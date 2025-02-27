@@ -84,7 +84,7 @@ func (c *CorrelationExplorer) GetSubgraphs(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	if strideId == -1 {
-		http.Error(w, err.Error(), http.StatusNotFound)
+		http.Error(w, fmt.Errorf("invalid stride id").Error(), http.StatusNotFound)
 		return
 	}
 	stride := c.strideCache[strideId]
@@ -115,6 +115,7 @@ func (c *CorrelationExplorer) GetSubgraphNodes(w http.ResponseWriter, r *http.Re
 		return
 	}
 	if strideId == -1 {
+		err := fmt.Errorf("stride %d not found", strideId)
 		log.Printf("stride %d not found\n", strideId)
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
@@ -149,9 +150,11 @@ func (c *CorrelationExplorer) GetSubgraphNodes(w http.ResponseWriter, r *http.Re
 		size = MAX_GRAPH_SIZE
 	}
 
+	log.Printf("subgraph %d has size %d\n", subgraphId, size)
 	resp := make([]subgraphNodeResponse, 0, size)
 
 	for row, graphId := range subgraphs.Rows {
+		log.Printf("looking at graph id %d and comparing it to %d\n", graphId, subgraphId)
 		if graphId == subgraphId {
 			metric, exists := stride.metricsCacheByRowId[row]
 			if !exists {
@@ -163,13 +166,14 @@ func (c *CorrelationExplorer) GetSubgraphNodes(w http.ResponseWriter, r *http.Re
 				Title:    string(metric.LabelSet["__name__"]),
 				MainStat: metric.MetricString(),
 			}
+			log.Printf("appending a node to the node response\n")
 			resp = append(resp, r)
 			if len(resp) >= size {
 				break
 			}
 		}
 	}
-	log.Printf("returning nodes for graph %d\n", subgraphId)
+	log.Printf("returning %d nodes for graph %d\n", len(resp), subgraphId)
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(resp)
@@ -190,6 +194,7 @@ func (c *CorrelationExplorer) GetSubgraphEdges(w http.ResponseWriter, r *http.Re
 	stride := c.strideCache[strideId]
 	subgraphs := stride.subgraphs
 	if subgraphs == nil {
+		err := fmt.Errorf("stride %d has no subgraphs", stride.ID)
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
@@ -201,13 +206,13 @@ func (c *CorrelationExplorer) GetSubgraphEdges(w http.ResponseWriter, r *http.Re
 
 	_, ok := subgraphs.Sizes[subgraphId]
 	if !ok {
-		http.Error(w, err.Error(), http.StatusNotFound)
+		http.Error(w, fmt.Errorf("no subgraph for id %d", subgraphId).Error(), http.StatusNotFound)
 		return
 	}
 
 	edges, err := c.retrieveEdges(stride, subgraphId)
 	if !ok {
-		http.Error(w, err.Error(), http.StatusNotFound)
+		http.Error(w, fmt.Errorf("no subgraph for id %d", subgraphId).Error(), http.StatusNotFound)
 		return
 	}
 
@@ -475,10 +480,14 @@ func (c *CorrelationExplorer) GetTimeseries(w http.ResponseWriter, r *http.Reque
 
 	resp := make([]TimeseriesResponse, len(results[0].Values))
 	for i, tsr := range results[0].Values {
-		log.Printf("i have a tsr %+v with %T and %T\n", tsr, tsr[0], tsr[1])
+		timestampFloat, _ := tsr[0].(string)
+		v, _ := strconv.ParseFloat(timestampFloat, 32)
+		t := time.UnixMicro(int64(v * 1000000))
+		value, _ := strconv.ParseInt(tsr[1].(string), 10, 32)
+		tsFormat := "2006-01-02T15:04:05.00Z"
 		resp[i] = TimeseriesResponse{
-			Time:  "", // TODO: parse tsr[0] into a time.Time value, then format using YYYY-MM-DDTHH:mm:ss.00Z
-			Value: 0,  // use tsr[1]
+			Time:  t.UTC().Format(tsFormat),
+			Value: int(value),
 		}
 	}
 

@@ -395,7 +395,7 @@ func (c *CorrelationExplorer) readAndCacheSubgraphs(filename string, stride *Str
 			return err
 		}
 		stride.subgraphs = subgraphs
-		log.Printf("obtained subgraphs for stride %d\n", stride.ID)
+		log.Printf("obtained subgraphs %+v for stride %d\n", subgraphs, stride.ID)
 	}
 	return nil
 }
