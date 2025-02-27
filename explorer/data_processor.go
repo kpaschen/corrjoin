@@ -7,13 +7,13 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"path/filepath"
 	"sort"
 	"time"
 )
 
 const (
 	STRIDE_CACHE_SIZE = 10
-	MAX_AGE           = 86400 // 1 day
 )
 
 type CorrelationExplorer struct {
@@ -25,16 +25,14 @@ type CorrelationExplorer struct {
 	metricsCacheByRowId map[int](*explorerlib.Metric)
 	prometheusBaseURL   string
 
-	// This should be the length of a stride expressed as a duration that
-	// Prometheus can understand. e.g. "10m" or "1h".
-	TimeRange string // e.g. "10m"
-
+	maxAgeSeconds        int
 	ticker               *time.Ticker
 	nextStrideCacheEntry int
 }
 
-func (c *CorrelationExplorer) Initialize(baseUrl string) error {
+func (c *CorrelationExplorer) Initialize(baseUrl string, maxAgeSeconds int) error {
 	c.prometheusBaseURL = baseUrl
+	c.maxAgeSeconds = maxAgeSeconds
 	c.strideCache = make([]*Stride, STRIDE_CACHE_SIZE, STRIDE_CACHE_SIZE)
 	c.metricsCache = make(map[uint64]int)
 	c.metricsCacheByRowId = make(map[int](*explorerlib.Metric))
@@ -92,9 +90,17 @@ func (c *CorrelationExplorer) scanResultFiles() error {
 		if err != nil {
 			continue
 		}
-		age := time.Now().UTC().Unix() - t.ModTime().UTC().Unix()
-		if age > MAX_AGE {
-			log.Printf("file %s should be deleted\n", e.Name())
+		age := int(time.Now().UTC().Unix() - t.ModTime().UTC().Unix())
+		if c.maxAgeSeconds > 0 && age > c.maxAgeSeconds {
+			fullPath := filepath.Join(c.FilenameBase, e.Name())
+			log.Printf("file %s should be deleted\n", fullPath)
+			err = os.RemoveAll(fullPath)
+			if err != nil {
+				log.Printf("failed to remove %s: %v\n", fullPath, err)
+				continue
+			}
+			stride.Status = StrideDeleted
+			continue
 		}
 
 		// Potential situations:
@@ -248,6 +254,48 @@ func parseStrideFromFilename(filename string) (*Stride, error) {
 		Status:          StrideExists,
 		Filename:        filename,
 	}, nil
+}
+
+func (c *CorrelationExplorer) retrieveCorrelatedTimeseries(stride *Stride, tsRowId int) (map[int]float32, error) {
+
+	if stride == nil || stride.subgraphs == nil {
+		return nil, fmt.Errorf("stride has no subgraphs")
+	}
+
+	ret := make(map[int]float32)
+
+	metric, exists := c.metricsCacheByRowId[tsRowId]
+	if !exists {
+		return ret, fmt.Errorf("no metric with id %d", tsRowId)
+	}
+	if metric.Constant {
+		log.Printf("metric %d is constant in stride %d\n", tsRowId, stride.ID)
+		return ret, nil
+	}
+
+	graphId, exists := stride.subgraphs.Rows[tsRowId]
+	if !exists {
+		log.Printf("no graph found for row id %d in stride %d\n", tsRowId, stride.ID)
+		return ret, nil // This timeseries is not correlated with anything.
+	}
+	edges, err := c.retrieveEdges(stride, graphId)
+	if err != nil {
+		return ret, err
+	}
+
+	for _, e := range edges {
+		if e.Pearson > 0 && (e.Source == tsRowId || e.Target == tsRowId) {
+			var otherRowId int
+			if e.Source == tsRowId {
+				otherRowId = e.Target
+			} else {
+				otherRowId = e.Source
+			}
+			ret[otherRowId] = e.Pearson
+		}
+	}
+	log.Printf("returning %d correlates for ts %d in stride %d\n", len(ret), tsRowId, stride.ID)
+	return ret, nil
 }
 
 func (c *CorrelationExplorer) retrieveEdges(stride *Stride, graphId int) ([]explorerlib.Edge, error) {

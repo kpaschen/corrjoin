@@ -38,6 +38,7 @@ func main() {
 	var resultsDirectory string
 	var justExplore bool
 	var prometheusURL string
+	var strideMaxAgeSeconds int
 
 	flag.StringVar(&metricsAddr, "metrics-address", ":9203", "The address the metrics endpoint binds to.")
 	flag.StringVar(&prometheusAddr, "listen-address", ":9201", "The address that the storage endpoint binds to.")
@@ -57,6 +58,7 @@ func main() {
 	flag.StringVar(&resultsDirectory, "resultsDirectory", "/tmp/corrjoinResults", "The directory with the result files.")
 	flag.BoolVar(&justExplore, "justExplore", false, "If true, launch only the explorer endpoint")
 	flag.StringVar(&prometheusURL, "prometheusURL", "", "A URL for the prometheus service")
+	flag.IntVar(&strideMaxAgeSeconds, "strideMaxAgeSeconds", 86400, "The maximum time to keep stride data around for.")
 
 	flag.Parse()
 
@@ -82,7 +84,7 @@ func main() {
 	expl := &explorer.CorrelationExplorer{
 		FilenameBase: resultsDirectory,
 	}
-	err := expl.Initialize(prometheusURL)
+	err := expl.Initialize(prometheusURL, strideMaxAgeSeconds)
 	if err != nil {
 		log.Printf("failed to initialize explorer: %v\n", err)
 	}

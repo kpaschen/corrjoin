@@ -11,7 +11,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-  "sort"
+	"sort"
 )
 
 type ParquetExplorer struct {
@@ -376,19 +376,21 @@ func (m *Metric) ComputePrometheusQuery() string {
 }
 
 func (m *Metric) MetricString() string {
-  labelNames := make([]string, 0, len(m.LabelSet))
+	labelNames := make([]string, 0, len(m.LabelSet))
 	for key := range m.LabelSet {
 		if key == "__name__" {
 			continue
 		}
-    labelNames  = append(labelNames, string(key))
-  }
-  sort.Strings(labelNames)
+		labelNames = append(labelNames, string(key))
+	}
+	sort.Strings(labelNames)
 	first := true
 	attributeString := "{"
-  for _, labelName := range labelNames {
-    value, ok := m.LabelSet[model.LabelName(labelName)]
-    if !ok { continue }
+	for _, labelName := range labelNames {
+		value, ok := m.LabelSet[model.LabelName(labelName)]
+		if !ok {
+			continue
+		}
 		if first {
 			attributeString = fmt.Sprintf("%s%s=\"%s\"", attributeString, labelName, string(value))
 			first = false

@@ -25,10 +25,10 @@ type subgraphResponse struct {
 }
 
 type CorrelatedResponse struct {
-	Rowid   int                                  `json:"rowid"`
-	Labels  map[model.LabelName]model.LabelValue `json:"labels"`
-  LabelString string `json:"labelString"`
-	Pearson float32                              `json:"pearson"`
+	Rowid       int                                  `json:"rowid"`
+	Labels      map[model.LabelName]model.LabelValue `json:"labels"`
+	LabelString string                               `json:"labelString"`
+	Pearson     float32                              `json:"pearson"`
 }
 
 type correlatedTimeseriesResponse struct {
@@ -54,6 +54,13 @@ type subgraphEdgeResponse struct {
 type TimeseriesResponse struct {
 	Time  string `json:"time"` // This must be in YYYY-MM-DDTHH:MM:SSZ format
 	Value int    `json:"value"`
+}
+
+// This is what the timeline panel wants.
+type TimelineResponse struct {
+	Time   string `json:"time"` // This must be in YYYY-MM-DDTHH:MM:SSZ format
+	Metric int    `json:"metric"`
+	State  string `json:"state"`
 }
 
 func (c *CorrelationExplorer) GetStrides(w http.ResponseWriter, r *http.Request) {
@@ -83,7 +90,7 @@ func (c *CorrelationExplorer) GetSubgraphs(w http.ResponseWriter, r *http.Reques
 	stride := c.strideCache[strideId]
 	subgraphs := stride.subgraphs
 	if subgraphs == nil {
-    err := fmt.Errorf("no subgraphs found for stride %d\n", strideId)
+		err := fmt.Errorf("no subgraphs found for stride %d\n", strideId)
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
@@ -302,10 +309,10 @@ func parseUrlDataIntoMetric(urlValue string) (*model.Metric, error) {
 }
 
 func (c *CorrelationExplorer) getMetric(params url.Values, strideId int) (int, error) {
-  metric, err := c.getMetricRowId(params)
-  if err == nil && metric != nil {
-     return metric.RowId, nil
-  }
+	metric, err := c.getMetricRowId(params)
+	if err == nil && metric != nil {
+		return metric.RowId, nil
+	}
 	labelset, ok := params["ts"]
 	if !ok {
 		return -1, fmt.Errorf("missing ts parameter")
@@ -342,14 +349,14 @@ func (c *CorrelationExplorer) getMetricRowId(params url.Values) (*explorerlib.Me
 }
 
 func (c *CorrelationExplorer) getTimeOverride(params url.Values) (string, string, error) {
-  isOverride, ok := params["timeOverride"]
-  if ok && isOverride[0] == "false" {
-     return "", "", nil
-  }
+	isOverride, ok := params["timeOverride"]
+	if ok && isOverride[0] == "false" {
+		return "", "", nil
+	}
 	timeToString := ""
 	timeFromString := ""
 	formatString := "2006-01-02T15:04:05.000Z"
-  inputFormat := "2006-01-02T15:04:05"
+	inputFormat := "2006-01-02T15:04:05"
 	timeTo, ok := params["timeTo"]
 	if ok {
 		if timeTo[0] == "now" {
@@ -381,7 +388,7 @@ func (c *CorrelationExplorer) getTimeOverride(params url.Values) (string, string
 
 func (c *CorrelationExplorer) GetTimeseries(w http.ResponseWriter, r *http.Request) {
 	params := r.URL.Query()
-  log.Printf("processing timeseries request with parameters %+v\n", params)
+	log.Printf("processing timeseries request with parameters %+v\n", params)
 	strideId, err := c.getStride(params)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -417,7 +424,7 @@ func (c *CorrelationExplorer) GetTimeseries(w http.ResponseWriter, r *http.Reque
 
 	promQLQuery := metric.ComputePrometheusQuery()
 	// make a request like this: 'http://prometheus:9090/api/v1/query_range?query=up&start=2015-07-01T20:10:30.781Z&end=2015-07-01T20:11:00.781Z&step=15s'
-  // TODO: maybe use the client api instead?
+	// TODO: maybe use the client api instead?
 	requestURL := fmt.Sprintf("%s/api/v1/query_range?query=%s&start=%s&end=%s&step=15s",
 		c.prometheusBaseURL,
 		promQLQuery,
@@ -439,35 +446,36 @@ func (c *CorrelationExplorer) GetTimeseries(w http.ResponseWriter, r *http.Reque
 	}
 	log.Printf("response body: %s\n", resBody)
 
-  var parsedResponse PromQueryResponse
-  err = json.Unmarshal([]byte(resBody), &parsedResponse)
-  if err != nil {
-     log.Printf("failed to parse response: %v\n", err)
+	var parsedResponse PromQueryResponse
+	err = json.Unmarshal([]byte(resBody), &parsedResponse)
+	if err != nil {
+		log.Printf("failed to parse response: %v\n", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
-    return
-  }
+		return
+	}
 
-  results := parsedResponse.Data.Result
-  // results should be a list. We assume that the list has exactly one entry because
-  // our timeseries id is supposed to be unique.
-  if len(results) == 0 {
+	results := parsedResponse.Data.Result
+	// results should be a list. We assume that the list has exactly one entry because
+	// our timeseries id is supposed to be unique.
+	if len(results) == 0 {
+		err = fmt.Errorf("no results found for timeseries")
 		http.Error(w, err.Error(), http.StatusNotFound)
-    return
-  }
-  if len(results) != 1 {
+		return
+	}
+	if len(results) != 1 {
 		log.Printf("results has unexpected length. %+v\n", results)
 		http.Error(w, err.Error(), http.StatusBadRequest)
-    return
-  }
+		return
+	}
 
-  resp := make([]TimeseriesResponse, len(results[0].Values))
-  for i, tsr := range results[0].Values {
-     log.Printf("i have a tsr %+v with %T and %T\n", tsr, tsr[0], tsr[1])
-     resp[i] = TimeseriesResponse{
-        Time: "", // TODO: parse tsr[0] into a time.Time value, then format using YYYY-MM-DDTHH:mm:ss.00Z
-        Value: 0, // use tsr[1]
-     }
-  }
+	resp := make([]TimeseriesResponse, len(results[0].Values))
+	for i, tsr := range results[0].Values {
+		log.Printf("i have a tsr %+v with %T and %T\n", tsr, tsr[0], tsr[1])
+		resp[i] = TimeseriesResponse{
+			Time:  "", // TODO: parse tsr[0] into a time.Time value, then format using YYYY-MM-DDTHH:mm:ss.00Z
+			Value: 0,  // use tsr[1]
+		}
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
@@ -475,11 +483,78 @@ func (c *CorrelationExplorer) GetTimeseries(w http.ResponseWriter, r *http.Reque
 }
 
 func (c *CorrelationExplorer) GetTimeline(w http.ResponseWriter, r *http.Request) {
-  // TODO: look up the timeseries requested
-  // look up the correlates of this timeseries in all strides
-  // a timeline response has to be a list of things that have
-  // time: 2024-02-07T11:00:00Z, metric, state
+	params := r.URL.Query()
+	strideId, err := c.getStride(params)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if strideId == -1 {
+		http.Error(w, fmt.Sprintf("no stride found for time"), http.StatusNotFound)
+		return
+	}
+
+	metricRowId, err := c.getMetric(params, strideId)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if metricRowId == -1 {
+		http.Error(w, fmt.Sprintf("no metric found for ts %s", params["ts"][0]), http.StatusNotFound)
+		return
+	}
+
+	// Look up the correlates of this timeseries in all strides.
+	timelinemap := make(map[int](map[int]float32))
+	allRowIds := make(map[int]bool)
+	for strideId, stride := range c.strideCache {
+		if stride == nil {
+			continue
+		}
+		// TODO: could retrieve the data for all strides in parallel
+		correlatesMap, err := c.retrieveCorrelatedTimeseries(stride, metricRowId)
+		if err != nil {
+			log.Printf("error retrieving correlates for timeseries %d and stride %d: %v\n", metricRowId, strideId, err)
+			continue
+		}
+		timelinemap[strideId] = correlatesMap
+		for rowid, _ := range correlatesMap {
+			allRowIds[rowid] = true
+		}
+	}
+
+	log.Printf("found a total of %d timeseries for the timeline of ts %d\n", len(allRowIds), metricRowId)
+
+	resp := make([]TimelineResponse, 0, len(c.strideCache)*len(allRowIds))
+	for strideId, stride := range c.strideCache {
+		if stride == nil {
+			continue
+		}
+		timelines := timelinemap[strideId]
+		for rowid, _ := range allRowIds {
+			pearson, exists := timelines[rowid]
+			if !exists {
+				resp = append(resp, TimelineResponse{
+					Time:   stride.EndTimeString,
+					Metric: rowid,
+					State:  "0",
+				})
+			} else {
+				resp = append(resp, TimelineResponse{
+					Time:   stride.EndTimeString,
+					Metric: rowid,
+					State:  fmt.Sprintf("%f", pearson),
+				})
+			}
+		}
+	}
+
+	log.Printf("returning %d entries for timeline\n", len(resp))
+
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(resp)
 }
 
 func (c *CorrelationExplorer) GetCorrelatedSeries(w http.ResponseWriter, r *http.Request) {
@@ -506,21 +581,15 @@ func (c *CorrelationExplorer) GetCorrelatedSeries(w http.ResponseWriter, r *http
 	}
 
 	stride := c.strideCache[strideId]
-	subgraphs := stride.subgraphs
-	if subgraphs == nil {
+	correlatesMap, err := c.retrieveCorrelatedTimeseries(stride, metricRowId)
+	if err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
-
-	metric, exists := c.metricsCacheByRowId[metricRowId]
-	if !exists {
-		http.Error(w, err.Error(), http.StatusNotFound)
-		return
-	}
-	if metric.Constant {
+	if len(correlatesMap) == 0 {
+		log.Printf("correlates map for %d is empty\n", metricRowId)
 		resp := correlatedTimeseriesResponse{
 			Correlates: make([]CorrelatedResponse, 0),
-			Constant:   true,
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
@@ -528,45 +597,27 @@ func (c *CorrelationExplorer) GetCorrelatedSeries(w http.ResponseWriter, r *http
 		return
 	}
 
-	graphId, exists := subgraphs.Rows[metricRowId]
-	if !exists {
-		http.Error(w, err.Error(), http.StatusNotFound)
-		return
-	}
-
-	edges, err := c.retrieveEdges(stride, graphId)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusNotFound)
-		return
-	}
-
 	resp := correlatedTimeseriesResponse{
-		Correlates: make([]CorrelatedResponse, 0, len(edges)),
+		Correlates: make([]CorrelatedResponse, 0, len(correlatesMap)),
 		Constant:   false,
 	}
 
-	for _, e := range edges {
-		if e.Pearson > 0 && (e.Source == metricRowId || e.Target == metricRowId) {
-			var otherRowId int
-			if e.Source == metricRowId {
-				otherRowId = e.Target
-			} else {
-				otherRowId = e.Source
-			}
-			otherMetric, exists := c.metricsCacheByRowId[otherRowId]
-			if !exists {
-				log.Printf("ts %d is allegedly correlated with %d but that does not exist\n", metricRowId, otherRowId)
-				http.Error(w, err.Error(), http.StatusNotFound)
-				return
-			}
-			resp.Correlates = append(resp.Correlates, CorrelatedResponse{
-				Rowid:   otherRowId,
-				Labels:  map[model.LabelName]model.LabelValue(otherMetric.LabelSet),
-        LabelString: otherMetric.MetricString(),
-				Pearson: e.Pearson,
-			})
+	for otherRowId, pearson := range correlatesMap {
+		otherMetric, exists := c.metricsCacheByRowId[otherRowId]
+		if !exists {
+			log.Printf("ts %d is allegedly correlated with %d but that does not exist\n", metricRowId, otherRowId)
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
 		}
+		resp.Correlates = append(resp.Correlates, CorrelatedResponse{
+			Rowid:       otherRowId,
+			Labels:      map[model.LabelName]model.LabelValue(otherMetric.LabelSet),
+			LabelString: otherMetric.MetricString(),
+			Pearson:     pearson,
+		})
 	}
+
+	log.Printf("returning %d correlated ts for ts %d and stride %d\n", len(resp.Correlates), metricRowId, stride.ID)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)

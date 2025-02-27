@@ -4,7 +4,7 @@ import (
 	"fmt"
 	explorerlib "github.com/kpaschen/corrjoin/lib/explorer"
 	"testing"
-  "time"
+	"time"
 )
 
 func TestScanResultFiles(t *testing.T) {
@@ -96,23 +96,29 @@ func TestGetTimeOverride(t *testing.T) {
 		nextStrideCacheEntry: 0,
 	}
 	params := make(map[string]([]string))
-  params["timeTo"] = []string{"now"}
-  from, to, err := explorer.getTimeOverride(params)
-  if err != nil { t.Errorf("unexpected: %v", err ) }
-  fmt.Printf("from based on now: %s, to: %s, err: %v\n", from, to, err)
+	params["timeTo"] = []string{"now"}
+	from, to, err := explorer.getTimeOverride(params)
+	if err != nil {
+		t.Errorf("unexpected: %v", err)
+	}
+	fmt.Printf("from based on now: %s, to: %s, err: %v\n", from, to, err)
 
-  now := time.Now().UTC()
-  toParsed, err := time.Parse("2006-01-02T15:04:05.000Z", to)
-  if err != nil { t.Errorf("unexpected: %v", err ) }
-  difference := now.Sub(toParsed)
-  if difference > time.Duration(1 * time.Minute) {
-     t.Errorf("timeTo should be close to now but there is a %+v difference", difference)
-  }
+	now := time.Now().UTC()
+	toParsed, err := time.Parse("2006-01-02T15:04:05.000Z", to)
+	if err != nil {
+		t.Errorf("unexpected: %v", err)
+	}
+	difference := now.Sub(toParsed)
+	if difference > time.Duration(1*time.Minute) {
+		t.Errorf("timeTo should be close to now but there is a %+v difference", difference)
+	}
 
-  fromParsed, err := time.Parse("2006-01-02T15:04:05.000Z", from)
-  if err != nil { t.Errorf("unexpected: %v", err ) }
-  difference = toParsed.Sub(fromParsed)
-  if difference != time.Duration(10 * time.Minute) {
-     t.Errorf("difference between 'from' and 'to' should be 10m but is %+v", difference)
-  }
+	fromParsed, err := time.Parse("2006-01-02T15:04:05.000Z", from)
+	if err != nil {
+		t.Errorf("unexpected: %v", err)
+	}
+	difference = toParsed.Sub(fromParsed)
+	if difference != time.Duration(10*time.Minute) {
+		t.Errorf("difference between 'from' and 'to' should be 10m but is %+v", difference)
+	}
 }
