@@ -88,7 +88,7 @@ func TestGetTimeseriesById(t *testing.T) {
 
 	params["timeTo"] = []string{"1738598499834"}
 
-	rowid, err := explorer.getMetric(params, 1)
+	rowid, err := explorer.getMetric(params, stride)
 	if err == nil {
 		t.Errorf("expected error but got rowid %d", rowid)
 	}

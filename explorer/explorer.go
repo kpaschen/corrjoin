@@ -33,7 +33,7 @@ type CorrelatedResponse struct {
 
 type correlatedTimeseriesResponse struct {
 	Correlates []CorrelatedResponse `json:"correlates"`
-	Constant   bool                 `json:"bool"`
+	Constant   bool                 `json:"constant"`
 }
 
 type subgraphNodeResponse struct {
@@ -78,19 +78,18 @@ func (c *CorrelationExplorer) GetStrides(w http.ResponseWriter, r *http.Request)
 
 func (c *CorrelationExplorer) GetSubgraphs(w http.ResponseWriter, r *http.Request) {
 	params := r.URL.Query()
-	strideId, err := c.getStride(params)
+	stride, err := c.getStride(params)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	if strideId == -1 {
+	if stride == nil {
 		http.Error(w, fmt.Errorf("invalid stride id").Error(), http.StatusNotFound)
 		return
 	}
-	stride := c.strideCache[strideId]
 	subgraphs := stride.subgraphs
 	if subgraphs == nil {
-		err := fmt.Errorf("no subgraphs found for stride %d\n", strideId)
+		err := fmt.Errorf("no subgraphs found for stride %d\n", stride.ID)
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
@@ -108,22 +107,19 @@ func (c *CorrelationExplorer) GetSubgraphs(w http.ResponseWriter, r *http.Reques
 // Get the nodes list for one subgraph.
 func (c *CorrelationExplorer) GetSubgraphNodes(w http.ResponseWriter, r *http.Request) {
 	params := r.URL.Query()
-	strideId, err := c.getStride(params)
+	stride, err := c.getStride(params)
 	if err != nil {
-		log.Printf("error %v retrieving stride %d\n", err, strideId)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	if strideId == -1 {
-		err := fmt.Errorf("stride %d not found", strideId)
-		log.Printf("stride %d not found\n", strideId)
+	if stride == nil {
+		err := fmt.Errorf("stride not found")
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
-	stride := c.strideCache[strideId]
 	subgraphs := stride.subgraphs
 	if subgraphs == nil {
-		log.Printf("stride %d has no subgraphs\n", strideId)
+		log.Printf("stride %d has no subgraphs\n", stride.ID)
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
@@ -179,17 +175,16 @@ func (c *CorrelationExplorer) GetSubgraphNodes(w http.ResponseWriter, r *http.Re
 // Get the edges list for one subgraph.
 func (c *CorrelationExplorer) GetSubgraphEdges(w http.ResponseWriter, r *http.Request) {
 	params := r.URL.Query()
-	strideId, err := c.getStride(params)
+	stride, err := c.getStride(params)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	if strideId == -1 {
+	if stride == nil {
 		err := fmt.Errorf("no stride found for params %v", params)
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
-	stride := c.strideCache[strideId]
 	subgraphs := stride.subgraphs
 	if subgraphs == nil {
 		err := fmt.Errorf("stride %d has no subgraphs", stride.ID)
@@ -242,22 +237,25 @@ func (c *CorrelationExplorer) getSubgraphId(params url.Values) (int, error) {
 	return int(subgraphID), nil
 }
 
-func (c *CorrelationExplorer) getStride(params url.Values) (int, error) {
+func (c *CorrelationExplorer) getStride(params url.Values) (*Stride, error) {
 	strideId, ok := params["strideId"]
 	if ok {
 		s, err := strconv.ParseInt(strings.TrimSpace(strideId[0]), 10, 32)
 		if err != nil {
-			return -1, nil
+			return nil, nil
 		}
-		for i, stride := range c.strideCache {
+		for _, stride := range c.strideCache {
 			if stride == nil {
 				continue
 			}
+			if stride.Status == StrideDeleted {
+				continue
+			}
 			if stride.ID == int(s) {
-				return i, nil
+				return stride, nil
 			}
 		}
-		return -1, nil
+		return nil, nil
 	}
 	timeToString, ok := params["timeTo"]
 	if !ok {
@@ -267,20 +265,23 @@ func (c *CorrelationExplorer) getStride(params url.Values) (int, error) {
 	timeTo, err := strconv.ParseInt(strings.TrimSpace(timeToString[0]), 10, 64)
 	if err != nil {
 		log.Printf("failed to parse %s into an int64: %v\n", timeToString[0], err)
-		return -1, fmt.Errorf("failed to parse int from timeTo parameter %s: %v", timeToString[0], err)
+		return nil, fmt.Errorf("failed to parse int from timeTo parameter %s: %v", timeToString[0], err)
 	}
 	for i, stride := range c.strideCache {
 		if stride == nil {
+			continue
+		}
+		if stride.Status == StrideDeleted {
 			continue
 		}
 		if timeTo >= stride.StartTime && timeTo <= stride.EndTime {
 			log.Printf("returning stride %d (%s -> %s) for time %s\n", i,
 				stride.StartTimeString, stride.EndTimeString,
 				time.Unix(timeTo, 0).UTC())
-			return i, nil
+			return stride, nil
 		}
 	}
-	return -1, nil
+	return nil, nil
 }
 
 // Assume urlValue is of the form
@@ -311,8 +312,11 @@ func parseUrlDataIntoMetric(urlValue string) (*model.Metric, error) {
 	return &ret, nil
 }
 
-func (c *CorrelationExplorer) getMetric(params url.Values, strideId int) (int, error) {
-	metric, err := c.getMetricRowId(params, strideId)
+func (c *CorrelationExplorer) getMetric(params url.Values, stride *Stride) (int, error) {
+	if stride == nil {
+		return -1, fmt.Errorf("stride cannot be nil")
+	}
+	metric, err := c.getMetricRowId(params, stride)
 	if err == nil && metric != nil {
 		return metric.RowId, nil
 	}
@@ -327,8 +331,6 @@ func (c *CorrelationExplorer) getMetric(params url.Values, strideId int) (int, e
 		return -1, err
 	}
 
-	stride := c.strideCache[strideId]
-
 	fp := modelMetric.Fingerprint()
 	fmt.Printf("metric is %+v and fingerprint is %d\n", modelMetric, fp)
 	rowid, exists := stride.metricsCache[uint64(fp)]
@@ -338,7 +340,7 @@ func (c *CorrelationExplorer) getMetric(params url.Values, strideId int) (int, e
 	return rowid, nil
 }
 
-func (c *CorrelationExplorer) getMetricRowId(params url.Values, strideId int) (*explorerlib.Metric, error) {
+func (c *CorrelationExplorer) getMetricRowId(params url.Values, stride *Stride) (*explorerlib.Metric, error) {
 	metricRowId, ok := params["tsid"]
 	if !ok {
 		return nil, fmt.Errorf("missing tsid parameter")
@@ -347,8 +349,9 @@ func (c *CorrelationExplorer) getMetricRowId(params url.Values, strideId int) (*
 	if err != nil {
 		return nil, err
 	}
-	stride := c.strideCache[strideId]
-
+	if stride == nil {
+		return nil, fmt.Errorf("stride cannot be nil")
+	}
 	metric, exists := stride.metricsCacheByRowId[int(metricId)]
 	if !exists {
 		return nil, fmt.Errorf("no metric with row id %d", metricId)
@@ -397,18 +400,16 @@ func (c *CorrelationExplorer) getTimeOverride(params url.Values) (string, string
 func (c *CorrelationExplorer) GetTimeseries(w http.ResponseWriter, r *http.Request) {
 	params := r.URL.Query()
 	log.Printf("processing timeseries request with parameters %+v\n", params)
-	strideId, err := c.getStride(params)
+	stride, err := c.getStride(params)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	if strideId == -1 {
+	if stride == nil {
 		http.Error(w, fmt.Sprintf("no stride found for time"), http.StatusNotFound)
 		return
 	}
-	stride := c.strideCache[strideId]
-
-	metric, err := c.getMetricRowId(params, strideId)
+	metric, err := c.getMetricRowId(params, stride)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -497,17 +498,17 @@ func (c *CorrelationExplorer) GetTimeseries(w http.ResponseWriter, r *http.Reque
 
 func (c *CorrelationExplorer) GetTimeline(w http.ResponseWriter, r *http.Request) {
 	params := r.URL.Query()
-	strideId, err := c.getStride(params)
+	stride, err := c.getStride(params)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	if strideId == -1 {
+	if stride == nil {
 		http.Error(w, fmt.Sprintf("no stride found for time"), http.StatusNotFound)
 		return
 	}
 
-	metricRowId, err := c.getMetric(params, strideId)
+	metricRowId, err := c.getMetric(params, stride)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -521,17 +522,20 @@ func (c *CorrelationExplorer) GetTimeline(w http.ResponseWriter, r *http.Request
 	// Look up the correlates of this timeseries in all strides.
 	timelinemap := make(map[int](map[int]float32))
 	allRowIds := make(map[int]bool)
-	for strideId, stride := range c.strideCache {
-		if stride == nil {
+	for _, st := range c.strideCache {
+		if st == nil {
+			continue
+		}
+		if st.Status == StrideDeleted {
 			continue
 		}
 		// TODO: could retrieve the data for all strides in parallel
-		correlatesMap, err := c.retrieveCorrelatedTimeseries(stride, metricRowId)
+		correlatesMap, err := c.retrieveCorrelatedTimeseries(st, metricRowId)
 		if err != nil {
-			log.Printf("error retrieving correlates for timeseries %d and stride %d: %v\n", metricRowId, strideId, err)
+			log.Printf("error retrieving correlates for timeseries %d and stride %d: %v\n", metricRowId, st.ID, err)
 			continue
 		}
-		timelinemap[strideId] = correlatesMap
+		timelinemap[st.ID] = correlatesMap
 		for rowid, _ := range correlatesMap {
 			allRowIds[rowid] = true
 		}
@@ -540,22 +544,25 @@ func (c *CorrelationExplorer) GetTimeline(w http.ResponseWriter, r *http.Request
 	log.Printf("found a total of %d timeseries for the timeline of ts %d\n", len(allRowIds), metricRowId)
 
 	resp := make([]TimelineResponse, 0, len(c.strideCache)*len(allRowIds))
-	for strideId, stride := range c.strideCache {
-		if stride == nil {
+	for _, st := range c.strideCache {
+		if st == nil {
 			continue
 		}
-		timelines := timelinemap[strideId]
+		if st.Status == StrideDeleted {
+			continue
+		}
+		timelines := timelinemap[st.ID]
 		for rowid, _ := range allRowIds {
 			pearson, exists := timelines[rowid]
 			if !exists {
 				resp = append(resp, TimelineResponse{
-					Time:   stride.EndTimeString,
+					Time:   st.EndTimeString,
 					Metric: rowid,
 					State:  "0",
 				})
 			} else {
 				resp = append(resp, TimelineResponse{
-					Time:   stride.EndTimeString,
+					Time:   st.EndTimeString,
 					Metric: rowid,
 					State:  fmt.Sprintf("%f", pearson),
 				})
@@ -572,17 +579,17 @@ func (c *CorrelationExplorer) GetTimeline(w http.ResponseWriter, r *http.Request
 
 func (c *CorrelationExplorer) GetCorrelatedSeries(w http.ResponseWriter, r *http.Request) {
 	params := r.URL.Query()
-	strideId, err := c.getStride(params)
+	stride, err := c.getStride(params)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	if strideId == -1 {
+	if stride == nil {
 		http.Error(w, fmt.Sprintf("no stride found for time"), http.StatusNotFound)
 		return
 	}
 
-	metricRowId, err := c.getMetric(params, strideId)
+	metricRowId, err := c.getMetric(params, stride)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -593,7 +600,6 @@ func (c *CorrelationExplorer) GetCorrelatedSeries(w http.ResponseWriter, r *http
 		return
 	}
 
-	stride := c.strideCache[strideId]
 	correlatesMap, err := c.retrieveCorrelatedTimeseries(stride, metricRowId)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)

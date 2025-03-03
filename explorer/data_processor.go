@@ -497,7 +497,7 @@ func (c *CorrelationExplorer) readResultFile(filename string, stride *Stride) er
 	return c.readAndCacheSubgraphs(filename, stride)
 }
 
-func (c *CorrelationExplorer) getLatestStride() int {
+func (c *CorrelationExplorer) getLatestStride() *Stride {
 	newestEntry := -1
 	for i, s := range c.strideCache {
 		if s == nil {
@@ -512,7 +512,7 @@ func (c *CorrelationExplorer) getLatestStride() int {
 	}
 	if newestEntry == -1 {
 		log.Printf("no valid strides found\n")
-		return -1
+		return nil
 	}
-	return c.strideCache[newestEntry].ID
+	return c.strideCache[newestEntry]
 }
