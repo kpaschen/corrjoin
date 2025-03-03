@@ -150,11 +150,9 @@ func (c *CorrelationExplorer) GetSubgraphNodes(w http.ResponseWriter, r *http.Re
 		size = MAX_GRAPH_SIZE
 	}
 
-	log.Printf("subgraph %d has size %d\n", subgraphId, size)
 	resp := make([]subgraphNodeResponse, 0, size)
 
 	for row, graphId := range subgraphs.Rows {
-		log.Printf("looking at graph id %d and comparing it to %d\n", graphId, subgraphId)
 		if graphId == subgraphId {
 			metric, exists := stride.metricsCacheByRowId[row]
 			if !exists {
@@ -166,7 +164,6 @@ func (c *CorrelationExplorer) GetSubgraphNodes(w http.ResponseWriter, r *http.Re
 				Title:    string(metric.LabelSet["__name__"]),
 				MainStat: metric.MetricString(),
 			}
-			log.Printf("appending a node to the node response\n")
 			resp = append(resp, r)
 			if len(resp) >= size {
 				break
@@ -365,7 +362,7 @@ func (c *CorrelationExplorer) getTimeOverride(params url.Values) (string, string
 	}
 	timeToString := ""
 	timeFromString := ""
-	formatString := "2006-01-02T15:04:05.000Z"
+	formatString := explorerlib.FORMAT
 	inputFormat := "2006-01-02T15:04:05"
 	timeTo, ok := params["timeTo"]
 	if ok {
@@ -480,13 +477,14 @@ func (c *CorrelationExplorer) GetTimeseries(w http.ResponseWriter, r *http.Reque
 
 	resp := make([]TimeseriesResponse, len(results[0].Values))
 	for i, tsr := range results[0].Values {
-		timestampFloat, _ := tsr[0].(string)
-		v, _ := strconv.ParseFloat(timestampFloat, 32)
-		t := time.UnixMicro(int64(v * 1000000))
+		tm, err := explorerlib.ConvertToUnixTime(tsr[0])
+		if err != nil {
+			log.Printf("failed to convert %v (%T) to time\n", tsr[0], tsr[0])
+			continue
+		}
 		value, _ := strconv.ParseInt(tsr[1].(string), 10, 32)
-		tsFormat := "2006-01-02T15:04:05.00Z"
 		resp[i] = TimeseriesResponse{
-			Time:  t.UTC().Format(tsFormat),
+			Time:  tm.UTC().Format(explorerlib.FORMAT),
 			Value: int(value),
 		}
 	}

@@ -54,25 +54,33 @@ func (c *CorrelationExplorer) scanResultFiles() error {
 		t2, _ := entries[j].Info()
 		return t1.ModTime().Unix() > t2.ModTime().Unix()
 	})
+	var strideParsedFromFilename *Stride
 	for _, e := range entries {
 		if !e.IsDir() {
-			_, err = parseStrideFromFilename(e.Name())
+			strideParsedFromFilename, err = parseStrideFromFilename(e.Name())
 			if err != nil {
 				// This is not a stride file.
 				continue
 			}
 		} else {
-			_, err = parseStrideFromDirname(e.Name())
+			strideParsedFromFilename, err = parseStrideFromDirname(e.Name())
 			if err != nil {
 				// This is not a stride directory.
 				continue
 			}
+		}
+		if strideParsedFromFilename == nil {
+			log.Printf("stride parsed from filename %s is nil\n", e.Name())
+			continue
 		}
 		// See if this stride is already in the cache
 		var stride *Stride
 		for _, s := range c.strideCache {
 			if s == nil {
 				break
+			}
+			if s.Status == StrideDeleted {
+				continue
 			}
 			if e.Name() == s.Filename || e.Name() == directoryNameForStride(*s) {
 				stride = s
@@ -84,6 +92,46 @@ func (c *CorrelationExplorer) scanResultFiles() error {
 		if err != nil {
 			continue
 		}
+
+		// See if we already have a stride with this id and a different time.
+		// In that case, delete the older file/directory.
+		for _, s := range c.strideCache {
+			if s == nil {
+				break
+			}
+			if s.ID == strideParsedFromFilename.ID {
+				if s.StartTime < strideParsedFromFilename.StartTime {
+					log.Printf("existing stride with id %d and filename %s is older than new stride with filename %s\n",
+						s.ID, s.Filename, e.Name())
+					fullPath := filepath.Join(c.FilenameBase, s.Filename)
+					err = os.RemoveAll(fullPath)
+					if err != nil {
+						log.Printf("failed to remove %s: %v\n", fullPath, err)
+						continue
+					}
+					fullPath = filepath.Join(c.FilenameBase, directoryNameForStride(*s))
+					err = os.RemoveAll(fullPath)
+					if err != nil {
+						log.Printf("failed to remove %s: %v\n", fullPath, err)
+						continue
+					}
+					s.Status = StrideDeleted
+				} else if strideParsedFromFilename.StartTime < s.StartTime {
+					log.Printf("new stride with id %d and filename %s is older than existing stride with filename %s\n",
+						strideParsedFromFilename.ID, e.Name(), s.Filename)
+					fullPath := filepath.Join(c.FilenameBase, e.Name())
+					err = os.RemoveAll(fullPath)
+					if err != nil {
+						log.Printf("failed to remove %s: %v\n", fullPath, err)
+						continue
+					}
+				}
+				// If the times are equal, then probably one is the parquet file and the other is the directory,
+				// so nothing to do.
+				break
+			}
+		}
+
 		age := int(time.Now().UTC().Unix() - t.ModTime().UTC().Unix())
 		if c.maxAgeSeconds > 0 && age > c.maxAgeSeconds {
 			fullPath := filepath.Join(c.FilenameBase, e.Name())
@@ -395,7 +443,6 @@ func (c *CorrelationExplorer) readAndCacheSubgraphs(filename string, stride *Str
 			return err
 		}
 		stride.subgraphs = subgraphs
-		log.Printf("obtained subgraphs %+v for stride %d\n", subgraphs, stride.ID)
 	}
 	return nil
 }

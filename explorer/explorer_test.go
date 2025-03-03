@@ -2,6 +2,7 @@ package explorer
 
 import (
 	"fmt"
+	explorerlib "github.com/kpaschen/corrjoin/lib/explorer"
 	"testing"
 	"time"
 )
@@ -118,7 +119,7 @@ func TestGetTimeOverride(t *testing.T) {
 	fmt.Printf("from based on now: %s, to: %s, err: %v\n", from, to, err)
 
 	now := time.Now().UTC()
-	toParsed, err := time.Parse("2006-01-02T15:04:05.000Z", to)
+	toParsed, err := time.Parse(explorerlib.FORMAT, to)
 	if err != nil {
 		t.Errorf("unexpected: %v", err)
 	}
@@ -127,7 +128,7 @@ func TestGetTimeOverride(t *testing.T) {
 		t.Errorf("timeTo should be close to now but there is a %+v difference", difference)
 	}
 
-	fromParsed, err := time.Parse("2006-01-02T15:04:05.000Z", from)
+	fromParsed, err := time.Parse(explorerlib.FORMAT, from)
 	if err != nil {
 		t.Errorf("unexpected: %v", err)
 	}
