@@ -136,7 +136,7 @@ func (c *CorrelationExplorer) GetSubgraphNodes(w http.ResponseWriter, r *http.Re
 
 	size, ok := subgraphs.Sizes[subgraphId]
 	if !ok {
-		log.Printf("no subgraph with id %d\n", subgraphId)
+		err := fmt.Errorf("no subgraph with id %d", subgraphId)
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
@@ -185,6 +185,7 @@ func (c *CorrelationExplorer) GetSubgraphEdges(w http.ResponseWriter, r *http.Re
 		return
 	}
 	if strideId == -1 {
+		err := fmt.Errorf("no stride found for params %v", params)
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
@@ -470,7 +471,7 @@ func (c *CorrelationExplorer) GetTimeseries(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	if len(results) != 1 {
-		log.Printf("results has unexpected length. %+v\n", results)
+		err = fmt.Errorf("results has unexpected length. %+v", results)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -617,7 +618,7 @@ func (c *CorrelationExplorer) GetCorrelatedSeries(w http.ResponseWriter, r *http
 	for otherRowId, pearson := range correlatesMap {
 		otherMetric, exists := stride.metricsCacheByRowId[otherRowId]
 		if !exists {
-			log.Printf("ts %d is allegedly correlated with %d but that does not exist\n", metricRowId, otherRowId)
+			err = fmt.Errorf("ts %d is allegedly correlated with %d but that does not exist", metricRowId, otherRowId)
 			http.Error(w, err.Error(), http.StatusNotFound)
 			return
 		}

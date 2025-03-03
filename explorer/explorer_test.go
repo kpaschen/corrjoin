@@ -9,9 +9,8 @@ import (
 
 func TestScanResultFiles(t *testing.T) {
 	explorer := CorrelationExplorer{
-		FilenameBase:         "./testdata",
-		strideCache:          make([]*Stride, STRIDE_CACHE_SIZE, STRIDE_CACHE_SIZE),
-		nextStrideCacheEntry: 0,
+		FilenameBase: "./testdata",
+		strideCache:  make([]*Stride, STRIDE_CACHE_SIZE, STRIDE_CACHE_SIZE),
 	}
 
 	err := explorer.scanResultFiles()
@@ -52,9 +51,8 @@ func TestScanResultFiles(t *testing.T) {
 
 func TestScanStrideAgain(t *testing.T) {
 	explorer := CorrelationExplorer{
-		FilenameBase:         "./testdata",
-		strideCache:          make([]*Stride, STRIDE_CACHE_SIZE, STRIDE_CACHE_SIZE),
-		nextStrideCacheEntry: 0,
+		FilenameBase: "./testdata",
+		strideCache:  make([]*Stride, STRIDE_CACHE_SIZE, STRIDE_CACHE_SIZE),
 	}
 
 	err := explorer.scanResultFiles()
@@ -72,9 +70,8 @@ func TestScanStrideAgain(t *testing.T) {
 func TestGetTimeseriesById(t *testing.T) {
 	explorer := CorrelationExplorer{
 		// FilenameBase:         "/tmp/corrjoinResults",
-		FilenameBase:         "./testdata",
-		strideCache:          make([]*Stride, STRIDE_CACHE_SIZE, STRIDE_CACHE_SIZE),
-		nextStrideCacheEntry: 0,
+		FilenameBase: "./testdata",
+		strideCache:  make([]*Stride, STRIDE_CACHE_SIZE, STRIDE_CACHE_SIZE),
 	}
 
 	err := explorer.scanResultFiles()
@@ -106,9 +103,8 @@ func TestGetTimeseriesById(t *testing.T) {
 
 func TestGetTimeOverride(t *testing.T) {
 	explorer := CorrelationExplorer{
-		FilenameBase:         "./tmp",
-		strideCache:          make([]*Stride, STRIDE_CACHE_SIZE, STRIDE_CACHE_SIZE),
-		nextStrideCacheEntry: 0,
+		FilenameBase: "./tmp",
+		strideCache:  make([]*Stride, STRIDE_CACHE_SIZE, STRIDE_CACHE_SIZE),
 	}
 	params := make(map[string]([]string))
 	params["timeTo"] = []string{"now"}

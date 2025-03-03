@@ -21,9 +21,8 @@ type CorrelationExplorer struct {
 	strideCache       []*Stride
 	prometheusBaseURL string
 
-	maxAgeSeconds        int
-	ticker               *time.Ticker
-	nextStrideCacheEntry int
+	maxAgeSeconds int
+	ticker        *time.Ticker
 }
 
 func (c *CorrelationExplorer) Initialize(baseUrl string, maxAgeSeconds int) error {
@@ -31,7 +30,6 @@ func (c *CorrelationExplorer) Initialize(baseUrl string, maxAgeSeconds int) erro
 	c.maxAgeSeconds = maxAgeSeconds
 	c.strideCache = make([]*Stride, STRIDE_CACHE_SIZE, STRIDE_CACHE_SIZE)
 	c.ticker = time.NewTicker(60 * time.Second)
-	c.nextStrideCacheEntry = 0
 
 	go func() {
 		for {
@@ -79,9 +77,6 @@ func (c *CorrelationExplorer) scanResultFiles() error {
 			if s == nil {
 				break
 			}
-			if s.Status == StrideDeleted {
-				continue
-			}
 			if e.Name() == s.Filename || e.Name() == directoryNameForStride(*s) {
 				stride = s
 				break
@@ -104,12 +99,14 @@ func (c *CorrelationExplorer) scanResultFiles() error {
 					log.Printf("existing stride with id %d and filename %s is older than new stride with filename %s\n",
 						s.ID, s.Filename, e.Name())
 					fullPath := filepath.Join(c.FilenameBase, s.Filename)
+					log.Printf("try to remove %s\n", fullPath)
 					err = os.RemoveAll(fullPath)
 					if err != nil {
 						log.Printf("failed to remove %s: %v\n", fullPath, err)
 						continue
 					}
 					fullPath = filepath.Join(c.FilenameBase, directoryNameForStride(*s))
+					log.Printf("try to remove %s\n", fullPath)
 					err = os.RemoveAll(fullPath)
 					if err != nil {
 						log.Printf("failed to remove %s: %v\n", fullPath, err)
@@ -463,8 +460,26 @@ func (c *CorrelationExplorer) materializeStrideData(stride *Stride) error {
 }
 
 func (c *CorrelationExplorer) addStrideCacheEntry(stride *Stride) {
-	c.strideCache[c.nextStrideCacheEntry] = stride
-	c.nextStrideCacheEntry = (c.nextStrideCacheEntry + 1) % STRIDE_CACHE_SIZE
+	oldestTime := stride.StartTime
+	oldestEntry := -1
+	for i, s := range c.strideCache {
+		if s == nil {
+			c.strideCache[i] = stride
+			return
+		}
+		if s.Status == StrideDeleted {
+			c.strideCache[i] = stride
+			return
+		}
+		if oldestEntry == -1 || s.StartTime < oldestTime {
+			oldestTime = s.StartTime
+			oldestEntry = i
+		}
+	}
+	if oldestEntry == -1 {
+		log.Printf("no entry found for stride %d with start time %v\n", stride.ID, stride.StartTime)
+	}
+	c.strideCache[oldestEntry] = stride
 }
 
 func (c *CorrelationExplorer) readResultFile(filename string, stride *Stride) error {
@@ -483,5 +498,21 @@ func (c *CorrelationExplorer) readResultFile(filename string, stride *Stride) er
 }
 
 func (c *CorrelationExplorer) getLatestStride() int {
-	return (c.nextStrideCacheEntry % STRIDE_CACHE_SIZE) - 1
+	newestEntry := -1
+	for i, s := range c.strideCache {
+		if s == nil {
+			continue
+		}
+		if s.Status == StrideDeleted {
+			continue
+		}
+		if newestEntry == -1 || s.StartTime > c.strideCache[newestEntry].StartTime {
+			newestEntry = i
+		}
+	}
+	if newestEntry == -1 {
+		log.Printf("no valid strides found\n")
+		return -1
+	}
+	return c.strideCache[newestEntry].ID
 }
