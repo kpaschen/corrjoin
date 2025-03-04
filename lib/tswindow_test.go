@@ -68,6 +68,91 @@ func matrixEqual(a [][]float64, b [][]float64, epsilon float64) bool {
 	return true
 }
 
+func TestShiftBufferWithRowExtend(t *testing.T) {
+	config := settings.CorrjoinSettings{
+		Algorithm:  settings.ALGO_NONE,
+		WindowSize: 9,
+	}
+	comparer := &comparisons.InProcessComparer{}
+	results := make(chan *datatypes.CorrjoinResult, 1)
+	defer close(results)
+	comparer.Initialize(config, results)
+	tswindow := NewTimeseriesWindow(config, comparer)
+	bufferWindow := [][]float64{
+		[]float64{0.1, 0.2, 0.3},
+		[]float64{1.1, 1.2, 1.3},
+		[]float64{2.1, 2.2, 2.3},
+	}
+	err, ready := tswindow.ShiftBuffer(bufferWindow)
+	if err != nil {
+		t.Errorf("unexpected: %v", err)
+	}
+	if ready {
+		t.Errorf("window of size 9 should not be ready with three columns")
+	}
+	bufferWindow = [][]float64{
+		[]float64{0.4, 0.5, 0.6},
+		[]float64{1.4, 1.5, 1.6},
+		[]float64{2.4, 2.5, 2.6},
+		[]float64{3.4, 3.5, 3.6},
+	}
+	err, ready = tswindow.ShiftBuffer(bufferWindow)
+	if err != nil {
+		t.Errorf("unexpected: %v", err)
+	}
+	if ready {
+		t.Errorf("window of size 9 should not be ready with three columns")
+	}
+}
+
+func TestShiftBufferMultipleTimes(t *testing.T) {
+	config := settings.CorrjoinSettings{
+		Algorithm:  settings.ALGO_NONE,
+		WindowSize: 9,
+	}
+	comparer := &comparisons.InProcessComparer{}
+	results := make(chan *datatypes.CorrjoinResult, 1)
+	defer close(results)
+	comparer.Initialize(config, results)
+	tswindow := NewTimeseriesWindow(config, comparer)
+	bufferWindow := [][]float64{
+		[]float64{0.1, 0.2, 0.3},
+		[]float64{1.1, 1.2, 1.3},
+		[]float64{2.1, 2.2, 2.3},
+	}
+	err, ready := tswindow.ShiftBuffer(bufferWindow)
+	if err != nil {
+		t.Errorf("unexpected: %v", err)
+	}
+	if ready {
+		t.Errorf("window of size 9 should not be ready with three columns")
+	}
+	bufferWindow = [][]float64{
+		[]float64{0.4, 0.5, 0.6},
+		[]float64{1.4, 1.5, 1.6},
+		[]float64{2.4, 2.5, 2.6},
+	}
+	err, ready = tswindow.ShiftBuffer(bufferWindow)
+	if err != nil {
+		t.Errorf("unexpected: %v", err)
+	}
+	if ready {
+		t.Errorf("window of size 9 should not be ready with six columns")
+	}
+	bufferWindow = [][]float64{
+		[]float64{0.7, 0.8, 0.9},
+		[]float64{1.7, 1.8, 1.9},
+		[]float64{2.7, 2.8, 2.9},
+	}
+	err, ready = tswindow.ShiftBuffer(bufferWindow)
+	if err != nil {
+		t.Errorf("unexpected: %v", err)
+	}
+	if !ready {
+		t.Errorf("window of size 9 should be ready with nine columns")
+	}
+}
+
 func TestShiftBuffer(t *testing.T) {
 	config := settings.CorrjoinSettings{
 		Algorithm:  settings.ALGO_NONE,

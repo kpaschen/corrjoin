@@ -2,7 +2,7 @@ correlationServiceAddress: "http://correlation-service.default:9205"
 
 image:
    repository: "ghcr.io/kpaschen"
-   pullPolicy: "IfNotPresent"
+   pullPolicy: "Always"
    version: cluster-explorer
    image: corrjoin
 

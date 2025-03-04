@@ -115,7 +115,7 @@ func (w *TimeseriesWindow) shiftBufferIntoWindow(buffer [][]float64) (bool, erro
 	currentRowCount = len(w.buffers)
 	if newRowCount > currentRowCount {
 		for i := currentRowCount; i < newRowCount; i++ {
-			row := make([]float64, w.settings.WindowSize-newColumnCount, w.settings.WindowSize)
+			row := make([]float64, expected-newColumnCount, w.settings.WindowSize)
 			row = append(row, buffer[i]...)
 			if len(row) != expected {
 				return false, fmt.Errorf("during extend: bad column count %d in row %d (expected %d)", len(row), i, expected)
