@@ -9,6 +9,8 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -288,9 +290,9 @@ func parseStrideFromFilename(filename string) (*Stride, error) {
 	return &Stride{
 		ID:                  strideCounter,
 		StartTime:           startT.UTC().Unix(),
-		StartTimeString:     startT.UTC().Format("2006-01-02T15:04:05.000Z"),
+		StartTimeString:     startT.UTC().Format(explorerlib.FORMAT),
 		EndTime:             endT.UTC().Unix(),
-		EndTimeString:       endT.UTC().Format("2006-01-02T15:04:05.000Z"),
+		EndTimeString:       endT.UTC().Format(explorerlib.FORMAT),
 		Status:              StrideExists,
 		Filename:            filename,
 		metricsCache:        make(map[uint64]int),
@@ -515,4 +517,22 @@ func (c *CorrelationExplorer) getLatestStride() *Stride {
 		return nil
 	}
 	return c.strideCache[newestEntry]
+}
+
+func (c *CorrelationExplorer) parseTsIdsFromGraphiteResult(graphite string) ([]int, error) {
+	metricId, err := strconv.ParseInt(graphite, 10, 32)
+	if err == nil {
+		return []int{int(metricId)}, nil
+	}
+	strippedGraphite := strings.Trim(graphite, "{}")
+	tsids := strings.Split(strippedGraphite, ",")
+	ret := make([]int, len(tsids), len(tsids))
+	for i, tsid := range tsids {
+		metricId, err := strconv.ParseInt(tsid, 10, 32)
+		if err != nil {
+			return nil, err
+		}
+		ret[i] = int(metricId)
+	}
+	return ret, nil
 }

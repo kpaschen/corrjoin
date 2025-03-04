@@ -9,7 +9,7 @@ func TestConvertToUnixTime(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	expected := "2025-03-03T07:20:52.00Z"
+	expected := "2025-03-03T07:20:52.000Z"
 	str := tm.UTC().Format(FORMAT)
 	if str != expected {
 		t.Errorf("unexpected result for timestamp: %s vs %s", str, expected)
@@ -19,7 +19,7 @@ func TestConvertToUnixTime(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	expected = "2015-07-01T20:10:30.00Z"
+	expected = "2015-07-01T20:10:30.000Z"
 	str = tm.UTC().Format(FORMAT)
 	if str != expected {
 		t.Errorf("unexpected result for timestamp: %s vs %s", str, expected)

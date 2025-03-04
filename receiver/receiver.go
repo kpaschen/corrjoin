@@ -35,7 +35,7 @@ var (
 			Help:                            "Duration of correlation computation calls.",
 			Buckets:                         prometheus.DefBuckets,
 			NativeHistogramBucketFactor:     1.1,
-			NativeHistogramMaxBucketNumber:  100,
+			NativeHistogramMaxBucketNumber:  10,
 			NativeHistogramMinResetDuration: 1 * time.Hour,
 		},
 	)

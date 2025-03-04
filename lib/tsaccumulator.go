@@ -162,7 +162,7 @@ func (a *TimeseriesAccumulator) AddObservation(observation *Observation) {
 	}
 
 	rowid, ok := a.rowmap[observation.MetricFingerprint]
-	if !ok && a.maxRow < 100 {
+	if !ok {
 		rowid = a.maxRow
 		a.rowmap[observation.MetricFingerprint] = rowid
 		a.buffers[rowid] = make([]float64, 0, colcount)

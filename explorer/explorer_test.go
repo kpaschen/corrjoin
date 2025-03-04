@@ -88,9 +88,9 @@ func TestGetTimeseriesById(t *testing.T) {
 
 	params["timeTo"] = []string{"1738598499834"}
 
-	rowid, err := explorer.getMetric(params, stride)
+	rowids, err := explorer.getMetrics(params, stride)
 	if err == nil {
-		t.Errorf("expected error but got rowid %d", rowid)
+		t.Errorf("expected error but got rowids %v", rowids)
 	}
 
 	sampleEntry, ok := stride.metricsCacheByRowId[10]

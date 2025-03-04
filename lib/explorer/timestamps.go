@@ -6,7 +6,7 @@ import (
 )
 
 const (
-	FORMAT = "2006-01-02T15:04:05.00Z"
+	FORMAT = "2006-01-02T15:04:05.000Z"
 )
 
 func ConvertToUnixTime(input interface{}) (time.Time, error) {

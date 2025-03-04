@@ -28,9 +28,9 @@ spec:
         imagePullPolicy: {{ .Values.image.pullPolicy }}
         command: ["/webroot/app"]
         args: ["-svdDimensions", "5", 
-           "-windowSize", "100", "-stride", "50", 
+           "-windowSize", "500", "-stride", "100", 
             #"-comparer", "inprocess", "-correlationThreshold", "99", "-justExplore", 
-            "-comparer", "inprocess", "-correlationThreshold", "99", "-sampleInterval", "10",
+            "-comparer", "inprocess", "-correlationThreshold", "99", "-sampleInterval", "20",
            "-prometheusURL", {{ .Values.prometheusURL }},
            "-parquetMaxRowsPerRowGroup", "10000" ]
         resources:

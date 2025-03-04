@@ -7,67 +7,6 @@ metadata:
 data:
    demo-vis.json: |-
       {
-        "__inputs": [
-          {
-            "name": "DS_PROMETHEUS",
-            "label": "Prometheus",
-            "description": "",
-            "type": "datasource",
-            "pluginId": "prometheus",
-            "pluginName": "Prometheus"
-          }
-        ],
-        "__elements": {},
-        "__requires": [
-          {
-            "type": "grafana",
-            "id": "grafana",
-            "name": "Grafana",
-            "version": "11.5.2"
-          },
-          {
-            "type": "panel",
-            "id": "nodeGraph",
-            "name": "Node Graph",
-            "version": ""
-          },
-          {
-            "type": "datasource",
-            "id": "prometheus",
-            "name": "Prometheus",
-            "version": "1.0.0"
-          },
-          {
-            "type": "panel",
-            "id": "state-timeline",
-            "name": "State timeline",
-            "version": ""
-          },
-          {
-            "type": "panel",
-            "id": "table",
-            "name": "Table",
-            "version": ""
-          },
-          {
-            "type": "panel",
-            "id": "text",
-            "name": "Text",
-            "version": ""
-          },
-          {
-            "type": "panel",
-            "id": "timeseries",
-            "name": "Time series",
-            "version": ""
-          },
-          {
-            "type": "datasource",
-            "id": "yesoreyeram-infinity-datasource",
-            "name": "Infinity",
-            "version": "3.0.0-beta.2"
-          }
-        ],
         "annotations": {
           "list": [
             {
@@ -87,243 +26,13 @@ data:
         "editable": true,
         "fiscalYearStartMonth": 0,
         "graphTooltip": 0,
-        "id": null,
+        "id": 32,
         "links": [],
         "panels": [
           {
             "datasource": {
               "type": "yesoreyeram-infinity-datasource",
-              "uid": "bebrqu5r2he68d",
-            },
-            "fieldConfig": {
-              "defaults": {
-                "color": {
-                  "mode": "thresholds"
-                },
-                "custom": {
-                  "align": "auto",
-                  "cellOptions": {
-                    "type": "auto"
-                  },
-                  "inspect": false
-                },
-                "mappings": [],
-                "thresholds": {
-                  "mode": "absolute",
-                  "steps": [
-                    {
-                      "color": "green",
-                      "value": null
-                    },
-                    {
-                      "color": "red",
-                      "value": 80
-                    }
-                  ]
-                }
-              },
-              "overrides": []
-            },
-            "gridPos": {
-              "h": 8,
-              "w": 12,
-              "x": 0,
-              "y": 0
-            },
-            "id": 9,
-            "options": {
-              "cellHeight": "sm",
-              "footer": {
-                "countRows": false,
-                "fields": "",
-                "reducer": [
-                  "sum"
-                ],
-                "show": false
-              },
-              "showHeader": true
-            },
-            "pluginVersion": "11.5.2",
-            "targets": [
-              {
-                "columns": [],
-                "datasource": {
-                  "type": "yesoreyeram-infinity-datasource",
-                  "uid": "bebrqu5r2he68d",
-                },
-                "filters": [],
-                "format": "table",
-                "global_query_id": "",
-                "parser": "uql",
-                "refId": "A",
-                "root_selector": "",
-                "source": "url",
-                "type": "json",
-                "uql": "parse-json\n| project \"correlates\"\n| extend \"metric\"=\"labels.__name__\"\n| extend \"labels\"=\"labels\"\n| project \"rowid\", \"pearson\", \"metric\", \"labels\"\n",
-                "url": "http://correlation-service.default:9205/getCorrelatedSeries?strideId=${Stride}&tsid=${Timeseries}",
-                "url_options": {
-                  "data": "",
-                  "method": "GET"
-                }
-              }
-            ],
-            "title": "Timeseries correlated with ${Timeseries}",
-            "type": "table"
-          },
-          {
-            "gridPos": {
-              "h": 5,
-              "w": 8,
-              "x": 12,
-              "y": 0
-            },
-            "id": 2,
-            "options": {
-              "code": {
-                "language": "plaintext",
-                "showLineNumbers": false,
-                "showMiniMap": false
-              },
-              "content": "# Title\n\nFor markdown syntax help: [commonmark.org/help](https://commonmark.org/help/)\n\nstride=${Stride}\nsubgraph=${Subgraph}\n\nusing ${__from:date:YYYY-MM-DDTHH:mm:ss.000Z} and \n${__to:date:YYYY-MM-DDTHH:mm:ss.000Z}",
-              "mode": "markdown"
-            },
-            "pluginVersion": "11.5.2",
-            "title": "Test Box",
-            "type": "text"
-          },
-          {
-            "datasource": {
-              "type": "yesoreyeram-infinity-datasource",
-              "uid": "bebrqu5r2he68d",
-            },
-            "fieldConfig": {
-              "defaults": {
-                "color": {
-                  "mode": "thresholds"
-                },
-                "custom": {
-                  "align": "right",
-                  "cellOptions": {
-                    "type": "auto"
-                  },
-                  "filterable": true,
-                  "inspect": false,
-                  "minWidth": 50,
-                  "width": 70
-                },
-                "mappings": [],
-                "thresholds": {
-                  "mode": "absolute",
-                  "steps": [
-                    {
-                      "color": "green",
-                      "value": null
-                    },
-                    {
-                      "color": "red",
-                      "value": 1500
-                    }
-                  ]
-                }
-              },
-              "overrides": [
-                {
-                  "matcher": {
-                    "id": "byName",
-                    "options": "id"
-                  },
-                  "properties": [
-                    {
-                      "id": "links",
-                      "value": [
-                        {
-                          "title": "",
-                          "url": "https://corrjoin.nephometrics.com/fedja39h566m8a/testvars?var-Stride=${Stride:queryparam}?var-Subgraph=${__data.fields.id}"
-                        }
-                      ]
-                    }
-                  ]
-                },
-                {
-                  "matcher": {
-                    "id": "byName",
-                    "options": "size"
-                  },
-                  "properties": [
-                    {
-                      "id": "color",
-                      "value": {
-                        "mode": "thresholds"
-                      }
-                    },
-                    {
-                      "id": "custom.cellOptions",
-                      "value": {
-                        "type": "color-text"
-                      }
-                    }
-                  ]
-                }
-              ]
-            },
-            "gridPos": {
-              "h": 13,
-              "w": 4,
-              "x": 16,
-              "y": 5
-            },
-            "id": 1,
-            "options": {
-              "cellHeight": "sm",
-              "footer": {
-                "countRows": false,
-                "enablePagination": true,
-                "fields": "",
-                "reducer": [
-                  "sum"
-                ],
-                "show": false
-              },
-              "showHeader": true,
-              "sortBy": [
-                {
-                  "desc": true,
-                  "displayName": "size"
-                }
-              ]
-            },
-            "pluginVersion": "11.5.2",
-            "targets": [
-              {
-                "columns": [],
-                "datasource": {
-                  "type": "yesoreyeram-infinity-datasource",
-                  "uid": "bebrqu5r2he68d",
-                },
-                "filters": [],
-                "format": "table",
-                "global_query_id": "",
-                "parser": "uql",
-                "refId": "A",
-                "root_selector": "",
-                "source": "url",
-                "type": "json",
-                "uql": "parse-json\n| order by \"size\" desc",
-                "url": "http://correlation-service.default:9205/getSubgraphs?stride=${Stride}",
-                "url_options": {
-                  "data": "",
-                  "method": "GET",
-                  "params": []
-                }
-              }
-            ],
-            "title": "Subgraphs",
-            "type": "table"
-          },
-          {
-            "datasource": {
-              "type": "yesoreyeram-infinity-datasource",
-              "uid": "bebrqu5r2he68d",
+              "uid": "PC3988D4F1D604C00"
             },
             "fieldConfig": {
               "defaults": {
@@ -430,7 +139,7 @@ data:
                       "value": [
                         {
                           "title": "",
-                          "url": "http://corrjoin.nephometrics.com/fedja39h566m8a/testvars?var-Stride=${__data.fields.ID}"
+                          "url": "http://corrjoin.nephometrics.com/d/explore/stride-exploration?var-Stride=${__data.fields.ID}"
                         }
                       ]
                     }
@@ -461,7 +170,7 @@ data:
               "h": 5,
               "w": 12,
               "x": 0,
-              "y": 8
+              "y": 0
             },
             "id": 3,
             "options": {
@@ -482,7 +191,7 @@ data:
                 "columns": [],
                 "datasource": {
                   "type": "yesoreyeram-infinity-datasource",
-                  "uid": "bebrqu5r2he68d",
+                  "uid": "PC3988D4F1D604C00"
                 },
                 "filters": [],
                 "format": "table",
@@ -492,7 +201,7 @@ data:
                 "root_selector": "",
                 "source": "url",
                 "type": "json",
-                "uql": "parse-json\n| project \"ID\", \"StartTimeString\", \"EndTimeString\", \"Status\"\n| order by \"ID\" desc",
+                "uql": "parse-json\n| project \"ID\", \"StartTimeString\", \"EndTimeString\", \"Status\"\n| order by \"EndTimeString\" desc",
                 "url": "http://correlation-service.default:9205/getStrides",
                 "url_options": {
                   "data": "",
@@ -504,9 +213,34 @@ data:
             "type": "table"
           },
           {
+            "fieldConfig": {
+              "defaults": {},
+              "overrides": []
+            },
+            "gridPos": {
+              "h": 5,
+              "w": 8,
+              "x": 12,
+              "y": 0
+            },
+            "id": 2,
+            "options": {
+              "code": {
+                "language": "plaintext",
+                "showLineNumbers": false,
+                "showMiniMap": false
+              },
+              "content": "# Title\n\nFor markdown syntax help: [commonmark.org/help](https://commonmark.org/help/)\n\nstride=${Stride}\nsubgraph=${Subgraph}\n\nusing ${__from:date:YYYY-MM-DDTHH:mm:ss.000Z} and \n${__to:date:YYYY-MM-DDTHH:mm:ss.000Z}",
+              "mode": "markdown"
+            },
+            "pluginVersion": "11.5.2",
+            "title": "Test Box",
+            "type": "text"
+          },
+          {
             "datasource": {
               "type": "yesoreyeram-infinity-datasource",
-              "uid": "bebrqu5r2he68d",
+              "uid": "PC3988D4F1D604C00"
             },
             "fieldConfig": {
               "defaults": {
@@ -557,7 +291,7 @@ data:
               "h": 8,
               "w": 16,
               "x": 0,
-              "y": 13
+              "y": 5
             },
             "id": 5,
             "options": {
@@ -570,7 +304,13 @@ data:
                 ],
                 "show": false
               },
-              "showHeader": true
+              "showHeader": true,
+              "sortBy": [
+                {
+                  "desc": false,
+                  "displayName": "id"
+                }
+              ]
             },
             "pluginVersion": "11.5.2",
             "targets": [
@@ -578,7 +318,7 @@ data:
                 "columns": [],
                 "datasource": {
                   "type": "yesoreyeram-infinity-datasource",
-                  "uid": "bebrqu5r2he68d",
+                  "uid": "PC3988D4F1D604C00"
                 },
                 "filters": [],
                 "format": "table",
@@ -602,7 +342,216 @@ data:
           {
             "datasource": {
               "type": "yesoreyeram-infinity-datasource",
-              "uid": "bebrqu5r2he68d",
+              "uid": "PC3988D4F1D604C00"
+            },
+            "fieldConfig": {
+              "defaults": {
+                "color": {
+                  "mode": "thresholds"
+                },
+                "custom": {
+                  "align": "right",
+                  "cellOptions": {
+                    "type": "auto"
+                  },
+                  "filterable": true,
+                  "inspect": false,
+                  "minWidth": 50,
+                  "width": 70
+                },
+                "mappings": [],
+                "thresholds": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "red",
+                      "value": 1500
+                    }
+                  ]
+                }
+              },
+              "overrides": [
+                {
+                  "matcher": {
+                    "id": "byName",
+                    "options": "id"
+                  },
+                  "properties": [
+                    {
+                      "id": "links",
+                      "value": [
+                        {
+                          "title": "",
+                          "url": "https://corrjoin.nephometrics.com/d/explore/stride-exploration?var-Stride=${Stride:queryparam}?var-Subgraph=${__data.fields.id}"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "matcher": {
+                    "id": "byName",
+                    "options": "size"
+                  },
+                  "properties": [
+                    {
+                      "id": "color",
+                      "value": {
+                        "mode": "thresholds"
+                      }
+                    },
+                    {
+                      "id": "custom.cellOptions",
+                      "value": {
+                        "type": "color-text"
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            "gridPos": {
+              "h": 13,
+              "w": 4,
+              "x": 16,
+              "y": 5
+            },
+            "id": 1,
+            "options": {
+              "cellHeight": "sm",
+              "footer": {
+                "countRows": false,
+                "enablePagination": true,
+                "fields": "",
+                "reducer": [
+                  "sum"
+                ],
+                "show": false
+              },
+              "showHeader": true,
+              "sortBy": [
+                {
+                  "desc": true,
+                  "displayName": "size"
+                }
+              ]
+            },
+            "pluginVersion": "11.5.2",
+            "targets": [
+              {
+                "columns": [],
+                "datasource": {
+                  "type": "yesoreyeram-infinity-datasource",
+                  "uid": "PC3988D4F1D604C00"
+                },
+                "filters": [],
+                "format": "table",
+                "global_query_id": "",
+                "parser": "uql",
+                "refId": "A",
+                "root_selector": "",
+                "source": "url",
+                "type": "json",
+                "uql": "parse-json\n| order by \"size\" desc",
+                "url": "http://correlation-service.default:9205/getSubgraphs?stride=${Stride}",
+                "url_options": {
+                  "data": "",
+                  "method": "GET",
+                  "params": []
+                }
+              }
+            ],
+            "title": "Subgraphs",
+            "type": "table"
+          },
+          {
+            "datasource": {
+              "type": "yesoreyeram-infinity-datasource",
+              "uid": "PC3988D4F1D604C00"
+            },
+            "fieldConfig": {
+              "defaults": {
+                "color": {
+                  "mode": "thresholds"
+                },
+                "custom": {
+                  "align": "auto",
+                  "cellOptions": {
+                    "type": "auto"
+                  },
+                  "inspect": false
+                },
+                "mappings": [],
+                "thresholds": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "red",
+                      "value": 80
+                    }
+                  ]
+                }
+              },
+              "overrides": []
+            },
+            "gridPos": {
+              "h": 8,
+              "w": 16,
+              "x": 0,
+              "y": 13
+            },
+            "id": 9,
+            "options": {
+              "cellHeight": "sm",
+              "footer": {
+                "countRows": false,
+                "fields": "",
+                "reducer": [
+                  "sum"
+                ],
+                "show": false
+              },
+              "showHeader": true
+            },
+            "pluginVersion": "11.5.2",
+            "targets": [
+              {
+                "columns": [],
+                "datasource": {
+                  "type": "yesoreyeram-infinity-datasource",
+                  "uid": "PC3988D4F1D604C00"
+                },
+                "filters": [],
+                "format": "table",
+                "global_query_id": "",
+                "parser": "uql",
+                "refId": "A",
+                "root_selector": "",
+                "source": "url",
+                "type": "json",
+                "uql": "parse-json\n| project \"correlates\"\n| extend \"metric\"=\"labels.__name__\"\n| extend \"labels\"=\"labels\"\n| project \"rowid\", \"pearson\", \"metric\", \"labels\"\n",
+                "url": "http://correlation-service.default:9205/getCorrelatedSeries?strideId=${Stride}&tsid=${Timeseries}",
+                "url_options": {
+                  "data": "",
+                  "method": "GET"
+                }
+              }
+            ],
+            "title": "Timeseries correlated with ${Timeseries}",
+            "type": "table"
+          },
+          {
+            "datasource": {
+              "type": "yesoreyeram-infinity-datasource",
+              "uid": "PC3988D4F1D604C00"
             },
             "fieldConfig": {
               "defaults": {
@@ -643,6 +592,7 @@ data:
                   }
                 },
                 "mappings": [],
+                "noValue": "0",
                 "thresholds": {
                   "mode": "absolute",
                   "steps": [
@@ -657,7 +607,59 @@ data:
                   ]
                 }
               },
-              "overrides": []
+              "overrides": [
+                {
+                  "matcher": {
+                    "id": "byName",
+                    "options": "B value"
+                  },
+                  "properties": [
+                    {
+                      "id": "custom.lineStyle",
+                      "value": {
+                        "dash": [
+                          10,
+                          10
+                        ],
+                        "fill": "dash"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "matcher": {
+                    "id": "byName",
+                    "options": ""
+                  },
+                  "properties": []
+                },
+                {
+                  "__systemRef": "hideSeriesFrom",
+                  "matcher": {
+                    "id": "byNames",
+                    "options": {
+                      "mode": "exclude",
+                      "names": [
+                        "A value",
+                        "B value",
+                        "C value"
+                      ],
+                      "prefix": "All except:",
+                      "readOnly": true
+                    }
+                  },
+                  "properties": [
+                    {
+                      "id": "custom.hideFrom",
+                      "value": {
+                        "legend": false,
+                        "tooltip": false,
+                        "viz": true
+                      }
+                    }
+                  ]
+                }
+              ]
             },
             "gridPos": {
               "h": 8,
@@ -685,7 +687,7 @@ data:
                 "columns": [],
                 "datasource": {
                   "type": "yesoreyeram-infinity-datasource",
-                  "uid": "bebrqu5r2he68d",
+                  "uid": "PC3988D4F1D604C00"
                 },
                 "filters": [],
                 "format": "table",
@@ -695,7 +697,93 @@ data:
                 "root_selector": "",
                 "source": "url",
                 "type": "json",
-                "url": "http://correlation-service.default:9205/getTimeseries?strideId=${Stride}&tsid=${Timeseries}&timeFrom=${__from:date:YYYY-MM-DDTHH:mm:ss}&timeTo=${__to:date:YYYY-MM-DDTHH:mm:ss}&timeOverride=${Timespan}",
+                "uql": "",
+                "url": "http://correlation-service.default:9205/getTimeseries?strideId=${Stride}&tsid=${Timeseries}&timeFrom=${__from:date:YYYY-MM-DDTHH:mm:ss}&timeTo=${__to:date:YYYY-MM-DDTHH:mm:ss}",
+                "url_options": {
+                  "data": "",
+                  "method": "GET"
+                }
+              },
+              {
+                "columns": [],
+                "datasource": {
+                  "type": "yesoreyeram-infinity-datasource",
+                  "uid": "PC3988D4F1D604C00"
+                },
+                "filters": [],
+                "format": "table",
+                "global_query_id": "",
+                "hide": false,
+                "parser": "uql",
+                "refId": "B",
+                "root_selector": "",
+                "source": "url",
+                "type": "json",
+                "uql": "parse-json",
+                "url": "http://correlation-service.default:9205/getTimeseries?strideId=${Stride}&tsid=${Timeseries}&timeFrom=${__from:date:YYYY-MM-DDTHH:mm:ss}&timeTo=${__to:date:YYYY-MM-DDTHH:mm:ss}&index=1",
+                "url_options": {
+                  "data": "",
+                  "method": "GET"
+                }
+              },
+              {
+                "columns": [],
+                "datasource": {
+                  "type": "yesoreyeram-infinity-datasource",
+                  "uid": "PC3988D4F1D604C00"
+                },
+                "filters": [],
+                "format": "table",
+                "global_query_id": "",
+                "hide": false,
+                "parser": "uql",
+                "refId": "C",
+                "root_selector": "",
+                "source": "url",
+                "type": "json",
+                "url": "http://correlation-service.default:9205/getTimeseries?strideId=${Stride}&tsid=${Timeseries}&timeFrom=${__from:date:YYYY-MM-DDTHH:mm:ss}&timeTo=${__to:date:YYYY-MM-DDTHH:mm:ss}&index=2",
+                "url_options": {
+                  "data": "",
+                  "method": "GET"
+                }
+              },
+              {
+                "columns": [],
+                "datasource": {
+                  "type": "yesoreyeram-infinity-datasource",
+                  "uid": "PC3988D4F1D604C00"
+                },
+                "filters": [],
+                "format": "table",
+                "global_query_id": "",
+                "hide": false,
+                "parser": "uql",
+                "refId": "D",
+                "root_selector": "",
+                "source": "url",
+                "type": "json",
+                "url": "http://correlation-service.default:9205/getTimeseries?strideId=${Stride}&tsid=${Timeseries}&timeFrom=${__from:date:YYYY-MM-DDTHH:mm:ss}&timeTo=${__to:date:YYYY-MM-DDTHH:mm:ss}&index=3",
+                "url_options": {
+                  "data": "",
+                  "method": "GET"
+                }
+              },
+              {
+                "columns": [],
+                "datasource": {
+                  "type": "yesoreyeram-infinity-datasource",
+                  "uid": "PC3988D4F1D604C00"
+                },
+                "filters": [],
+                "format": "table",
+                "global_query_id": "",
+                "hide": false,
+                "parser": "uql",
+                "refId": "E",
+                "root_selector": "",
+                "source": "url",
+                "type": "json",
+                "url": "http://correlation-service.default:9205/getTimeseries?strideId=${Stride}&tsid=${Timeseries}&timeFrom=${__from:date:YYYY-MM-DDTHH:mm:ss}&timeTo=${__to:date:YYYY-MM-DDTHH:mm:ss}&index=4",
                 "url_options": {
                   "data": "",
                   "method": "GET"
@@ -707,113 +795,13 @@ data:
           },
           {
             "datasource": {
-              "type": "prometheus",
-              "uid": "${DS_PROMETHEUS}"
-            },
-            "fieldConfig": {
-              "defaults": {
-                "color": {
-                  "mode": "palette-classic"
-                },
-                "custom": {
-                  "axisBorderShow": false,
-                  "axisCenteredZero": false,
-                  "axisColorMode": "text",
-                  "axisLabel": "",
-                  "axisPlacement": "auto",
-                  "barAlignment": 0,
-                  "barWidthFactor": 0.6,
-                  "drawStyle": "line",
-                  "fillOpacity": 0,
-                  "gradientMode": "none",
-                  "hideFrom": {
-                    "legend": false,
-                    "tooltip": false,
-                    "viz": false
-                  },
-                  "insertNulls": false,
-                  "lineInterpolation": "linear",
-                  "lineWidth": 1,
-                  "pointSize": 5,
-                  "scaleDistribution": {
-                    "type": "linear"
-                  },
-                  "showPoints": "auto",
-                  "spanNulls": false,
-                  "stacking": {
-                    "group": "A",
-                    "mode": "none"
-                  },
-                  "thresholdsStyle": {
-                    "mode": "off"
-                  }
-                },
-                "mappings": [],
-                "thresholds": {
-                  "mode": "absolute",
-                  "steps": [
-                    {
-                      "color": "green",
-                      "value": null
-                    },
-                    {
-                      "color": "red",
-                      "value": 80
-                    }
-                  ]
-                }
-              },
-              "overrides": []
-            },
-            "gridPos": {
-              "h": 8,
-              "w": 12,
-              "x": 0,
-              "y": 29
-            },
-            "id": 7,
-            "options": {
-              "legend": {
-                "calcs": [],
-                "displayMode": "list",
-                "placement": "bottom",
-                "showLegend": true
-              },
-              "tooltip": {
-                "hideZeros": false,
-                "mode": "single",
-                "sort": "none"
-              }
-            },
-            "pluginVersion": "11.5.2",
-            "targets": [
-              {
-                "disableTextWrap": false,
-                "editorMode": "builder",
-                "expr": "kubelet_http_requests_duration_seconds_count{node=\"n2\"}",
-                "fullMetaSearch": false,
-                "includeNullMetadata": true,
-                "legendFormat": "__auto",
-                "range": true,
-                "refId": "A",
-                "useBackend": false,
-                "datasource": {
-                  "type": "prometheus",
-                  "uid": "${DS_PROMETHEUS}"
-                }
-              }
-            ],
-            "title": "Panel Title",
-            "type": "timeseries"
-          },
-          {
-            "datasource": {
               "type": "yesoreyeram-infinity-datasource",
-              "uid": "bebrqu5r2he68d",
+              "uid": "PC3988D4F1D604C00"
             },
             "fieldConfig": {
               "defaults": {
                 "color": {
+                  "fixedColor": "blue",
                   "mode": "thresholds"
                 },
                 "custom": {
@@ -824,7 +812,7 @@ data:
                     "viz": false
                   },
                   "insertNulls": false,
-                  "lineWidth": 0,
+                  "lineWidth": 2,
                   "spanNulls": false
                 },
                 "mappings": [],
@@ -836,8 +824,24 @@ data:
                       "value": null
                     },
                     {
-                      "color": "red",
-                      "value": 80
+                      "color": "dark-red",
+                      "value": 0
+                    },
+                    {
+                      "color": "orange",
+                      "value": 0.8
+                    },
+                    {
+                      "color": "yellow",
+                      "value": 0.9
+                    },
+                    {
+                      "color": "blue",
+                      "value": 0.995
+                    },
+                    {
+                      "color": "green",
+                      "value": 0.999
                     }
                   ]
                 }
@@ -845,10 +849,10 @@ data:
               "overrides": []
             },
             "gridPos": {
-              "h": 8,
+              "h": 7,
               "w": 12,
               "x": 0,
-              "y": 37
+              "y": 29
             },
             "id": 8,
             "options": {
@@ -858,7 +862,7 @@ data:
                 "placement": "bottom",
                 "showLegend": true
               },
-              "mergeValues": true,
+              "mergeValues": false,
               "rowHeight": 0.9,
               "showValue": "auto",
               "tooltip": {
@@ -873,7 +877,7 @@ data:
                 "columns": [],
                 "datasource": {
                   "type": "yesoreyeram-infinity-datasource",
-                  "uid": "bebrqu5r2he68d",
+                  "uid": "PC3988D4F1D604C00"
                 },
                 "filters": [],
                 "format": "table",
@@ -884,7 +888,7 @@ data:
                 "source": "url",
                 "type": "json",
                 "uql": "parse-json",
-                "url": "http://correlation-service.default:9205/getCorrelatedSeries?stride=${Stride}&tsid=${Timeseries}",
+                "url": "http://correlation-service.default:9205/getTimeline?strideId=${Stride}&tsid=${Timeseries}",
                 "url_options": {
                   "data": "",
                   "method": "GET"
@@ -892,18 +896,56 @@ data:
               }
             ],
             "title": "Timeline of timeseries ${Timeseries}",
+            "transformations": [
+              {
+                "id": "groupingToMatrix",
+                "options": {
+                  "columnField": "metric",
+                  "rowField": "time",
+                  "valueField": "state"
+                }
+              },
+              {
+                "id": "convertFieldType",
+                "options": {
+                  "conversions": [
+                    {
+                      "destinationType": "time",
+                      "targetField": "time\\metric"
+                    }
+                  ],
+                  "fields": {}
+                }
+              },
+              {
+                "id": "sortBy",
+                "options": {
+                  "fields": {},
+                  "sort": [
+                    {
+                      "desc": false,
+                      "field": "time\\metric"
+                    }
+                  ]
+                }
+              }
+            ],
             "type": "state-timeline"
           },
           {
             "datasource": {
               "type": "yesoreyeram-infinity-datasource",
-              "uid": "bebrqu5r2he68d",
+              "uid": "PC3988D4F1D604C00"
+            },
+            "fieldConfig": {
+              "defaults": {},
+              "overrides": []
             },
             "gridPos": {
               "h": 31,
               "w": 15,
               "x": 0,
-              "y": 45
+              "y": 36
             },
             "id": 4,
             "options": {
@@ -917,7 +959,7 @@ data:
                 "columns": [],
                 "datasource": {
                   "type": "yesoreyeram-infinity-datasource",
-                  "uid": "bebrqu5r2he68d",
+                  "uid": "PC3988D4F1D604C00"
                 },
                 "filters": [],
                 "format": "table",
@@ -928,7 +970,7 @@ data:
                 "source": "url",
                 "type": "json",
                 "uql": "parse-json",
-                "url": "http://correlation-service.default:9205/getSubgraphNodes?stride=${Stride}&subgraph=${Subgraph}",
+                "url": "http://correlation-service.default:9205/getSubgraphNodes?strideId=${Stride}&subgraph=${Subgraph}",
                 "url_options": {
                   "data": "",
                   "method": "GET"
@@ -938,7 +980,7 @@ data:
                 "columns": [],
                 "datasource": {
                   "type": "yesoreyeram-infinity-datasource",
-                  "uid": "bebrqu5r2he68d",
+                  "uid": "PC3988D4F1D604C00"
                 },
                 "filters": [],
                 "format": "table",
@@ -949,7 +991,7 @@ data:
                 "root_selector": "",
                 "source": "url",
                 "type": "json",
-                "url": "http://correlation-service:9205/getSubgraphEdges?stride=${Stride}&subgraph=${Subgraph}",
+                "url": "http://correlation-service:9205/getSubgraphEdges?strideId=${Stride}&subgraph=${Subgraph}",
                 "url_options": {
                   "data": "",
                   "method": "GET"
@@ -960,6 +1002,7 @@ data:
             "type": "nodeGraph"
           }
         ],
+        "preload": false,
         "refresh": "",
         "schemaVersion": 40,
         "tags": [],
@@ -967,10 +1010,13 @@ data:
           "list": [
             {
               "allowCustomValue": false,
-              "current": {},
+              "current": {
+                "text": "30",
+                "value": "30"
+              },
               "datasource": {
                 "type": "yesoreyeram-infinity-datasource",
-                "uid": "bebrqu5r2he68d",
+                "uid": "PC3988D4F1D604C00"
               },
               "definition": "",
               "description": "",
@@ -1012,10 +1058,13 @@ data:
             },
             {
               "allowCustomValue": false,
-              "current": {},
+              "current": {
+                "text": "0",
+                "value": "0"
+              },
               "datasource": {
                 "type": "yesoreyeram-infinity-datasource",
-                "uid": "bebrqu5r2he68d",
+                "uid": "PC3988D4F1D604C00"
               },
               "definition": "",
               "name": "Subgraph",
@@ -1052,10 +1101,13 @@ data:
             },
             {
               "allowCustomValue": false,
-              "current": {},
+              "current": {
+                "text": "2025-03-04T12:54:10.000Z",
+                "value": "2025-03-04T12:54:10.000Z"
+              },
               "datasource": {
                 "type": "yesoreyeram-infinity-datasource",
-                "uid": "bebrqu5r2he68d",
+                "uid": "PC3988D4F1D604C00"
               },
               "definition": "",
               "hide": 2,
@@ -1087,10 +1139,13 @@ data:
             },
             {
               "allowCustomValue": false,
-              "current": {},
+              "current": {
+                "text": "2025-03-04T12:37:31.000Z",
+                "value": "2025-03-04T12:37:31.000Z"
+              },
               "datasource": {
                 "type": "yesoreyeram-infinity-datasource",
-                "uid": "bebrqu5r2he68d",
+                "uid": "PC3988D4F1D604C00"
               },
               "definition": "",
               "hide": 2,
@@ -1122,10 +1177,23 @@ data:
             },
             {
               "allowCustomValue": false,
-              "current": {},
+              "current": {
+                "text": [
+                  "96",
+                  "28",
+                  "47",
+                  "37"
+                ],
+                "value": [
+                  "96",
+                  "28",
+                  "47",
+                  "37"
+                ]
+              },
               "datasource": {
                 "type": "yesoreyeram-infinity-datasource",
-                "uid": "bebrqu5r2he68d",
+                "uid": "PC3988D4F1D604C00"
               },
               "definition": "",
               "multi": true,
@@ -1154,41 +1222,17 @@ data:
               "refresh": 1,
               "regex": "",
               "type": "query"
-            },
-            {
-              "allowCustomValue": false,
-              "current": {
-                "text": "true",
-                "value": "true"
-              },
-              "description": "Set this to true if you want to use the dashboard time in graphs instead of the stride times.",
-              "label": "Use dashboard timespan",
-              "name": "Timespan",
-              "options": [
-                {
-                  "selected": false,
-                  "text": "false",
-                  "value": "false"
-                },
-                {
-                  "selected": true,
-                  "text": "true",
-                  "value": "true"
-                }
-              ],
-              "query": "false, true",
-              "type": "custom"
             }
           ]
         },
         "time": {
-          "from": "now-6h",
+          "from": "now-3h",
           "to": "now"
         },
         "timepicker": {},
-        "timezone": "browser",
-        "title": "testvars",
-        "uid": "fedja39h566m8a",
-        "version": 16,
+        "timezone": "utc",
+        "title": "Stride Exploration",
+        "uid": "explore",
+        "version": 6,
         "weekStart": ""
       }
