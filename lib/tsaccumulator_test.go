@@ -11,7 +11,7 @@ func TestComputeSlotIndex(t *testing.T) {
 	now := time.Now()
 	replies := make(chan *ObservationResult, 1)
 	defer close(replies)
-	acc := NewTimeseriesAccumulator(6, now, 5, replies)
+	acc := NewTimeseriesAccumulator(6, now, 5, 100, replies)
 
 	s0, err := acc.computeSlotIndex(now)
 	if err != nil {
@@ -37,7 +37,7 @@ func TestAddObservation(t *testing.T) {
 	now := time.Now()
 	replies := make(chan *ObservationResult, 1)
 	defer close(replies)
-	acc := NewTimeseriesAccumulator(6, now, 5, replies)
+	acc := NewTimeseriesAccumulator(6, now, 5, 100, replies)
 	acc.AddObservation(&Observation{
 		MetricFingerprint: uint64(1),
 		MetricName:        "ts1",
@@ -79,7 +79,7 @@ func TestAddObservation_newStride(t *testing.T) {
 	now := time.Now()
 	replies := make(chan *ObservationResult, 1)
 	defer close(replies)
-	acc := NewTimeseriesAccumulator(2, now, 5, replies)
+	acc := NewTimeseriesAccumulator(2, now, 5, 100, replies)
 	acc.AddObservation(&Observation{
 		MetricFingerprint: uint64(1),
 		MetricName:        "ts1",
@@ -124,7 +124,7 @@ func TestAddObservation_interpolate(t *testing.T) {
 	now := time.Now()
 	replies := make(chan *ObservationResult, 1)
 	defer close(replies)
-	acc := NewTimeseriesAccumulator(6, now, 2, replies)
+	acc := NewTimeseriesAccumulator(6, now, 2, 100, replies)
 	acc.AddObservation(&Observation{
 		MetricFingerprint: uint64(1),
 		MetricName:        "ts1",

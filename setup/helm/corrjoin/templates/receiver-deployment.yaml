@@ -27,19 +27,22 @@ spec:
         image: {{ .Values.image.repository }}/{{ .Values.image.image }}:{{ .Values.image.version }}
         imagePullPolicy: {{ .Values.image.pullPolicy }}
         command: ["/webroot/app"]
-        args: ["-svdDimensions", "5", 
-           "-windowSize", "500", "-stride", "100", 
-            #"-comparer", "inprocess", "-correlationThreshold", "99", "-justExplore", 
-            "-comparer", "inprocess", "-correlationThreshold", "99", "-sampleInterval", "20",
+        args: ["-svdDimensions", {{ .Values.corrjoin.svdDimensions | quote }},
+           "-windowSize", {{ .Values.corrjoin.windowSize | quote }},
+           "-stride", {{ .Values.corrjoin.stride | quote }},
+            "-comparer", "inprocess",
+            "-correlationThreshold", {{ .Values.corrjoin.correlationThreshold | quote }},
+            "-sampleInterval", {{ .Values.corrjoin.sampleInterval | quote }},
            "-prometheusURL", {{ .Values.prometheusURL }},
-           "-parquetMaxRowsPerRowGroup", "10000" ]
+           "-maxRows", {{ .Values.corrjoin.maxRows | quote }},
+           "-parquetMaxRowsPerRowGroup", "10000"]
         resources:
            limits:
               cpu: "1"
               memory: "6Gi"
            requests:
               cpu: "1"
-              memory: "4Gi"
+              memory: "6Gi"
         ports:
         - containerPort: 9201
           name: api

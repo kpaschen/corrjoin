@@ -39,6 +39,7 @@ func main() {
 	var justExplore bool
 	var prometheusURL string
 	var strideMaxAgeSeconds int
+	var maxRows int
 
 	flag.StringVar(&metricsAddr, "metrics-address", ":9203", "The address the metrics endpoint binds to.")
 	flag.StringVar(&prometheusAddr, "listen-address", ":9201", "The address that the storage endpoint binds to.")
@@ -59,6 +60,7 @@ func main() {
 	flag.BoolVar(&justExplore, "justExplore", false, "If true, launch only the explorer endpoint")
 	flag.StringVar(&prometheusURL, "prometheusURL", "", "A URL for the prometheus service")
 	flag.IntVar(&strideMaxAgeSeconds, "strideMaxAgeSeconds", 86400, "The maximum time to keep stride data around for.")
+	flag.IntVar(&maxRows, "maxRows", 0, "The maximum number of timeseries to process. 0 means no limit.")
 
 	flag.Parse()
 
@@ -79,6 +81,7 @@ func main() {
 		Algorithm:            algorithm,
 		MaxRowsPerRowGroup:   int64(parquetMaxRowsPerRowGroup),
 		ResultsDirectory:     resultsDirectory,
+		MaxRows:              maxRows,
 	}
 	corrjoinConfig = corrjoinConfig.ComputeSettingsFields()
 
@@ -99,6 +102,7 @@ func main() {
 	explorerRouter.HandleFunc("/getTimeseries", expl.GetTimeseries).Methods("GET")
 	explorerRouter.HandleFunc("/getTimeline", expl.GetTimeline).Methods("GET")
 	explorerRouter.HandleFunc("/getMetricInfo", expl.GetMetricInfo).Methods("GET")
+	explorerRouter.HandleFunc("/dumpMetricCache", expl.DumpMetricCache).Methods("GET")
 
 	http.Handle("/metrics", promhttp.Handler())
 	go http.ListenAndServe(cfg.metricsAddress, nil)

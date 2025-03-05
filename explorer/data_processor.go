@@ -198,12 +198,11 @@ func (c *CorrelationExplorer) scanResultFiles() error {
 				}
 				err = c.readResultFile(e.Name(), stride)
 				if err != nil {
-					log.Printf("failed to parse result file %s because %v\n", e.Name(), err)
 					if age > 3600 {
+						log.Printf("failed to parse result file %s because %v\n", e.Name(), err)
 						log.Println("giving up on this stride")
 						stride.Status = StrideError
 					} else {
-						log.Println("will try again")
 						stride.Status = StrideRetrying
 					}
 					break
@@ -505,7 +504,7 @@ func (c *CorrelationExplorer) getLatestStride() *Stride {
 		if s == nil {
 			continue
 		}
-		if s.Status == StrideDeleted {
+		if s.Status != StrideProcessed {
 			continue
 		}
 		if newestEntry == -1 || s.StartTime > c.strideCache[newestEntry].StartTime {

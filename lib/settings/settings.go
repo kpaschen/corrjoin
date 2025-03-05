@@ -54,6 +54,12 @@ type CorrjoinSettings struct {
 	// anything > maxint32 is a good choice.
 	MaxRowsPerRowGroup int64
 
+	// This is mainly for debugging. You can limit the number of timeseries in the system,
+	// but the selection will be random. The system will process the first /MaxRows/ timeseries
+	// it sees and drop all others. If you want more control over the time series selection, use
+	// the label expression in the remote write config.
+	MaxRows int
+
 	ResultsDirectory string
 
 	Algorithm string

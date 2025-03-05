@@ -128,7 +128,7 @@ func (c *CorrelationExplorer) GetSubgraphNodes(w http.ResponseWriter, r *http.Re
 	subgraphs := stride.subgraphs
 	if subgraphs == nil {
 		log.Printf("stride %d has no subgraphs\n", stride.ID)
-		http.Error(w, err.Error(), http.StatusNotFound)
+		http.Error(w, fmt.Sprintf("stride %d has no subgraphs", stride.ID), http.StatusNotFound)
 		return
 	}
 	subgraphId, err := c.getSubgraphId(params)
@@ -233,6 +233,50 @@ func (c *CorrelationExplorer) GetSubgraphEdges(w http.ResponseWriter, r *http.Re
 	json.NewEncoder(w).Encode(resp)
 }
 
+func (c *CorrelationExplorer) DumpMetricCache(w http.ResponseWriter, r *http.Request) {
+	params := r.URL.Query()
+	stride, err := c.getStride(params)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if stride == nil {
+		err := fmt.Errorf("no stride found for params %v", params)
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+
+	var metricName string
+	metricNames, ok := params["metric"]
+	if !ok {
+		metricName = ""
+	} else {
+		metricName = metricNames[0]
+	}
+
+	maxMetrics := 200
+	resp := make([]explorerlib.Metric, 0, maxMetrics)
+
+	ctr := 0
+	for _, cacheEntry := range stride.metricsCacheByRowId {
+		if metricName != "" {
+			labels := cacheEntry.LabelSet
+			if labels[model.LabelName("__name__")] != model.LabelValue(metricName) {
+				continue
+			}
+		}
+		resp = append(resp, *cacheEntry)
+		ctr++
+		if ctr > maxMetrics {
+			break
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(resp)
+}
+
 func (c *CorrelationExplorer) getSubgraphId(params url.Values) (int, error) {
 	subgraph, ok := params["subgraph"]
 	if !ok {
@@ -297,6 +341,7 @@ func (c *CorrelationExplorer) getStride(params url.Values) (*Stride, error) {
 // Note the keys are not quoted, that's why you cannot just unmarshal this with json.
 // we assume there are no nested objects and parse this as just a key-value map.
 func parseUrlDataIntoMetric(urlValue string) (*model.Metric, error) {
+	log.Printf("input value is %s\n", urlValue)
 	if urlValue[0] != '{' {
 		return nil, fmt.Errorf("expected value to start with '{'")
 	}
@@ -349,7 +394,7 @@ func (c *CorrelationExplorer) getMetrics(params url.Values, stride *Stride) ([]i
 	if !ok {
 		return nil, fmt.Errorf("missing ts parameter")
 	}
-	log.Printf("in getMetrics, params %v and err %v\n", params, err)
+	log.Printf("in getMetrics, parsing %s into metric\n", labelset[0])
 	modelMetric, err := parseUrlDataIntoMetric(labelset[0])
 
 	if err != nil {
@@ -361,8 +406,10 @@ func (c *CorrelationExplorer) getMetrics(params url.Values, stride *Stride) ([]i
 	fmt.Printf("metric is %+v and fingerprint is %d\n", modelMetric, fp)
 	rowid, exists := stride.metricsCache[uint64(fp)]
 	if !exists {
+		log.Printf("metric not found in cache\n")
 		return nil, nil
 	}
+	log.Printf("returning row id %d\n", rowid)
 	return []int{rowid}, nil
 }
 
@@ -374,7 +421,6 @@ func (c *CorrelationExplorer) getMetricsByRowId(params url.Values, stride *Strid
 	if !ok {
 		return nil, fmt.Errorf("missing tsid parameter")
 	}
-	log.Printf("tsid parameter type is %T\n", metricRowId[0])
 	tsids, err := c.parseTsIdsFromGraphiteResult(strings.TrimSpace(metricRowId[0]))
 	if err != nil {
 		return nil, err
@@ -460,8 +506,8 @@ func (c *CorrelationExplorer) GetTimeseries(w http.ResponseWriter, r *http.Reque
 		index = 0
 	}
 	if index >= len(metrics) {
-		log.Printf("index %d is greater than length of metrics, using 0 instead\n", index)
-		index = 0
+		http.Error(w, "skip", http.StatusNotFound)
+		return
 	}
 
 	startTimeString := stride.StartTimeString
@@ -627,8 +673,6 @@ func (c *CorrelationExplorer) GetTimeline(w http.ResponseWriter, r *http.Request
 			}
 		}
 	}
-
-	log.Printf("returning %d entries for timeline\n", len(resp))
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)

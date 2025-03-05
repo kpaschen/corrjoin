@@ -139,7 +139,7 @@ func NewTsProcessor(corrjoinConfig settings.CorrjoinSettings) *tsProcessor {
 
 	processor := &tsProcessor{
 		accumulator: corrjoin.NewTimeseriesAccumulator(corrjoinConfig.StrideLength,
-			time.Now().UTC(), corrjoinConfig.SampleInterval, bufferChannel),
+			time.Now().UTC(), corrjoinConfig.SampleInterval, corrjoinConfig.MaxRows, bufferChannel),
 		settings:                    &corrjoinConfig,
 		observationQueue:            observationQueue,
 		window:                      corrjoin.NewTimeseriesWindow(corrjoinConfig, comparer),

@@ -54,6 +54,7 @@ type TimeseriesAccumulator struct {
 	currentStrideMaxTs   time.Time
 	sampleTime           int
 	strideDuration       time.Duration
+	maxRows              int
 
 	bufferChannel chan<- *ObservationResult
 }
@@ -66,6 +67,7 @@ func maxTime(startTime time.Time, strideDuration time.Duration) time.Time {
 }
 
 func NewTimeseriesAccumulator(stride int, startTime time.Time, sampleInterval int,
+	maxRows int,
 	bc chan<- *ObservationResult) *TimeseriesAccumulator {
 	strideDuration, _ := time.ParseDuration(fmt.Sprintf("%ds", stride*sampleInterval))
 	acc := &TimeseriesAccumulator{
@@ -79,6 +81,7 @@ func NewTimeseriesAccumulator(stride int, startTime time.Time, sampleInterval in
 		currentStrideMaxTs:   maxTime(startTime, strideDuration),
 		strideDuration:       strideDuration,
 		bufferChannel:        bc,
+		maxRows:              maxRows,
 	}
 	log.Printf("created accumulator with start time %v and end time %v\n",
 		acc.currentStrideStartTs.UTC().Format("20060102150405"),
@@ -162,7 +165,7 @@ func (a *TimeseriesAccumulator) AddObservation(observation *Observation) {
 	}
 
 	rowid, ok := a.rowmap[observation.MetricFingerprint]
-	if !ok {
+	if !ok && (a.maxRows <= 0 || a.maxRow < a.maxRows) {
 		rowid = a.maxRow
 		a.rowmap[observation.MetricFingerprint] = rowid
 		a.buffers[rowid] = make([]float64, 0, colcount)

@@ -36,6 +36,6 @@ spec:
 {{- if .Values.cni.createPv }}
          storage: 1Gi
 {{- else }}
-         storage: 30Gi
+         storage: 20Gi
 {{- end -}}
 {{- end -}}

@@ -19,5 +19,14 @@ cni:
   useCeph: false
   createPv: false  
 
+corrjoin:
+  svdDimensions: 5
+  windowSize: 100
+  stride: 50
+  correlationThreshold: 99
+  sampleInterval: 20
+  parquetMaxRowsPerRowGroup: 10000
+  maxRows: 20000
+
 prometheusURL: "http://prometheus-kube-prometheus-prometheus.monitoring:9090"
 
