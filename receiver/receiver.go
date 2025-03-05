@@ -247,7 +247,6 @@ func NewTsProcessor(corrjoinConfig settings.CorrjoinSettings) *tsProcessor {
 					}
 					log.Printf("finished recording data for stride %d\n", stride)
 				} else {
-					log.Printf("adding correlated pairs for stride %d\n", correlationResult.StrideCounter)
 					err := processor.reporter.AddCorrelatedPairs(*correlationResult)
 					if err != nil {
 						log.Printf("failed to log results: %v\n", err)

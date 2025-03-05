@@ -98,6 +98,7 @@ func main() {
 	explorerRouter.HandleFunc("/getCorrelatedSeries", expl.GetCorrelatedSeries).Methods("GET")
 	explorerRouter.HandleFunc("/getTimeseries", expl.GetTimeseries).Methods("GET")
 	explorerRouter.HandleFunc("/getTimeline", expl.GetTimeline).Methods("GET")
+	explorerRouter.HandleFunc("/getMetricInfo", expl.GetMetricInfo).Methods("GET")
 
 	http.Handle("/metrics", promhttp.Handler())
 	go http.ListenAndServe(cfg.metricsAddress, nil)

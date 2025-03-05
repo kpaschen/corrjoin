@@ -31,6 +31,14 @@ type CorrelatedResponse struct {
 	Pearson     float32                              `json:"pearson"`
 }
 
+type metricInfoResponse struct {
+	Rowid       int                                  `json:"rowid"`
+	Labels      map[model.LabelName]model.LabelValue `json:"labels"`
+	LabelString string                               `json:"labelString"`
+	Constant    bool                                 `json:"constant"`
+	SubgraphId  int                                  `json:"subgraphId"`
+}
+
 type correlatedTimeseriesResponse struct {
 	Correlates []CorrelatedResponse `json:"correlates"`
 	Constant   bool                 `json:"constant"`
@@ -336,12 +344,12 @@ func (c *CorrelationExplorer) getMetrics(params url.Values, stride *Stride) ([]i
 		}
 		return ret, nil
 	}
-	log.Printf("in getMetrics, metrics %v and err %v\n", metrics, err)
 
 	labelset, ok := params["ts"]
 	if !ok {
 		return nil, fmt.Errorf("missing ts parameter")
 	}
+	log.Printf("in getMetrics, params %v and err %v\n", params, err)
 	modelMetric, err := parseUrlDataIntoMetric(labelset[0])
 
 	if err != nil {
@@ -621,6 +629,60 @@ func (c *CorrelationExplorer) GetTimeline(w http.ResponseWriter, r *http.Request
 	}
 
 	log.Printf("returning %d entries for timeline\n", len(resp))
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(resp)
+}
+
+func (c *CorrelationExplorer) GetMetricInfo(w http.ResponseWriter, r *http.Request) {
+	params := r.URL.Query()
+	stride, err := c.getStride(params)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if stride == nil {
+		http.Error(w, fmt.Sprintf("no stride found for time"), http.StatusNotFound)
+		return
+	}
+
+	metricRowIds, err := c.getMetrics(params, stride)
+	if err != nil {
+		log.Printf("failed to identify metrics from request: %v\n", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if metricRowIds == nil || len(metricRowIds) == 0 {
+		http.Error(w, fmt.Sprintf("no metrics found for params %v", params), http.StatusNotFound)
+		return
+	}
+
+	resp := make([]metricInfoResponse, 0, len(metricRowIds))
+
+	for _, rowid := range metricRowIds {
+		m, exists := stride.metricsCacheByRowId[rowid]
+		if !exists || m == nil {
+			http.Error(w, fmt.Sprintf("missing metric with row id %d", rowid), http.StatusNotFound)
+			return
+		}
+		subgraphId := -1
+		if stride.subgraphs != nil {
+			var exists bool
+			subgraphId, exists = stride.subgraphs.Rows[rowid]
+			if !exists {
+				subgraphId = -1
+			}
+		}
+		resp = append(resp, metricInfoResponse{
+			Rowid:       rowid,
+			Labels:      m.LabelSet,
+			LabelString: m.MetricString(),
+			Constant:    m.Constant,
+			SubgraphId:  subgraphId,
+		})
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
