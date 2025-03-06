@@ -9,6 +9,7 @@ import (
 	"github.com/kpaschen/corrjoin/receiver"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"log"
+  _ "net/http/pprof"
 	"net/http"
 	"os"
 	"os/signal"
