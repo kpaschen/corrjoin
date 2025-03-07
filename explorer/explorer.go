@@ -340,8 +340,11 @@ func (c *CorrelationExplorer) getStride(params url.Values) (*Stride, error) {
 // {__name__="kube_pod_container_info", container="grafana"}
 // Note the keys are not quoted, that's why you cannot just unmarshal this with json.
 // we assume there are no nested objects and parse this as just a key-value map.
-func parseUrlDataIntoMetric(urlValue string) (*model.Metric, error) {
+func parseUrlDataIntoMetric(urlValue string, dropLabels map[string]bool) (*model.Metric, error) {
 	log.Printf("input value is %s\n", urlValue)
+	if len(urlValue) == 0 {
+		return nil, fmt.Errorf("empty url value")
+	}
 	if urlValue[0] != '{' {
 		return nil, fmt.Errorf("expected value to start with '{'")
 	}
@@ -359,8 +362,13 @@ func parseUrlDataIntoMetric(urlValue string) (*model.Metric, error) {
 		if len(keyvalue) != 2 {
 			return nil, fmt.Errorf("bad key-value pair: %s\n", part)
 		}
-		ret[(model.LabelName)(keyvalue[0])] = (model.LabelValue)(strings.Trim(keyvalue[1], `'"`))
+		dropme := dropLabels[keyvalue[0]]
+		if !dropme {
+			ret[(model.LabelName)(keyvalue[0])] = (model.LabelValue)(strings.Trim(keyvalue[1], `'"`))
+		}
 	}
+
+	log.Printf("parsed url data into metric %+v\n", ret)
 
 	return &ret, nil
 }
@@ -395,7 +403,7 @@ func (c *CorrelationExplorer) getMetrics(params url.Values, stride *Stride) ([]i
 		return nil, fmt.Errorf("missing ts parameter")
 	}
 	log.Printf("in getMetrics, parsing %s into metric\n", labelset[0])
-	modelMetric, err := parseUrlDataIntoMetric(labelset[0])
+	modelMetric, err := parseUrlDataIntoMetric(labelset[0], c.dropLabels)
 
 	if err != nil {
 		log.Printf("err: %v\n", err)
@@ -506,7 +514,10 @@ func (c *CorrelationExplorer) GetTimeseries(w http.ResponseWriter, r *http.Reque
 		index = 0
 	}
 	if index >= len(metrics) {
-		http.Error(w, "skip", http.StatusNotFound)
+		resp := make([]TimeseriesResponse, 0)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(resp)
 		return
 	}
 
@@ -543,7 +554,7 @@ func (c *CorrelationExplorer) GetTimeseries(w http.ResponseWriter, r *http.Reque
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	log.Printf("response body: %s\n", resBody)
+	// log.Printf("response body: %s\n", resBody)
 
 	var parsedResponse PromQueryResponse
 	err = json.Unmarshal([]byte(resBody), &parsedResponse)
@@ -719,6 +730,7 @@ func (c *CorrelationExplorer) GetMetricInfo(w http.ResponseWriter, r *http.Reque
 				subgraphId = -1
 			}
 		}
+		log.Printf("metric %d is in subgraph %d\n", rowid, subgraphId)
 		resp = append(resp, metricInfoResponse{
 			Rowid:       rowid,
 			Labels:      m.LabelSet,
@@ -773,11 +785,17 @@ func (c *CorrelationExplorer) GetCorrelatedSeries(w http.ResponseWriter, r *http
 		return
 	}
 
+	maxLen := len(correlatesMap)
+	if maxLen > 200 {
+		maxLen = 200
+	}
+
 	resp := correlatedTimeseriesResponse{
-		Correlates: make([]CorrelatedResponse, 0, len(correlatesMap)),
+		Correlates: make([]CorrelatedResponse, 0, maxLen),
 		Constant:   false,
 	}
 
+	ctr := 0
 	for otherRowId, pearson := range correlatesMap {
 		otherMetric, exists := stride.metricsCacheByRowId[otherRowId]
 		if !exists {
@@ -791,6 +809,10 @@ func (c *CorrelationExplorer) GetCorrelatedSeries(w http.ResponseWriter, r *http
 			LabelString: otherMetric.MetricString(),
 			Pearson:     pearson,
 		})
+		ctr++
+		if ctr >= maxLen {
+			break
+		}
 	}
 
 	log.Printf("returning %d correlated ts for ts %d and stride %d\n", len(resp.Correlates), metricRowIds[0], stride.ID)

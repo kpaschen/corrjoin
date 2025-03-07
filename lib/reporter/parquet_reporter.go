@@ -173,6 +173,7 @@ func (r *ParquetReporter) AddCorrelatedPairs(result datatypes.CorrjoinResult) er
 }
 
 func (r *ParquetReporter) Flush(strideCounter int) error {
+	log.Printf("flushing parquet writer for stride %d\n", strideCounter)
 	writer, exists := r.strideWriters[strideCounter]
 	if !exists || writer == nil {
 		return nil

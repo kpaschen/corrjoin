@@ -99,6 +99,7 @@ type metricRow struct {
 
 func (p *ParquetExplorer) GetMetrics(cache *map[int]*Metric) error {
 	reader := parquet.NewGenericReader[metricRow](p.file)
+	defer reader.Close()
 	results := make([]metricRow, 2000)
 	for done := false; !done; {
 		numRead, err := reader.Read(results)
@@ -219,6 +220,7 @@ func (s *SubgraphMemberships) GetGraphId(rowId int) int {
 // Read subgraph information from a parquet file.
 func (p *ParquetExplorer) GetSubgraphs() (*SubgraphMemberships, error) {
 	reader := parquet.NewGenericReader[reporter.Timeseries](p.file)
+	defer reader.Close()
 	results := make([]reporter.Timeseries, 2000)
 	subgraphs := &SubgraphMemberships{
 		Rows:           make(map[int]int),
@@ -256,6 +258,7 @@ func (p *ParquetExplorer) GetEdges(edgeChan chan<- []*Edge) error {
 		return fmt.Errorf("parquet explorer has no parquet file")
 	}
 	reader := parquet.NewGenericReader[reporter.Timeseries](p.file)
+	defer reader.Close()
 	results := make([]reporter.Timeseries, 2000)
 	for done := false; !done; {
 		numRead, err := reader.Read(results)
@@ -307,6 +310,7 @@ func (p *ParquetExplorer) LookupMetric(timeSeriesId int) (map[string]string, err
 			continue
 		}
 		reader := parquet.NewGenericReader[reporter.Timeseries](p.file)
+		defer reader.Close()
 		offsetidx, _ := idchunk.OffsetIndex()
 		reader.SeekToRow(offsetidx.FirstRowIndex(found))
 		results := make([]reporter.Timeseries, 10)

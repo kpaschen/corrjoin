@@ -25,13 +25,19 @@ type CorrelationExplorer struct {
 
 	maxAgeSeconds int
 	ticker        *time.Ticker
+	dropLabels    map[string]bool
 }
 
-func (c *CorrelationExplorer) Initialize(baseUrl string, maxAgeSeconds int) error {
+func (c *CorrelationExplorer) Initialize(baseUrl string, maxAgeSeconds int, dropLabels []string) error {
 	c.prometheusBaseURL = baseUrl
 	c.maxAgeSeconds = maxAgeSeconds
 	c.strideCache = make([]*Stride, STRIDE_CACHE_SIZE, STRIDE_CACHE_SIZE)
 	c.ticker = time.NewTicker(60 * time.Second)
+	c.dropLabels = make(map[string]bool)
+
+	for _, lb := range dropLabels {
+		c.dropLabels[lb] = true
+	}
 
 	go func() {
 		for {

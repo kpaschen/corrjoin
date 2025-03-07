@@ -9,10 +9,11 @@ import (
 	"github.com/kpaschen/corrjoin/receiver"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"log"
-  _ "net/http/pprof"
 	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"os/signal"
+	"strings"
 )
 
 type config struct {
@@ -41,6 +42,7 @@ func main() {
 	var prometheusURL string
 	var strideMaxAgeSeconds int
 	var maxRows int
+	var labeldrop string
 
 	flag.StringVar(&metricsAddr, "metrics-address", ":9203", "The address the metrics endpoint binds to.")
 	flag.StringVar(&prometheusAddr, "listen-address", ":9201", "The address that the storage endpoint binds to.")
@@ -62,6 +64,7 @@ func main() {
 	flag.StringVar(&prometheusURL, "prometheusURL", "", "A URL for the prometheus service")
 	flag.IntVar(&strideMaxAgeSeconds, "strideMaxAgeSeconds", 86400, "The maximum time to keep stride data around for.")
 	flag.IntVar(&maxRows, "maxRows", 0, "The maximum number of timeseries to process. 0 means no limit.")
+	flag.StringVar(&labeldrop, "labeldrop", "", "The labels to drop from timeseries, separated by |")
 
 	flag.Parse()
 
@@ -89,7 +92,7 @@ func main() {
 	expl := &explorer.CorrelationExplorer{
 		FilenameBase: resultsDirectory,
 	}
-	err := expl.Initialize(prometheusURL, strideMaxAgeSeconds)
+	err := expl.Initialize(prometheusURL, strideMaxAgeSeconds, strings.Split(labeldrop, "|"))
 	if err != nil {
 		log.Printf("failed to initialize explorer: %v\n", err)
 	}
