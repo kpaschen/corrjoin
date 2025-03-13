@@ -350,7 +350,7 @@ func (c *CorrelationExplorer) retrieveCorrelatedTimeseries(stride *Stride, tsRow
 						break
 					}
 				}
-				if found {
+				if !found {
 					continue
 				}
 			}

@@ -644,20 +644,23 @@ func (c *CorrelationExplorer) GetTimeline(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	// Two options: single-select or multi-select of the timeseries.
-	// If only a single timeseries was selected (len(metricRowIds) == 1), look up the correlated timeseries
-	// in all strides.
-	// If several timeseries were selected, limit output to them. So we only retrieve the correlation coefficient
-	// of the first selected timeseries with any of the others.
+	if len(metricRowIds) < 2 {
+		log.Printf("not computing timeline for isolated timeseries\n")
+		resp := make([]TimelineResponse, 0, 0)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(resp)
+		return
+	}
 
-	// Look up the correlates of metricRowIds[0] in all strides.
-	timelinemap := make(map[int](map[int]float32))
-	allRowIds := make(map[int]bool)
+	resp := make([]TimelineResponse, 0, len(c.strideCache)*(len(metricRowIds)-1))
+
+	// Look up the Pearson correlation of the first selected timeseries with any of the others across all strides.
 	for _, st := range c.strideCache {
 		if st == nil {
 			continue
 		}
-		if st.Status == StrideDeleted {
+		if st.Status != StrideProcessed {
 			continue
 		}
 		log.Printf("requesting correlated timeseries for stride %d and ts %d\n", st.ID, metricRowIds[0])
@@ -666,25 +669,11 @@ func (c *CorrelationExplorer) GetTimeline(w http.ResponseWriter, r *http.Request
 			log.Printf("error retrieving correlates for timeseries %d and stride %d: %v\n", metricRowIds[0], st.ID, err)
 			continue
 		}
-		timelinemap[st.ID] = correlatesMap
-		for rowid, _ := range correlatesMap {
-			allRowIds[rowid] = true
-		}
-	}
-
-	log.Printf("got %d timeseries for the timeline of ts %d\n", len(allRowIds), metricRowIds[0])
-
-	resp := make([]TimelineResponse, 0, len(c.strideCache)*len(allRowIds))
-	for _, st := range c.strideCache {
-		if st == nil {
-			continue
-		}
-		if st.Status != StrideProcessed {
-			continue
-		}
-		timelines := timelinemap[st.ID]
-		for rowid, _ := range allRowIds {
-			pearson, exists := timelines[rowid]
+		for i, rowid := range metricRowIds {
+			if i == 0 {
+				continue
+			}
+			pearson, exists := correlatesMap[rowid]
 			if !exists {
 				resp = append(resp, TimelineResponse{
 					Time:   st.EndTimeString,

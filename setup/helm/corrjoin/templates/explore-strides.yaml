@@ -6,1471 +6,1471 @@ metadata:
    name: explore-strides
 data:
    explore-strides.json: |-
-{
-  "annotations": {
-    "list": [
       {
-        "datasource": {
-          "type": "yesoreyeram-infinity-datasource",
-          "uid": "PC3988D4F1D      04C00"
-        },
-        "enable": true,
-        "hide": false,
-        "iconColor": "purple",
-        "mappings": {
-          "text": {
-            "source": "field",
-            "value": "ID"
-          },
-          "time": {
-            "source": "field",
-            "value": "Start"
-          },
-          "timeEnd": {
-            "source": "field",
-            "value": "End"
-          },
-          "title": {
-            "source": "field",
-            "value": "ID"
-          }
-        },
-        "name": "Strides",
-        "target": {
-          "columns": [],
-          "filters": [],
-          "format": "table",
-          "global_query_id": "",
-          "parser": "uql",
-          "refId": "Anno",
-          "root_selector": "",
-          "source": "url",
-          "type": "json",
-          "uql": "parse-json\n| extend \"Start\"=todatetime(\"StartTimeString\"), \"End\"=todatetime(\"EndTimeString\")",
-          "url": "http://correlation-service.default:9205/getStrides",
-          "url_options": {
-            "data": "",
-            "method": "GET"
-          }
-        }
-      },
-      {
-        "builtIn": 1,
-        "datasource": {
-          "type": "grafana",
-          "uid": "-- Grafana --"
-        },
-        "enable": true,
-        "hide": true,
-        "iconColor": "rgba(0, 211, 255, 1)",
-        "name": "Annotations & Alerts",
-        "type": "dashboard"
-      }
-    ]
-  },
-  "editable": true,
-  "fiscalYearStartMonth": 0,
-  "graphTooltip": 0,
-  "id": 34,
-  "links": [],
-  "panels": [
-    {
-      "datasource": {
-        "type": "yesoreyeram-infinity-datasource",
-        "uid": "PC3988D4F1D      04C00"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "custom": {
-            "align": "left",
-            "cellOptions": {
-              "type": "auto"
-            },
-            "inspect": false,
-            "minWidth": 50
-          },
-          "fieldMinMax": false,
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
+        "annotations": {
+          "list": [
+            {
+              "datasource": {
+                "type": "yesoreyeram-infinity-datasource",
+                "uid": "PC3988D4F1D      04C00"
               },
-              {
-                "color": "red",
-                "value": 80
+              "enable": true,
+              "hide": false,
+              "iconColor": "purple",
+              "mappings": {
+                "text": {
+                  "source": "field",
+                  "value": "ID"
+                },
+                "time": {
+                  "source": "field",
+                  "value": "Start"
+                },
+                "timeEnd": {
+                  "source": "field",
+                  "value": "End"
+                },
+                "title": {
+                  "source": "field",
+                  "value": "ID"
+                }
+              },
+              "name": "Strides",
+              "target": {
+                "columns": [],
+                "filters": [],
+                "format": "table",
+                "global_query_id": "",
+                "parser": "uql",
+                "refId": "Anno",
+                "root_selector": "",
+                "source": "url",
+                "type": "json",
+                "uql": "parse-json\n| extend \"Start\"=todatetime(\"StartTimeString\"), \"End\"=todatetime(\"EndTimeString\")",
+                "url": "http://correlation-service.default:9205/getStrides",
+                "url_options": {
+                  "data": "",
+                  "method": "GET"
+                }
               }
-            ]
-          }
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Status"
             },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 100
+            {
+              "builtIn": 1,
+              "datasource": {
+                "type": "grafana",
+                "uid": "-- Grafana --"
               },
+              "enable": true,
+              "hide": true,
+              "iconColor": "rgba(0, 211, 255, 1)",
+              "name": "Annotations & Alerts",
+              "type": "dashboard"
+            }
+          ]
+        },
+        "editable": true,
+        "fiscalYearStartMonth": 0,
+        "graphTooltip": 0,
+        "id": 34,
+        "links": [],
+        "panels": [
+          {
+            "datasource": {
+              "type": "yesoreyeram-infinity-datasource",
+              "uid": "PC3988D4F1D      04C00"
+            },
+            "fieldConfig": {
+              "defaults": {
+                "color": {
+                  "mode": "thresholds"
+                },
+                "custom": {
+                  "align": "left",
+                  "cellOptions": {
+                    "type": "auto"
+                  },
+                  "inspect": false,
+                  "minWidth": 50
+                },
+                "fieldMinMax": false,
+                "mappings": [],
+                "thresholds": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "red",
+                      "value": 80
+                    }
+                  ]
+                }
+              },
+              "overrides": [
+                {
+                  "matcher": {
+                    "id": "byName",
+                    "options": "Status"
+                  },
+                  "properties": [
+                    {
+                      "id": "custom.width",
+                      "value": 100
+                    },
+                    {
+                      "id": "mappings",
+                      "value": [
+                        {
+                          "options": {
+                            "3": {
+                              "color": "green",
+                              "index": 0,
+                              "text": "Processed"
+                            },
+                            "4": {
+                              "color": "orange",
+                              "index": 1,
+                              "text": "Retrying"
+                            },
+                            "5": {
+                              "color": "red",
+                              "index": 2,
+                              "text": "Error"
+                            },
+                            "      ": {
+                              "color": "purple",
+                              "index": 3,
+                              "text": "Deleted"
+                            }
+                          },
+                          "type": "value"
+                        },
+                        {
+                          "options": {
+                            "from": 0,
+                            "result": {
+                              "color": "yellow",
+                              "index": 4,
+                              "text": "Processing"
+                            },
+                            "to": 2
+                          },
+                          "type": "range"
+                        }
+                      ]
+                    },
+                    {
+                      "id": "custom.cellOptions",
+                      "value": {
+                        "type": "color-text"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "matcher": {
+                    "id": "byName",
+                    "options": "ID"
+                  },
+                  "properties": [
+                    {
+                      "id": "custom.width",
+                      "value": 20
+                    },
+                    {
+                      "id": "links",
+                      "value": [
+                        {
+                          "title": "",
+                          "url": "http://corrjoin.nephometrics.com/d/explore/stride-exploration?var-Stride=${__data.fields.ID}"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "matcher": {
+                    "id": "byRegexp",
+                    "options": "/.*TimeString/"
+                  },
+                  "properties": [
+                    {
+                      "id": "custom.width",
+                      "value": 199
+                    }
+                  ]
+                },
+                {
+                  "matcher": {
+                    "id": "byName",
+                    "options": ""
+                  },
+                  "properties": []
+                }
+              ]
+            },
+            "gridPos": {
+              "h": 5,
+              "w": 12,
+              "x": 0,
+              "y": 0
+            },
+            "id": 3,
+            "options": {
+              "cellHeight": "sm",
+              "footer": {
+                "countRows": false,
+                "fields": "",
+                "reducer": [
+                  "sum"
+                ],
+                "show": false
+              },
+              "showHeader": true
+            },
+            "pluginVersion": "11.5.2",
+            "targets": [
               {
-                "id": "mappings",
-                "value": [
-                  {
-                    "options": {
-                      "3": {
-                        "color": "green",
-                        "index": 0,
-                        "text": "Processed"
-                      },
-                      "4": {
-                        "color": "orange",
-                        "index": 1,
-                        "text": "Retrying"
-                      },
-                      "5": {
-                        "color": "red",
-                        "index": 2,
-                        "text": "Error"
-                      },
-                      "      ": {
-                        "color": "purple",
-                        "index": 3,
-                        "text": "Deleted"
+                "columns": [],
+                "datasource": {
+                  "type": "yesoreyeram-infinity-datasource",
+                  "uid": "PC3988D4F1D      04C00"
+                },
+                "filters": [],
+                "format": "table",
+                "global_query_id": "",
+                "parser": "uql",
+                "refId": "A",
+                "root_selector": "",
+                "source": "url",
+                "type": "json",
+                "uql": "parse-json\n| project \"ID\", \"StartTimeString\", \"EndTimeString\", \"Status\"\n| order by \"EndTimeString\" desc",
+                "url": "http://correlation-service.default:9205/getStrides",
+                "url_options": {
+                  "data": "",
+                  "method": "GET"
+                }
+              }
+            ],
+            "title": "Strides",
+            "type": "table"
+          },
+          {
+            "datasource": {
+              "type": "yesoreyeram-infinity-datasource",
+              "uid": "PC3988D4F1D      04C00"
+            },
+            "fieldConfig": {
+              "defaults": {
+                "color": {
+                  "mode": "thresholds"
+                },
+                "custom": {
+                  "align": "right",
+                  "cellOptions": {
+                    "type": "auto"
+                  },
+                  "filterable": true,
+                  "inspect": false,
+                  "minWidth": 50,
+                  "width": 70
+                },
+                "mappings": [],
+                "thresholds": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "red",
+                      "value": 1500
+                    }
+                  ]
+                }
+              },
+              "overrides": [
+                {
+                  "matcher": {
+                    "id": "byName",
+                    "options": "id"
+                  },
+                  "properties": [
+                    {
+                      "id": "links",
+                      "value": [
+                        {
+                          "title": "",
+                          "url": "https://corrjoin.nephometrics.com/d/explore/stride-exploration?var-Stride=${Stride:queryparam}?var-Subgraph=${__data.fields.id}"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "matcher": {
+                    "id": "byName",
+                    "options": "size"
+                  },
+                  "properties": [
+                    {
+                      "id": "color",
+                      "value": {
+                        "mode": "thresholds"
                       }
                     },
-                    "type": "value"
-                  },
-                  {
-                    "options": {
-                      "from": 0,
-                      "result": {
-                        "color": "yellow",
-                        "index": 4,
-                        "text": "Processing"
-                      },
-                      "to": 2
-                    },
-                    "type": "range"
-                  }
-                ]
+                    {
+                      "id": "custom.cellOptions",
+                      "value": {
+                        "type": "color-text"
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            "gridPos": {
+              "h": 13,
+              "w": 4,
+              "x": 12,
+              "y": 0
+            },
+            "id": 1,
+            "options": {
+              "cellHeight": "sm",
+              "footer": {
+                "countRows": false,
+                "enablePagination": true,
+                "fields": "",
+                "reducer": [
+                  "sum"
+                ],
+                "show": false
               },
+              "showHeader": true,
+              "sortBy": [
+                {
+                  "desc": true,
+                  "displayName": "size"
+                }
+              ]
+            },
+            "pluginVersion": "11.5.2",
+            "targets": [
               {
-                "id": "custom.cellOptions",
-                "value": {
-                  "type": "color-text"
+                "columns": [],
+                "datasource": {
+                  "type": "yesoreyeram-infinity-datasource",
+                  "uid": "PC3988D4F1D      04C00"
+                },
+                "filters": [],
+                "format": "table",
+                "global_query_id": "",
+                "parser": "uql",
+                "refId": "A",
+                "root_selector": "",
+                "source": "url",
+                "type": "json",
+                "uql": "parse-json\n| order by \"size\" desc",
+                "url": "http://correlation-service.default:9205/getSubgraphs?strideId=${Stride}",
+                "url_options": {
+                  "data": "",
+                  "method": "GET",
+                  "params": []
                 }
               }
-            ]
+            ],
+            "title": "Subgraphs",
+            "type": "table"
           },
           {
-            "matcher": {
-              "id": "byName",
-              "options": "ID"
+            "datasource": {
+              "type": "yesoreyeram-infinity-datasource",
+              "uid": "PC3988D4F1D      04C00"
             },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 20
-              },
-              {
-                "id": "links",
-                "value": [
-                  {
-                    "title": "",
-                    "url": "http://corrjoin.nephometrics.com/d/explore/stride-exploration?var-Stride=${__data.fields.ID}"
-                  }
-                ]
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byRegexp",
-              "options": "/.*TimeString/"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 199
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": ""
-            },
-            "properties": []
-          }
-        ]
-      },
-      "gridPos": {
-        "h": 5,
-        "w": 12,
-        "x": 0,
-        "y": 0
-      },
-      "id": 3,
-      "options": {
-        "cellHeight": "sm",
-        "footer": {
-          "countRows": false,
-          "fields": "",
-          "reducer": [
-            "sum"
-          ],
-          "show": false
-        },
-        "showHeader": true
-      },
-      "pluginVersion": "11.5.2",
-      "targets": [
-        {
-          "columns": [],
-          "datasource": {
-            "type": "yesoreyeram-infinity-datasource",
-            "uid": "PC3988D4F1D      04C00"
-          },
-          "filters": [],
-          "format": "table",
-          "global_query_id": "",
-          "parser": "uql",
-          "refId": "A",
-          "root_selector": "",
-          "source": "url",
-          "type": "json",
-          "uql": "parse-json\n| project \"ID\", \"StartTimeString\", \"EndTimeString\", \"Status\"\n| order by \"EndTimeString\" desc",
-          "url": "http://correlation-service.default:9205/getStrides",
-          "url_options": {
-            "data": "",
-            "method": "GET"
-          }
-        }
-      ],
-      "title": "Strides",
-      "type": "table"
-    },
-    {
-      "datasource": {
-        "type": "yesoreyeram-infinity-datasource",
-        "uid": "PC3988D4F1D      04C00"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "custom": {
-            "align": "right",
-            "cellOptions": {
-              "type": "auto"
-            },
-            "filterable": true,
-            "inspect": false,
-            "minWidth": 50,
-            "width": 70
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 1500
-              }
-            ]
-          }
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "id"
-            },
-            "properties": [
-              {
-                "id": "links",
-                "value": [
-                  {
-                    "title": "",
-                    "url": "https://corrjoin.nephometrics.com/d/explore/stride-exploration?var-Stride=${Stride:queryparam}?var-Subgraph=${__data.fields.id}"
-                  }
-                ]
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "size"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
+            "fieldConfig": {
+              "defaults": {
+                "color": {
                   "mode": "thresholds"
+                },
+                "custom": {
+                  "align": "auto",
+                  "cellOptions": {
+                    "type": "auto"
+                  },
+                  "inspect": false
+                },
+                "mappings": [],
+                "thresholds": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "red",
+                      "value": 80
+                    }
+                  ]
                 }
               },
+              "overrides": [
+                {
+                  "matcher": {
+                    "id": "byName",
+                    "options": "labels"
+                  },
+                  "properties": [
+                    {
+                      "id": "custom.hidden",
+                      "value": true
+                    }
+                  ]
+                },
+                {
+                  "matcher": {
+                    "id": "byName",
+                    "options": "__name__"
+                  },
+                  "properties": [
+                    {
+                      "id": "displayName",
+                      "value": "metric"
+                    },
+                    {
+                      "id": "custom.inspect",
+                      "value": true
+                    },
+                    {
+                      "id": "custom.width",
+                      "value": 200
+                    }
+                  ]
+                }
+              ]
+            },
+            "gridPos": {
+              "h": 8,
+              "w": 12,
+              "x": 0,
+              "y": 5
+            },
+            "id": 11,
+            "options": {
+              "cellHeight": "sm",
+              "footer": {
+                "countRows": false,
+                "fields": "",
+                "reducer": [
+                  "sum"
+                ],
+                "show": false
+              },
+              "showHeader": true
+            },
+            "pluginVersion": "11.5.2",
+            "targets": [
               {
-                "id": "custom.cellOptions",
-                "value": {
-                  "type": "color-text"
+                "columns": [],
+                "datasource": {
+                  "type": "yesoreyeram-infinity-datasource",
+                  "uid": "PC3988D4F1D      04C00"
+                },
+                "filters": [],
+                "format": "table",
+                "global_query_id": "",
+                "parser": "uql",
+                "refId": "A",
+                "root_selector": "",
+                "source": "url",
+                "type": "json",
+                "uql": "parse-json | project \"stride\", \"rowid\", \"subgraphId\", \"constant\", \"labels\"",
+                "url": "http://correlation-service.default:9205/getMetricInfo?strideId=${Stride}&tsid=${Timeseries}",
+                "url_options": {
+                  "data": "",
+                  "method": "GET"
                 }
               }
-            ]
-          }
-        ]
-      },
-      "gridPos": {
-        "h": 13,
-        "w": 4,
-        "x": 12,
-        "y": 0
-      },
-      "id": 1,
-      "options": {
-        "cellHeight": "sm",
-        "footer": {
-          "countRows": false,
-          "enablePagination": true,
-          "fields": "",
-          "reducer": [
-            "sum"
-          ],
-          "show": false
-        },
-        "showHeader": true,
-        "sortBy": [
-          {
-            "desc": true,
-            "displayName": "size"
-          }
-        ]
-      },
-      "pluginVersion": "11.5.2",
-      "targets": [
-        {
-          "columns": [],
-          "datasource": {
-            "type": "yesoreyeram-infinity-datasource",
-            "uid": "PC3988D4F1D      04C00"
-          },
-          "filters": [],
-          "format": "table",
-          "global_query_id": "",
-          "parser": "uql",
-          "refId": "A",
-          "root_selector": "",
-          "source": "url",
-          "type": "json",
-          "uql": "parse-json\n| order by \"size\" desc",
-          "url": "http://correlation-service.default:9205/getSubgraphs?strideId=${Stride}",
-          "url_options": {
-            "data": "",
-            "method": "GET",
-            "params": []
-          }
-        }
-      ],
-      "title": "Subgraphs",
-      "type": "table"
-    },
-    {
-      "datasource": {
-        "type": "yesoreyeram-infinity-datasource",
-        "uid": "PC3988D4F1D      04C00"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "custom": {
-            "align": "auto",
-            "cellOptions": {
-              "type": "auto"
-            },
-            "inspect": false
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
+            ],
+            "title": "Timeseries information for ${Timeseries} in stride ${Stride}",
+            "transformations": [
               {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
+                "id": "extractFields",
+                "options": {
+                  "delimiter": ",",
+                  "source": "labels"
+                }
               }
-            ]
-          }
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "labels"
-            },
-            "properties": [
-              {
-                "id": "custom.hidden",
-                "value": true
-              }
-            ]
+            ],
+            "type": "table"
           },
           {
-            "matcher": {
-              "id": "byName",
-              "options": "__name__"
+            "datasource": {
+              "type": "yesoreyeram-infinity-datasource",
+              "uid": "PC3988D4F1D      04C00"
             },
-            "properties": [
-              {
-                "id": "displayName",
-                "value": "metric"
+            "fieldConfig": {
+              "defaults": {
+                "color": {
+                  "mode": "thresholds"
+                },
+                "custom": {
+                  "align": "auto",
+                  "cellOptions": {
+                    "type": "auto",
+                    "wrapText": false
+                  },
+                  "inspect": true
+                },
+                "mappings": [],
+                "thresholds": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "red",
+                      "value": 80
+                    }
+                  ]
+                }
               },
-              {
-                "id": "custom.inspect",
-                "value": true
-              },
-              {
-                "id": "custom.width",
-                "value": 200
-              }
-            ]
-          }
-        ]
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 5
-      },
-      "id": 11,
-      "options": {
-        "cellHeight": "sm",
-        "footer": {
-          "countRows": false,
-          "fields": "",
-          "reducer": [
-            "sum"
-          ],
-          "show": false
-        },
-        "showHeader": true
-      },
-      "pluginVersion": "11.5.2",
-      "targets": [
-        {
-          "columns": [],
-          "datasource": {
-            "type": "yesoreyeram-infinity-datasource",
-            "uid": "PC3988D4F1D      04C00"
-          },
-          "filters": [],
-          "format": "table",
-          "global_query_id": "",
-          "parser": "uql",
-          "refId": "A",
-          "root_selector": "",
-          "source": "url",
-          "type": "json",
-          "uql": "parse-json | project \"stride\", \"rowid\", \"subgraphId\", \"constant\", \"labels\"",
-          "url": "http://correlation-service.default:9205/getMetricInfo?strideId=${Stride}&tsid=${Timeseries}",
-          "url_options": {
-            "data": "",
-            "method": "GET"
-          }
-        }
-      ],
-      "title": "Timeseries information for ${Timeseries} in stride ${Stride}",
-      "transformations": [
-        {
-          "id": "extractFields",
-          "options": {
-            "delimiter": ",",
-            "source": "labels"
-          }
-        }
-      ],
-      "type": "table"
-    },
-    {
-      "datasource": {
-        "type": "yesoreyeram-infinity-datasource",
-        "uid": "PC3988D4F1D      04C00"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "custom": {
-            "align": "auto",
-            "cellOptions": {
-              "type": "auto",
-              "wrapText": false
+              "overrides": [
+                {
+                  "matcher": {
+                    "id": "byName",
+                    "options": "id"
+                  },
+                  "properties": [
+                    {
+                      "id": "custom.width",
+                      "value": 80
+                    },
+                    {
+                      "id": "links",
+                      "value": [
+                        {
+                          "targetBlank": true,
+                          "title": "",
+                          "url": "/d/explore/stride-exploration?var-Metric=${__data.fields.title}"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "matcher": {
+                    "id": "byName",
+                    "options": "mainstat"
+                  },
+                  "properties": [
+                    {
+                      "id": "custom.inspect",
+                      "value": false
+                    },
+                    {
+                      "id": "custom.filterable",
+                      "value": false
+                    },
+                    {
+                      "id": "custom.hidden",
+                      "value": true
+                    }
+                  ]
+                },
+                {
+                  "matcher": {
+                    "id": "byName",
+                    "options": "title"
+                  },
+                  "properties": [
+                    {
+                      "id": "custom.width",
+                      "value": 250
+                    },
+                    {
+                      "id": "custom.inspect",
+                      "value": false
+                    },
+                    {
+                      "id": "custom.filterable",
+                      "value": true
+                    }
+                  ]
+                },
+                {
+                  "matcher": {
+                    "id": "byFrameRefID",
+                    "options": "A"
+                  },
+                  "properties": [
+                    {
+                      "id": "custom.filterable",
+                      "value": true
+                    }
+                  ]
+                }
+              ]
             },
-            "inspect": true
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
+            "gridPos": {
+              "h": 9,
+              "w": 1      ,
+              "x": 0,
+              "y": 13
+            },
+            "id": 5,
+            "options": {
+              "cellHeight": "sm",
+              "footer": {
+                "countRows": false,
+                "enablePagination": true,
+                "fields": "",
+                "reducer": [
+                  "sum"
+                ],
+                "show": false
               },
+              "showHeader": true,
+              "sortBy": [
+                {
+                  "desc": false,
+                  "displayName": "image"
+                }
+              ]
+            },
+            "pluginVersion": "11.5.2",
+            "targets": [
               {
-                "color": "red",
-                "value": 80
+                "columns": [],
+                "datasource": {
+                  "type": "yesoreyeram-infinity-datasource",
+                  "uid": "PC3988D4F1D      04C00"
+                },
+                "filters": [],
+                "format": "table",
+                "global_query_id": "",
+                "parser": "uql",
+                "refId": "A",
+                "root_selector": "",
+                "source": "url",
+                "type": "json",
+                "uql": "parse-json\n| project \"id\", \"title\", \"mainstat\"",
+                "url": "http://correlation-service.default:9205/getSubgraphNodes?strideId=${Stride}&subgraph=${Subgraph}",
+                "url_options": {
+                  "data": "",
+                  "method": "GET"
+                }
               }
-            ]
-          }
-        },
-        "overrides": [
+            ],
+            "title": "Timeseries for stride ${Stride} and Subgraph ${Subgraph}",
+            "transformations": [
+              {
+                "id": "extractFields",
+                "options": {
+                  "delimiter": ",",
+                  "keepTime": false,
+                  "replace": false,
+                  "source": "mainstat"
+                }
+              }
+            ],
+            "type": "table"
+          },
           {
-            "matcher": {
-              "id": "byName",
-              "options": "id"
+            "datasource": {
+              "type": "yesoreyeram-infinity-datasource",
+              "uid": "PC3988D4F1D      04C00"
             },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 80
+            "fieldConfig": {
+              "defaults": {
+                "color": {
+                  "mode": "thresholds"
+                },
+                "custom": {
+                  "align": "auto",
+                  "cellOptions": {
+                    "type": "auto",
+                    "wrapText": false
+                  },
+                  "filterable": false,
+                  "inspect": true
+                },
+                "mappings": [],
+                "thresholds": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "red",
+                      "value": 80
+                    }
+                  ]
+                }
               },
+              "overrides": [
+                {
+                  "matcher": {
+                    "id": "byName",
+                    "options": "labels"
+                  },
+                  "properties": [
+                    {
+                      "id": "custom.inspect",
+                      "value": false
+                    },
+                    {
+                      "id": "custom.hidden",
+                      "value": true
+                    }
+                  ]
+                },
+                {
+                  "matcher": {
+                    "id": "byName",
+                    "options": "rowid"
+                  },
+                  "properties": [
+                    {
+                      "id": "custom.width",
+                      "value": 70
+                    }
+                  ]
+                },
+                {
+                  "matcher": {
+                    "id": "byName",
+                    "options": "pearson"
+                  },
+                  "properties": [
+                    {
+                      "id": "custom.width",
+                      "value": 70
+                    }
+                  ]
+                },
+                {
+                  "matcher": {
+                    "id": "byName",
+                    "options": "metric"
+                  },
+                  "properties": [
+                    {
+                      "id": "custom.width",
+                      "value": 250
+                    },
+                    {
+                      "id": "custom.inspect",
+                      "value": true
+                    }
+                  ]
+                },
+                {
+                  "matcher": {
+                    "id": "byName",
+                    "options": "__name__"
+                  },
+                  "properties": [
+                    {
+                      "id": "custom.hidden",
+                      "value": true
+                    }
+                  ]
+                },
+                {
+                  "matcher": {
+                    "id": "byFrameRefID",
+                    "options": "A"
+                  },
+                  "properties": [
+                    {
+                      "id": "custom.inspect",
+                      "value": true
+                    },
+                    {
+                      "id": "custom.filterable",
+                      "value": true
+                    }
+                  ]
+                }
+              ]
+            },
+            "gridPos": {
+              "h": 8,
+              "w": 1      ,
+              "x": 0,
+              "y": 22
+            },
+            "id": 9,
+            "options": {
+              "cellHeight": "sm",
+              "footer": {
+                "countRows": false,
+                "fields": "",
+                "reducer": [
+                  "sum"
+                ],
+                "show": false
+              },
+              "showHeader": true
+            },
+            "pluginVersion": "11.5.2",
+            "targets": [
               {
-                "id": "links",
-                "value": [
-                  {
-                    "targetBlank": true,
-                    "title": "",
-                    "url": "/d/explore/stride-exploration?var-Metric=${__data.fields.title}"
+                "columns": [],
+                "datasource": {
+                  "type": "yesoreyeram-infinity-datasource",
+                  "uid": "PC3988D4F1D      04C00"
+                },
+                "filters": [],
+                "format": "table",
+                "global_query_id": "",
+                "parser": "uql",
+                "refId": "A",
+                "root_selector": "",
+                "source": "url",
+                "type": "json",
+                "uql": "parse-json\n| project \"correlates\"\n| extend \"metric\"=\"labels.__name__\"\n| extend \"labels\"=\"labels\"\n| project \"rowid\", \"pearson\", \"metric\", \"labels\"\n",
+                "url": "http://correlation-service.default:9205/getCorrelatedSeries?stride=${Stride}&tsid=${Timeseries}",
+                "url_options": {
+                  "data": "",
+                  "method": "GET"
+                }
+              }
+            ],
+            "title": "Timeseries correlated with ${Timeseries}",
+            "transformations": [
+              {
+                "id": "extractFields",
+                "options": {
+                  "delimiter": ",",
+                  "source": "labels"
+                }
+              }
+            ],
+            "type": "table"
+          },
+          {
+            "datasource": {
+              "type": "yesoreyeram-infinity-datasource",
+              "uid": "PC3988D4F1D      04C00"
+            },
+            "fieldConfig": {
+              "defaults": {
+                "color": {
+                  "mode": "palette-classic"
+                },
+                "custom": {
+                  "axisBorderShow": false,
+                  "axisCenteredZero": false,
+                  "axisColorMode": "text",
+                  "axisLabel": "",
+                  "axisPlacement": "auto",
+                  "barAlignment": 0,
+                  "barWidthFactor": 0.      ,
+                  "drawStyle": "line",
+                  "fillOpacity": 0,
+                  "gradientMode": "none",
+                  "hideFrom": {
+                    "legend": false,
+                    "tooltip": false,
+                    "viz": false
+                  },
+                  "insertNulls": false,
+                  "lineInterpolation": "linear",
+                  "lineWidth": 1,
+                  "pointSize": 5,
+                  "scaleDistribution": {
+                    "type": "linear"
+                  },
+                  "showPoints": "auto",
+                  "spanNulls": false,
+                  "stacking": {
+                    "group": "A",
+                    "mode": "none"
+                  },
+                  "thresholdsStyle": {
+                    "mode": "off"
                   }
-                ]
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "mainstat"
+                },
+                "mappings": [],
+                "noValue": "0",
+                "thresholds": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "red",
+                      "value": 80
+                    }
+                  ]
+                }
+              },
+              "overrides": [
+                {
+                  "matcher": {
+                    "id": "byName",
+                    "options": "B value"
+                  },
+                  "properties": [
+                    {
+                      "id": "custom.lineStyle",
+                      "value": {
+                        "dash": [
+                          10,
+                          10
+                        ],
+                        "fill": "dash"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "matcher": {
+                    "id": "byName",
+                    "options": ""
+                  },
+                  "properties": []
+                }
+              ]
             },
-            "properties": [
+            "gridPos": {
+              "h": 8,
+              "w": 1      ,
+              "x": 0,
+              "y": 30
+            },
+            "id":       ,
+            "options": {
+              "legend": {
+                "calcs": [],
+                "displayMode": "list",
+                "placement": "bottom",
+                "showLegend": true
+              },
+              "tooltip": {
+                "hideZeros": false,
+                "mode": "single",
+                "sort": "none"
+              }
+            },
+            "pluginVersion": "11.5.2",
+            "targets": [
               {
-                "id": "custom.inspect",
-                "value": false
+                "columns": [],
+                "datasource": {
+                  "type": "yesoreyeram-infinity-datasource",
+                  "uid": "PC3988D4F1D      04C00"
+                },
+                "filters": [],
+                "format": "table",
+                "global_query_id": "",
+                "parser": "uql",
+                "refId": "A",
+                "root_selector": "",
+                "source": "url",
+                "type": "json",
+                "uql": "",
+                "url": "http://correlation-service.default:9205/getTimeseries?strideId=${Stride}&tsid=${Timeseries}&timeFrom=${__from:date:YYYY-MM-DDTHH:mm:ss}&timeTo=${__to:date:YYYY-MM-DDTHH:mm:ss}",
+                "url_options": {
+                  "data": "",
+                  "method": "GET"
+                }
               },
               {
-                "id": "custom.filterable",
-                "value": false
+                "columns": [],
+                "datasource": {
+                  "type": "yesoreyeram-infinity-datasource",
+                  "uid": "PC3988D4F1D      04C00"
+                },
+                "filters": [],
+                "format": "table",
+                "global_query_id": "",
+                "hide": false,
+                "parser": "uql",
+                "refId": "B",
+                "root_selector": "",
+                "source": "url",
+                "type": "json",
+                "uql": "parse-json",
+                "url": "http://correlation-service.default:9205/getTimeseries?strideId=${Stride}&tsid=${Timeseries}&timeFrom=${__from:date:YYYY-MM-DDTHH:mm:ss}&timeTo=${__to:date:YYYY-MM-DDTHH:mm:ss}&index=1",
+                "url_options": {
+                  "data": "",
+                  "method": "GET"
+                }
               },
               {
-                "id": "custom.hidden",
-                "value": true
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "title"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 250
+                "columns": [],
+                "datasource": {
+                  "type": "yesoreyeram-infinity-datasource",
+                  "uid": "PC3988D4F1D      04C00"
+                },
+                "filters": [],
+                "format": "table",
+                "global_query_id": "",
+                "hide": false,
+                "parser": "uql",
+                "refId": "C",
+                "root_selector": "",
+                "source": "url",
+                "type": "json",
+                "url": "http://correlation-service.default:9205/getTimeseries?strideId=${Stride}&tsid=${Timeseries}&timeFrom=${__from:date:YYYY-MM-DDTHH:mm:ss}&timeTo=${__to:date:YYYY-MM-DDTHH:mm:ss}&index=2",
+                "url_options": {
+                  "data": "",
+                  "method": "GET"
+                }
               },
               {
-                "id": "custom.inspect",
-                "value": false
+                "columns": [],
+                "datasource": {
+                  "type": "yesoreyeram-infinity-datasource",
+                  "uid": "PC3988D4F1D      04C00"
+                },
+                "filters": [],
+                "format": "table",
+                "global_query_id": "",
+                "hide": false,
+                "parser": "uql",
+                "refId": "D",
+                "root_selector": "",
+                "source": "url",
+                "type": "json",
+                "url": "http://correlation-service.default:9205/getTimeseries?strideId=${Stride}&tsid=${Timeseries}&timeFrom=${__from:date:YYYY-MM-DDTHH:mm:ss}&timeTo=${__to:date:YYYY-MM-DDTHH:mm:ss}&index=3",
+                "url_options": {
+                  "data": "",
+                  "method": "GET"
+                }
               },
               {
-                "id": "custom.filterable",
-                "value": true
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byFrameRefID",
-              "options": "A"
-            },
-            "properties": [
-              {
-                "id": "custom.filterable",
-                "value": true
-              }
-            ]
-          }
-        ]
-      },
-      "gridPos": {
-        "h": 9,
-        "w": 1      ,
-        "x": 0,
-        "y": 13
-      },
-      "id": 5,
-      "options": {
-        "cellHeight": "sm",
-        "footer": {
-          "countRows": false,
-          "enablePagination": true,
-          "fields": "",
-          "reducer": [
-            "sum"
-          ],
-          "show": false
-        },
-        "showHeader": true,
-        "sortBy": [
-          {
-            "desc": false,
-            "displayName": "image"
-          }
-        ]
-      },
-      "pluginVersion": "11.5.2",
-      "targets": [
-        {
-          "columns": [],
-          "datasource": {
-            "type": "yesoreyeram-infinity-datasource",
-            "uid": "PC3988D4F1D      04C00"
-          },
-          "filters": [],
-          "format": "table",
-          "global_query_id": "",
-          "parser": "uql",
-          "refId": "A",
-          "root_selector": "",
-          "source": "url",
-          "type": "json",
-          "uql": "parse-json\n| project \"id\", \"title\", \"mainstat\"",
-          "url": "http://correlation-service.default:9205/getSubgraphNodes?strideId=${Stride}&subgraph=${Subgraph}",
-          "url_options": {
-            "data": "",
-            "method": "GET"
-          }
-        }
-      ],
-      "title": "Timeseries for stride ${Stride} and Subgraph ${Subgraph}",
-      "transformations": [
-        {
-          "id": "extractFields",
-          "options": {
-            "delimiter": ",",
-            "keepTime": false,
-            "replace": false,
-            "source": "mainstat"
-          }
-        }
-      ],
-      "type": "table"
-    },
-    {
-      "datasource": {
-        "type": "yesoreyeram-infinity-datasource",
-        "uid": "PC3988D4F1D      04C00"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "custom": {
-            "align": "auto",
-            "cellOptions": {
-              "type": "auto",
-              "wrapText": false
-            },
-            "filterable": false,
-            "inspect": true
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          }
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "labels"
-            },
-            "properties": [
-              {
-                "id": "custom.inspect",
-                "value": false
-              },
-              {
-                "id": "custom.hidden",
-                "value": true
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "rowid"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 70
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "pearson"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 70
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "metric"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 250
-              },
-              {
-                "id": "custom.inspect",
-                "value": true
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "__name__"
-            },
-            "properties": [
-              {
-                "id": "custom.hidden",
-                "value": true
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byFrameRefID",
-              "options": "A"
-            },
-            "properties": [
-              {
-                "id": "custom.inspect",
-                "value": true
-              },
-              {
-                "id": "custom.filterable",
-                "value": true
-              }
-            ]
-          }
-        ]
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 1      ,
-        "x": 0,
-        "y": 22
-      },
-      "id": 9,
-      "options": {
-        "cellHeight": "sm",
-        "footer": {
-          "countRows": false,
-          "fields": "",
-          "reducer": [
-            "sum"
-          ],
-          "show": false
-        },
-        "showHeader": true
-      },
-      "pluginVersion": "11.5.2",
-      "targets": [
-        {
-          "columns": [],
-          "datasource": {
-            "type": "yesoreyeram-infinity-datasource",
-            "uid": "PC3988D4F1D      04C00"
-          },
-          "filters": [],
-          "format": "table",
-          "global_query_id": "",
-          "parser": "uql",
-          "refId": "A",
-          "root_selector": "",
-          "source": "url",
-          "type": "json",
-          "uql": "parse-json\n| project \"correlates\"\n| extend \"metric\"=\"labels.__name__\"\n| extend \"labels\"=\"labels\"\n| project \"rowid\", \"pearson\", \"metric\", \"labels\"\n",
-          "url": "http://correlation-service.default:9205/getCorrelatedSeries?stride=${Stride}&tsid=${Timeseries}",
-          "url_options": {
-            "data": "",
-            "method": "GET"
-          }
-        }
-      ],
-      "title": "Timeseries correlated with ${Timeseries}",
-      "transformations": [
-        {
-          "id": "extractFields",
-          "options": {
-            "delimiter": ",",
-            "source": "labels"
-          }
-        }
-      ],
-      "type": "table"
-    },
-    {
-      "datasource": {
-        "type": "yesoreyeram-infinity-datasource",
-        "uid": "PC3988D4F1D      04C00"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "barWidthFactor": 0.      ,
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "insertNulls": false,
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "auto",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "noValue": "0",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          }
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "B value"
-            },
-            "properties": [
-              {
-                "id": "custom.lineStyle",
-                "value": {
-                  "dash": [
-                    10,
-                    10
-                  ],
-                  "fill": "dash"
+                "columns": [],
+                "datasource": {
+                  "type": "yesoreyeram-infinity-datasource",
+                  "uid": "PC3988D4F1D      04C00"
+                },
+                "filters": [],
+                "format": "table",
+                "global_query_id": "",
+                "hide": false,
+                "parser": "uql",
+                "refId": "E",
+                "root_selector": "",
+                "source": "url",
+                "type": "json",
+                "url": "http://correlation-service.default:9205/getTimeseries?strideId=${Stride}&tsid=${Timeseries}&timeFrom=${__from:date:YYYY-MM-DDTHH:mm:ss}&timeTo=${__to:date:YYYY-MM-DDTHH:mm:ss}&index=4",
+                "url_options": {
+                  "data": "",
+                  "method": "GET"
                 }
               }
-            ]
+            ],
+            "title": "Selected Timeseries ${Timeseries}",
+            "type": "timeseries"
           },
           {
-            "matcher": {
-              "id": "byName",
-              "options": ""
+            "datasource": {
+              "type": "yesoreyeram-infinity-datasource",
+              "uid": "PC3988D4F1D      04C00"
             },
-            "properties": []
-          }
-        ]
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 1      ,
-        "x": 0,
-        "y": 30
-      },
-      "id":       ,
-      "options": {
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "hideZeros": false,
-          "mode": "single",
-          "sort": "none"
-        }
-      },
-      "pluginVersion": "11.5.2",
-      "targets": [
-        {
-          "columns": [],
-          "datasource": {
-            "type": "yesoreyeram-infinity-datasource",
-            "uid": "PC3988D4F1D      04C00"
-          },
-          "filters": [],
-          "format": "table",
-          "global_query_id": "",
-          "parser": "uql",
-          "refId": "A",
-          "root_selector": "",
-          "source": "url",
-          "type": "json",
-          "uql": "",
-          "url": "http://correlation-service.default:9205/getTimeseries?strideId=${Stride}&tsid=${Timeseries}&timeFrom=${__from:date:YYYY-MM-DDTHH:mm:ss}&timeTo=${__to:date:YYYY-MM-DDTHH:mm:ss}",
-          "url_options": {
-            "data": "",
-            "method": "GET"
-          }
-        },
-        {
-          "columns": [],
-          "datasource": {
-            "type": "yesoreyeram-infinity-datasource",
-            "uid": "PC3988D4F1D      04C00"
-          },
-          "filters": [],
-          "format": "table",
-          "global_query_id": "",
-          "hide": false,
-          "parser": "uql",
-          "refId": "B",
-          "root_selector": "",
-          "source": "url",
-          "type": "json",
-          "uql": "parse-json",
-          "url": "http://correlation-service.default:9205/getTimeseries?strideId=${Stride}&tsid=${Timeseries}&timeFrom=${__from:date:YYYY-MM-DDTHH:mm:ss}&timeTo=${__to:date:YYYY-MM-DDTHH:mm:ss}&index=1",
-          "url_options": {
-            "data": "",
-            "method": "GET"
-          }
-        },
-        {
-          "columns": [],
-          "datasource": {
-            "type": "yesoreyeram-infinity-datasource",
-            "uid": "PC3988D4F1D      04C00"
-          },
-          "filters": [],
-          "format": "table",
-          "global_query_id": "",
-          "hide": false,
-          "parser": "uql",
-          "refId": "C",
-          "root_selector": "",
-          "source": "url",
-          "type": "json",
-          "url": "http://correlation-service.default:9205/getTimeseries?strideId=${Stride}&tsid=${Timeseries}&timeFrom=${__from:date:YYYY-MM-DDTHH:mm:ss}&timeTo=${__to:date:YYYY-MM-DDTHH:mm:ss}&index=2",
-          "url_options": {
-            "data": "",
-            "method": "GET"
-          }
-        },
-        {
-          "columns": [],
-          "datasource": {
-            "type": "yesoreyeram-infinity-datasource",
-            "uid": "PC3988D4F1D      04C00"
-          },
-          "filters": [],
-          "format": "table",
-          "global_query_id": "",
-          "hide": false,
-          "parser": "uql",
-          "refId": "D",
-          "root_selector": "",
-          "source": "url",
-          "type": "json",
-          "url": "http://correlation-service.default:9205/getTimeseries?strideId=${Stride}&tsid=${Timeseries}&timeFrom=${__from:date:YYYY-MM-DDTHH:mm:ss}&timeTo=${__to:date:YYYY-MM-DDTHH:mm:ss}&index=3",
-          "url_options": {
-            "data": "",
-            "method": "GET"
-          }
-        },
-        {
-          "columns": [],
-          "datasource": {
-            "type": "yesoreyeram-infinity-datasource",
-            "uid": "PC3988D4F1D      04C00"
-          },
-          "filters": [],
-          "format": "table",
-          "global_query_id": "",
-          "hide": false,
-          "parser": "uql",
-          "refId": "E",
-          "root_selector": "",
-          "source": "url",
-          "type": "json",
-          "url": "http://correlation-service.default:9205/getTimeseries?strideId=${Stride}&tsid=${Timeseries}&timeFrom=${__from:date:YYYY-MM-DDTHH:mm:ss}&timeTo=${__to:date:YYYY-MM-DDTHH:mm:ss}&index=4",
-          "url_options": {
-            "data": "",
-            "method": "GET"
-          }
-        }
-      ],
-      "title": "Selected Timeseries ${Timeseries}",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "yesoreyeram-infinity-datasource",
-        "uid": "PC3988D4F1D      04C00"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "fixedColor": "blue",
-            "mode": "thresholds"
-          },
-          "custom": {
-            "fillOpacity": 70,
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
+            "fieldConfig": {
+              "defaults": {
+                "color": {
+                  "fixedColor": "blue",
+                  "mode": "thresholds"
+                },
+                "custom": {
+                  "fillOpacity": 70,
+                  "hideFrom": {
+                    "legend": false,
+                    "tooltip": false,
+                    "viz": false
+                  },
+                  "insertNulls": false,
+                  "lineWidth": 2,
+                  "spanNulls": false
+                },
+                "mappings": [],
+                "thresholds": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "dark-red",
+                      "value": 0
+                    },
+                    {
+                      "color": "orange",
+                      "value": 0.8
+                    },
+                    {
+                      "color": "yellow",
+                      "value": 0.9
+                    },
+                    {
+                      "color": "blue",
+                      "value": 0.995
+                    },
+                    {
+                      "color": "green",
+                      "value": 0.999
+                    }
+                  ]
+                }
+              },
+              "overrides": []
             },
-            "insertNulls": false,
-            "lineWidth": 2,
-            "spanNulls": false
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
+            "gridPos": {
+              "h": 7,
+              "w": 12,
+              "x": 0,
+              "y": 38
+            },
+            "id": 8,
+            "options": {
+              "alignValue": "left",
+              "legend": {
+                "displayMode": "list",
+                "placement": "bottom",
+                "showLegend": true
               },
-              {
-                "color": "dark-red",
-                "value": 0
-              },
-              {
-                "color": "orange",
-                "value": 0.8
-              },
-              {
-                "color": "yellow",
-                "value": 0.9
-              },
-              {
-                "color": "blue",
-                "value": 0.995
-              },
-              {
-                "color": "green",
-                "value": 0.999
+              "mergeValues": false,
+              "rowHeight": 0.9,
+              "showValue": "auto",
+              "tooltip": {
+                "hideZeros": false,
+                "mode": "single",
+                "sort": "none"
               }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 7,
-        "w": 12,
-        "x": 0,
-        "y": 38
-      },
-      "id": 8,
-      "options": {
-        "alignValue": "left",
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "mergeValues": false,
-        "rowHeight": 0.9,
-        "showValue": "auto",
-        "tooltip": {
-          "hideZeros": false,
-          "mode": "single",
-          "sort": "none"
-        }
-      },
-      "pluginVersion": "11.5.2",
-      "targets": [
-        {
-          "columns": [],
-          "datasource": {
-            "type": "yesoreyeram-infinity-datasource",
-            "uid": "PC3988D4F1D      04C00"
-          },
-          "filters": [],
-          "format": "table",
-          "global_query_id": "",
-          "parser": "uql",
-          "refId": "A",
-          "root_selector": "",
-          "source": "url",
-          "type": "json",
-          "uql": "parse-json",
-          "url": "http://correlation-service.default:9205/getTimeline?strideId=${Stride}&tsid=${Timeseries}",
-          "url_options": {
-            "data": "",
-            "method": "GET"
-          }
-        }
-      ],
-      "title": "Timeline of timeseries ${Timeseries}",
-      "transformations": [
-        {
-          "id": "groupingToMatrix",
-          "options": {
-            "columnField": "metric",
-            "rowField": "time",
-            "valueField": "state"
-          }
-        },
-        {
-          "id": "convertFieldType",
-          "options": {
-            "conversions": [
+            },
+            "pluginVersion": "11.5.2",
+            "targets": [
               {
-                "destinationType": "time",
-                "targetField": "time\\metric"
+                "columns": [],
+                "datasource": {
+                  "type": "yesoreyeram-infinity-datasource",
+                  "uid": "PC3988D4F1D      04C00"
+                },
+                "filters": [],
+                "format": "table",
+                "global_query_id": "",
+                "parser": "uql",
+                "refId": "A",
+                "root_selector": "",
+                "source": "url",
+                "type": "json",
+                "uql": "parse-json",
+                "url": "http://correlation-service.default:9205/getTimeline?strideId=${Stride}&tsid=${Timeseries}",
+                "url_options": {
+                  "data": "",
+                  "method": "GET"
+                }
               }
             ],
-            "fields": {}
-          }
-        },
-        {
-          "id": "sortBy",
-          "options": {
-            "fields": {},
-            "sort": [
+            "title": "Timeline of timeseries ${Timeseries}",
+            "transformations": [
               {
-                "desc": false,
-                "field": "time\\metric"
-              }
-            ]
-          }
-        }
-      ],
-      "type": "state-timeline"
-    },
-    {
-      "datasource": {
-        "type": "yesoreyeram-infinity-datasource",
-        "uid": "PC3988D4F1D      04C00"
-      },
-      "fieldConfig": {
-        "defaults": {},
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 31,
-        "w": 15,
-        "x": 0,
-        "y": 45
-      },
-      "id": 4,
-      "options": {
-        "edges": {},
-        "nodes": {},
-        "zoomMode": "cooperative"
-      },
-      "pluginVersion": "11.5.2",
-      "targets": [
-        {
-          "columns": [],
-          "datasource": {
-            "type": "yesoreyeram-infinity-datasource",
-            "uid": "PC3988D4F1D      04C00"
-          },
-          "filters": [],
-          "format": "table",
-          "global_query_id": "",
-          "parser": "backend",
-          "refId": "Nodes",
-          "root_selector": "",
-          "source": "url",
-          "type": "json",
-          "uql": "parse-json",
-          "url": "http://correlation-service.default:9205/getSubgraphNodes?strideId=${Stride}&subgraph=${Subgraph}",
-          "url_options": {
-            "data": "",
-            "method": "GET"
-          }
-        },
-        {
-          "columns": [],
-          "datasource": {
-            "type": "yesoreyeram-infinity-datasource",
-            "uid": "PC3988D4F1D      04C00"
-          },
-          "filters": [],
-          "format": "table",
-          "global_query_id": "",
-          "hide": false,
-          "parser": "backend",
-          "refId": "Edges",
-          "root_selector": "",
-          "source": "url",
-          "type": "json",
-          "url": "http://correlation-service:9205/getSubgraphEdges?strideId=${Stride}&subgraph=${Subgraph}",
-          "url_options": {
-            "data": "",
-            "method": "GET"
-          }
-        }
-      ],
-      "title": "Subgraph ${Subgraph}",
-      "type": "nodeGraph"
-    },
-    {
-      "fieldConfig": {
-        "defaults": {},
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 5,
-        "w": 8,
-        "x": 0,
-        "y": 7      
-      },
-      "id": 2,
-      "options": {
-        "code": {
-          "language": "plaintext",
-          "showLineNumbers": false,
-          "showMiniMap": false
-        },
-        "content": "# Title\n\nFor markdown syntax help: [commonmark.org/help](https://commonmark.org/help/)\n\nstride=${Stride}\nsubgraph=${Subgraph}\n\nusing ${__from:date:YYYY-MM-DDTHH:mm:ss.000Z} and \n${__to:date:YYYY-MM-DDTHH:mm:ss.000Z}",
-        "mode": "markdown"
-      },
-      "pluginVersion": "11.5.2",
-      "title": "Test Box",
-      "type": "text"
-    }
-  ],
-  "preload": false,
-  "refresh": "",
-  "schemaVersion": 40,
-  "tags": [],
-  "templating": {
-    "list": [
-      {
-        "allowCustomValue": false,
-        "current": {
-          "text": "13",
-          "value": "13"
-        },
-        "datasource": {
-          "type": "yesoreyeram-infinity-datasource",
-          "uid": "PC3988D4F1D      04C00"
-        },
-        "definition": "",
-        "description": "",
-        "name": "Stride",
-        "options": [],
-        "query": {
-          "infinityQuery": {
-            "columns": [
+                "id": "groupingToMatrix",
+                "options": {
+                  "columnField": "metric",
+                  "rowField": "time",
+                  "valueField": "state"
+                }
+              },
               {
-                "selector": "",
-                "text": "",
-                "type": "string"
+                "id": "convertFieldType",
+                "options": {
+                  "conversions": [
+                    {
+                      "destinationType": "time",
+                      "targetField": "time\\metric"
+                    }
+                  ],
+                  "fields": {}
+                }
+              },
+              {
+                "id": "sortBy",
+                "options": {
+                  "fields": {},
+                  "sort": [
+                    {
+                      "desc": false,
+                      "field": "time\\metric"
+                    }
+                  ]
+                }
               }
             ],
-            "filters": [],
-            "format": "table",
-            "json_options": {
-              "root_is_not_array": false
+            "type": "state-timeline"
+          },
+          {
+            "datasource": {
+              "type": "yesoreyeram-infinity-datasource",
+              "uid": "PC3988D4F1D      04C00"
             },
-            "parser": "uql",
-            "refId": "variable",
-            "root_selector": "",
-            "source": "url",
-            "type": "json",
-            "uql": "parse-json\n| project \"ID\"",
-            "url": "http://correlation-service.default:9205/getStrides",
-            "url_options": {
-              "data": "",
-              "method": "GET"
-            }
+            "fieldConfig": {
+              "defaults": {},
+              "overrides": []
+            },
+            "gridPos": {
+              "h": 31,
+              "w": 15,
+              "x": 0,
+              "y": 45
+            },
+            "id": 4,
+            "options": {
+              "edges": {},
+              "nodes": {},
+              "zoomMode": "cooperative"
+            },
+            "pluginVersion": "11.5.2",
+            "targets": [
+              {
+                "columns": [],
+                "datasource": {
+                  "type": "yesoreyeram-infinity-datasource",
+                  "uid": "PC3988D4F1D      04C00"
+                },
+                "filters": [],
+                "format": "table",
+                "global_query_id": "",
+                "parser": "backend",
+                "refId": "Nodes",
+                "root_selector": "",
+                "source": "url",
+                "type": "json",
+                "uql": "parse-json",
+                "url": "http://correlation-service.default:9205/getSubgraphNodes?strideId=${Stride}&subgraph=${Subgraph}",
+                "url_options": {
+                  "data": "",
+                  "method": "GET"
+                }
+              },
+              {
+                "columns": [],
+                "datasource": {
+                  "type": "yesoreyeram-infinity-datasource",
+                  "uid": "PC3988D4F1D      04C00"
+                },
+                "filters": [],
+                "format": "table",
+                "global_query_id": "",
+                "hide": false,
+                "parser": "backend",
+                "refId": "Edges",
+                "root_selector": "",
+                "source": "url",
+                "type": "json",
+                "url": "http://correlation-service:9205/getSubgraphEdges?strideId=${Stride}&subgraph=${Subgraph}",
+                "url_options": {
+                  "data": "",
+                  "method": "GET"
+                }
+              }
+            ],
+            "title": "Subgraph ${Subgraph}",
+            "type": "nodeGraph"
           },
-          "query": "",
-          "queryType": "infinity"
-        },
-        "refresh": 1,
-        "regex": "",
-        "sort": 4,
-        "type": "query"
-      },
-      {
-        "current": {
-          "text": "484",
-          "value": "484"
-        },
-        "name": "Subgraph",
-        "options": [],
-        "query": "",
-        "type": "custom"
-      },
-      {
-        "allowCustomValue": false,
-        "current": {
-          "text": "2025-03-13T11:45:00.000Z",
-          "value": "2025-03-13T11:45:00.000Z"
-        },
-        "datasource": {
-          "type": "yesoreyeram-infinity-datasource",
-          "uid": "PC3988D4F1D      04C00"
-        },
-        "definition": "",
-        "hide": 2,
-        "name": "StrideEndTime",
-        "options": [],
-        "query": {
-          "infinityQuery": {
-            "columns": [],
-            "filters": [],
-            "format": "table",
-            "parser": "uql",
-            "refId": "variable",
-            "root_selector": "",
-            "source": "url",
-            "type": "json",
-            "uql": "parse-json\n| where \"ID\" == ${Stride}\n| project \"EndTimeString\"",
-            "url": "http://correlation-service.default:9205/getStrides",
-            "url_options": {
-              "data": "",
-              "method": "GET"
+          {
+            "fieldConfig": {
+              "defaults": {},
+              "overrides": []
+            },
+            "gridPos": {
+              "h": 5,
+              "w": 8,
+              "x": 0,
+              "y": 7      
+            },
+            "id": 2,
+            "options": {
+              "code": {
+                "language": "plaintext",
+                "showLineNumbers": false,
+                "showMiniMap": false
+              },
+              "content": "# Title\n\nFor markdown syntax help: [commonmark.org/help](https://commonmark.org/help/)\n\nstride=${Stride}\nsubgraph=${Subgraph}\n\nusing ${__from:date:YYYY-MM-DDTHH:mm:ss.000Z} and \n${__to:date:YYYY-MM-DDTHH:mm:ss.000Z}",
+              "mode": "markdown"
+            },
+            "pluginVersion": "11.5.2",
+            "title": "Test Box",
+            "type": "text"
+          }
+        ],
+        "preload": false,
+        "refresh": "",
+        "schemaVersion": 40,
+        "tags": [],
+        "templating": {
+          "list": [
+            {
+              "allowCustomValue": false,
+              "current": {
+                "text": "13",
+                "value": "13"
+              },
+              "datasource": {
+                "type": "yesoreyeram-infinity-datasource",
+                "uid": "PC3988D4F1D      04C00"
+              },
+              "definition": "",
+              "description": "",
+              "name": "Stride",
+              "options": [],
+              "query": {
+                "infinityQuery": {
+                  "columns": [
+                    {
+                      "selector": "",
+                      "text": "",
+                      "type": "string"
+                    }
+                  ],
+                  "filters": [],
+                  "format": "table",
+                  "json_options": {
+                    "root_is_not_array": false
+                  },
+                  "parser": "uql",
+                  "refId": "variable",
+                  "root_selector": "",
+                  "source": "url",
+                  "type": "json",
+                  "uql": "parse-json\n| project \"ID\"",
+                  "url": "http://correlation-service.default:9205/getStrides",
+                  "url_options": {
+                    "data": "",
+                    "method": "GET"
+                  }
+                },
+                "query": "",
+                "queryType": "infinity"
+              },
+              "refresh": 1,
+              "regex": "",
+              "sort": 4,
+              "type": "query"
+            },
+            {
+              "current": {
+                "text": "484",
+                "value": "484"
+              },
+              "name": "Subgraph",
+              "options": [],
+              "query": "",
+              "type": "custom"
+            },
+            {
+              "allowCustomValue": false,
+              "current": {
+                "text": "2025-03-13T11:45:00.000Z",
+                "value": "2025-03-13T11:45:00.000Z"
+              },
+              "datasource": {
+                "type": "yesoreyeram-infinity-datasource",
+                "uid": "PC3988D4F1D      04C00"
+              },
+              "definition": "",
+              "hide": 2,
+              "name": "StrideEndTime",
+              "options": [],
+              "query": {
+                "infinityQuery": {
+                  "columns": [],
+                  "filters": [],
+                  "format": "table",
+                  "parser": "uql",
+                  "refId": "variable",
+                  "root_selector": "",
+                  "source": "url",
+                  "type": "json",
+                  "uql": "parse-json\n| where \"ID\" == ${Stride}\n| project \"EndTimeString\"",
+                  "url": "http://correlation-service.default:9205/getStrides",
+                  "url_options": {
+                    "data": "",
+                    "method": "GET"
+                  }
+                },
+                "query": "",
+                "queryType": "infinity"
+              },
+              "refresh": 1,
+              "regex": "",
+              "type": "query"
+            },
+            {
+              "allowCustomValue": false,
+              "current": {
+                "text": "2025-03-13T11:11:41.000Z",
+                "value": "2025-03-13T11:11:41.000Z"
+              },
+              "datasource": {
+                "type": "yesoreyeram-infinity-datasource",
+                "uid": "PC3988D4F1D      04C00"
+              },
+              "definition": "",
+              "hide": 2,
+              "name": "StrideStartTime",
+              "options": [],
+              "query": {
+                "infinityQuery": {
+                  "columns": [],
+                  "filters": [],
+                  "format": "table",
+                  "parser": "uql",
+                  "refId": "variable",
+                  "root_selector": "",
+                  "source": "url",
+                  "type": "json",
+                  "uql": "parse-json\n| where \"ID\" == ${Stride}\n| project \"StartTimeString\"",
+                  "url": "http://correlation-service.default:9205/getStrides",
+                  "url_options": {
+                    "data": "",
+                    "method": "GET"
+                  }
+                },
+                "query": "",
+                "queryType": "infinity"
+              },
+              "refresh": 1,
+              "regex": "",
+              "type": "query"
+            },
+            {
+              "current": {
+                "text": "8557 ",
+                "value": "8557 "
+              },
+              "name": "Timeseries",
+              "options": [],
+              "query": "",
+              "type": "custom"
             }
-          },
-          "query": "",
-          "queryType": "infinity"
+          ]
         },
-        "refresh": 1,
-        "regex": "",
-        "type": "query"
-      },
-      {
-        "allowCustomValue": false,
-        "current": {
-          "text": "2025-03-13T11:11:41.000Z",
-          "value": "2025-03-13T11:11:41.000Z"
+        "time": {
+          "from": "now-1h",
+          "to": "now"
         },
-        "datasource": {
-          "type": "yesoreyeram-infinity-datasource",
-          "uid": "PC3988D4F1D      04C00"
-        },
-        "definition": "",
-        "hide": 2,
-        "name": "StrideStartTime",
-        "options": [],
-        "query": {
-          "infinityQuery": {
-            "columns": [],
-            "filters": [],
-            "format": "table",
-            "parser": "uql",
-            "refId": "variable",
-            "root_selector": "",
-            "source": "url",
-            "type": "json",
-            "uql": "parse-json\n| where \"ID\" == ${Stride}\n| project \"StartTimeString\"",
-            "url": "http://correlation-service.default:9205/getStrides",
-            "url_options": {
-              "data": "",
-              "method": "GET"
-            }
-          },
-          "query": "",
-          "queryType": "infinity"
-        },
-        "refresh": 1,
-        "regex": "",
-        "type": "query"
-      },
-      {
-        "current": {
-          "text": "8557 ",
-          "value": "8557 "
-        },
-        "name": "Timeseries",
-        "options": [],
-        "query": "",
-        "type": "custom"
+        "timepicker": {},
+        "timezone": "utc",
+        "title": "Stride Exploration3",
+        "uid": "explore3",
+        "version": 5,
+        "weekStart": ""
       }
-    ]
-  },
-  "time": {
-    "from": "now-1h",
-    "to": "now"
-  },
-  "timepicker": {},
-  "timezone": "utc",
-  "title": "Stride Exploration3",
-  "uid": "explore3",
-  "version": 5,
-  "weekStart": ""
-}
