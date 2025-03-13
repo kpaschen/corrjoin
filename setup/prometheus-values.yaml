@@ -3661,10 +3661,13 @@ prometheus:
     - url: http://correlation-service.default:9201/api/v1/write
       writeRelabelConfigs:
       - sourceLabels: ["__name__"]
-        regex: "node_os_|node_network_iface_|node_network_info|node_network_name_|prometheus_operator_build_info|ALERTS|etcd_request_duration_seconds_.*|alertmanager_.*|apiserver_.*|coredns_.*|_bucket$"
+        regex: "ALERTS.*|alertmanager_.*|.*_bucket"
         action: Drop
-      - regex: "instance|job|prometheus|service|prometheus_replica"
+      - regex: "prometheus|prometheus_replica|id|image"
         action: LabelDrop
+      - sourceLabels: ["stage"]
+        regex: "ALPHA|BETA|DEPRECATED"
+        action: Drop
       queueConfig:
          sampleAgeLimit: 500s
 

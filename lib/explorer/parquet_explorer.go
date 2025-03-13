@@ -100,8 +100,8 @@ type metricRow struct {
 func (p *ParquetExplorer) GetMetrics(cache *map[int]*Metric) error {
 	reader := parquet.NewGenericReader[metricRow](p.file)
 	defer reader.Close()
-	results := make([]metricRow, 2000)
 	for done := false; !done; {
+		results := make([]metricRow, 2000)
 		numRead, err := reader.Read(results)
 		if err != nil {
 			if errors.Is(err, io.EOF) {
@@ -125,6 +125,10 @@ func (p *ParquetExplorer) GetMetrics(cache *map[int]*Metric) error {
 						LabelSet:    (model.LabelSet)(make(map[model.LabelName]model.LabelValue)),
 					}
 					(*cache)[result.ID] = m
+				} else {
+					log.Printf("metric found for row id %d and metric fp %d: %v\n", m.RowId, m.Fingerprint, m)
+					log.Printf("expanding with fingerprint %d, name %s, and labels %v\n",
+						result.MetricFingerprint, result.Metric, result.Labels)
 				}
 				m.Fingerprint = result.MetricFingerprint
 				m.LabelSet["__name__"] = (model.LabelValue)(result.Metric)
@@ -221,12 +225,12 @@ func (s *SubgraphMemberships) GetGraphId(rowId int) int {
 func (p *ParquetExplorer) GetSubgraphs() (*SubgraphMemberships, error) {
 	reader := parquet.NewGenericReader[reporter.Timeseries](p.file)
 	defer reader.Close()
-	results := make([]reporter.Timeseries, 2000)
 	subgraphs := &SubgraphMemberships{
 		Rows:           make(map[int]int),
 		Sizes:          make(map[int]int),
 		nextSubgraphId: 0,
 	}
+	results := make([]reporter.Timeseries, 2000)
 	for done := false; !done; {
 		numRead, err := reader.Read(results)
 		if err != nil {

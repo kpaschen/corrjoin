@@ -135,8 +135,10 @@ func (r *ParquetReporter) RecordTimeseriesIds(strideCounter int, tsids []lib.TsI
 		}
 		metadataRows[i] = row
 	}
-	n, err := writer.Write(metadataRows)
-	log.Printf("wrote %d timeseries ids for stride %d\n", n, strideCounter)
+	_, err := writer.Write(metadataRows)
+	if err != nil {
+		log.Printf("error writing timeseries ids: %v\n", err)
+	}
 	return err
 }
 
@@ -156,7 +158,11 @@ func (r *ParquetReporter) AddConstantRows(strideCounter int, constantRows []bool
 		}
 	}
 	n, err := writer.Write(newRows)
-	log.Printf("recorded %d constant rows for stride %d\n", n, strideCounter)
+	if err == nil {
+		log.Printf("recorded %d constant rows for stride %d\n", n, strideCounter)
+	} else {
+		log.Printf("error recording constant rows: %v\n", err)
+	}
 	return err
 }
 
@@ -168,6 +174,9 @@ func (r *ParquetReporter) AddCorrelatedPairs(result datatypes.CorrjoinResult) er
 
 	rows := extractRowsFromResult(result)
 	_, err := writer.Write(rows)
+	if err != nil {
+		log.Printf("error writing correlation results: %v\n", err)
+	}
 
 	return err
 }

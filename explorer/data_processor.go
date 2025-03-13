@@ -32,7 +32,7 @@ func (c *CorrelationExplorer) Initialize(baseUrl string, maxAgeSeconds int, drop
 	c.prometheusBaseURL = baseUrl
 	c.maxAgeSeconds = maxAgeSeconds
 	c.strideCache = make([]*Stride, STRIDE_CACHE_SIZE, STRIDE_CACHE_SIZE)
-	c.ticker = time.NewTicker(60 * time.Second)
+	c.ticker = time.NewTicker(180 * time.Second)
 	c.dropLabels = make(map[string]bool)
 
 	for _, lb := range dropLabels {
@@ -204,8 +204,8 @@ func (c *CorrelationExplorer) scanResultFiles() error {
 				}
 				err = c.readResultFile(e.Name(), stride)
 				if err != nil {
-					if age > 3600 {
-						log.Printf("failed to parse result file %s because %v\n", e.Name(), err)
+					log.Printf("failed to parse result file %s because %v\n", e.Name(), err)
+					if age > 600 {
 						log.Println("giving up on this stride")
 						stride.Status = StrideError
 					} else {
@@ -305,7 +305,8 @@ func parseStrideFromFilename(filename string) (*Stride, error) {
 	}, nil
 }
 
-func (c *CorrelationExplorer) retrieveCorrelatedTimeseries(stride *Stride, tsRowId int) (map[int]float32, error) {
+func (c *CorrelationExplorer) retrieveCorrelatedTimeseries(stride *Stride, tsRowId int,
+	onlyConsider []int, maxResults int) (map[int]float32, error) {
 
 	if stride == nil || stride.subgraphs == nil {
 		return nil, fmt.Errorf("stride has no subgraphs")
@@ -332,6 +333,7 @@ func (c *CorrelationExplorer) retrieveCorrelatedTimeseries(stride *Stride, tsRow
 		return ret, err
 	}
 
+	ctr := 0
 	for _, e := range edges {
 		if e.Pearson > 0 && (e.Source == tsRowId || e.Target == tsRowId) {
 			var otherRowId int
@@ -340,7 +342,23 @@ func (c *CorrelationExplorer) retrieveCorrelatedTimeseries(stride *Stride, tsRow
 			} else {
 				otherRowId = e.Source
 			}
+			if len(onlyConsider) > 0 {
+				found := false
+				for _, c := range onlyConsider {
+					if c == otherRowId {
+						found = true
+						break
+					}
+				}
+				if found {
+					continue
+				}
+			}
 			ret[otherRowId] = e.Pearson
+			ctr++
+			if maxResults > 0 && ctr >= maxResults {
+				break
+			}
 		}
 	}
 	log.Printf("returning %d correlates for ts %d in stride %d\n", len(ret), tsRowId, stride.ID)
@@ -433,14 +451,9 @@ func terminateEdgeFiles(files map[int]*os.File) {
 	}
 }
 
-func (c *CorrelationExplorer) readAndCacheSubgraphs(filename string, stride *Stride) error {
+func (c *CorrelationExplorer) readAndCacheSubgraphs(parquetExplorer *explorerlib.ParquetExplorer, stride *Stride) error {
 	if stride.subgraphs == nil {
 		log.Printf("requesting subgraphs for stride %d\n", stride.ID)
-		parquetExplorer := explorerlib.NewParquetExplorer(c.FilenameBase)
-		err := parquetExplorer.Initialize(stride.Filename)
-		if err != nil {
-			return err
-		}
 		// It takes about 90s to get these on my machine.
 		subgraphs, err := parquetExplorer.GetSubgraphs()
 		if err != nil {
@@ -501,7 +514,7 @@ func (c *CorrelationExplorer) readResultFile(filename string, stride *Stride) er
 		return err
 	}
 	log.Printf("read metrics, now reading subgraphs\n")
-	return c.readAndCacheSubgraphs(filename, stride)
+	return c.readAndCacheSubgraphs(parquetExplorer, stride)
 }
 
 func (c *CorrelationExplorer) getLatestStride() *Stride {

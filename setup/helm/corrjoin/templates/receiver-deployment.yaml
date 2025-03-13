@@ -42,8 +42,8 @@ spec:
             "-sampleInterval", {{ .Values.corrjoin.sampleInterval | quote }},
            "-prometheusURL", {{ .Values.prometheusURL }},
            "-maxRows", {{ .Values.corrjoin.maxRows | quote }},
-           "-labeldrop", "instance|job|prometheus|service|prometheus_replica",
-           "-parquetMaxRowsPerRowGroup", "10000"]
+           "-labeldrop", "prometheus|prometheus_replica|id|image",
+           "-parquetMaxRowsPerRowGroup", "20000"]
         resources:
            limits:
               cpu: "1"

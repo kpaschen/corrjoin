@@ -24,6 +24,6 @@ corrjoin:
    stride: 50
    sampleInterval: 20
    correlationThreshold: 99
-   maxRows: 20000
+   maxRows: 0
 
 prometheusURL: "http://prometheus-kube-prometheus-prometheus.monitoring:9090"
