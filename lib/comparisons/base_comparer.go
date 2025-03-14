@@ -4,12 +4,37 @@ import (
 	"github.com/kpaschen/corrjoin/lib/correlation"
 	"github.com/kpaschen/corrjoin/lib/paa"
 	"github.com/kpaschen/corrjoin/lib/settings"
+	"github.com/prometheus/client_golang/prometheus"
 	"log"
+)
+
+var (
+
+	// This isn't called 'pearson' because a comparer could implement
+	// a comparison function besides pearson.
+	// If we want to support multiple comparison functions, could use a label here.
+	comparisons = prometheus.NewCounter(
+		prometheus.GaugeOpts{
+			name: "corrjoin_comparison_calls",
+			Help: "number of times a comparison was computed",
+		},
+	)
+	correlated_pairs = prometheus.NewCounter(
+		prometheus.GaugeOpts{
+			name: "corrjoin_correlated_pairs",
+			Help: "number of correlated pairs found",
+		},
+	)
 )
 
 type StrideStats struct {
 	comparisons int
 	correlated  int
+}
+
+func init() {
+	prometheus.MustRegister(comparisons)
+	prometheus.MustRegister(correlated_pairs)
 }
 
 type BaseComparer struct {
@@ -45,6 +70,11 @@ func IsConstantRow(index int, constantRows []bool) bool {
 		return constantRows[index]
 	}
 	return false
+}
+
+func (b *BaseComparer) RecordStats() {
+	comparisons.Set(float64(b.stats.comparisons))
+	correlated_pairs.Set(float64(b.stats.correlated))
 }
 
 func (b *BaseComparer) getVector(index int) []float64 {

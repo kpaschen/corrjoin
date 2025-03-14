@@ -58,7 +58,7 @@ func (r *ParquetReporter) InitializeStride(strideCounter int,
 
 	r.strideStartTimes[strideCounter] = strideStart.UTC().Format("20060102150405")
 	r.strideEndTimes[strideCounter] = strideEnd.UTC().Format("20060102150405")
-	log.Printf("initializing with strideCounter %d, start time %s (%s), end time %s (%s)\n",
+	log.Printf("initializing parquet reporter with strideCounter %d, start time %s (%s), end time %s (%s)\n",
 		strideCounter, r.strideStartTimes[strideCounter], strideStart.UTC().String(),
 		r.strideEndTimes[strideCounter], strideEnd.UTC().String())
 
@@ -75,7 +75,6 @@ func (r *ParquetReporter) InitializeStride(strideCounter int,
 
 	// max rows per row group 10k is good for memory use but the files are about 3.5G per stride.
 	r.strideWriters[strideCounter] = parquet.NewGenericWriter[Timeseries](file, parquet.MaxRowsPerRowGroup(r.maxRowsPerRowGroup))
-
 }
 
 func extractRowsFromResult(result datatypes.CorrjoinResult) []Timeseries {
@@ -108,7 +107,6 @@ func (r *ParquetReporter) RecordTimeseriesIds(strideCounter int, tsids []lib.TsI
 	if !exists || writer == nil {
 		return fmt.Errorf("missing writer for timeseries")
 	}
-	// r.tsids = tsids
 	metadataRows := make([]Timeseries, len(tsids), len(tsids))
 	for i, tsid := range tsids {
 		var metricModel model.Metric
@@ -172,12 +170,12 @@ func (r *ParquetReporter) AddCorrelatedPairs(result datatypes.CorrjoinResult) er
 		return fmt.Errorf("missing writer for timeseries")
 	}
 
+	// TODO: maybe stream these straight to the file and avoid the extra alloc.
 	rows := extractRowsFromResult(result)
 	_, err := writer.Write(rows)
 	if err != nil {
 		log.Printf("error writing correlation results: %v\n", err)
 	}
-
 	return err
 }
 
@@ -187,6 +185,7 @@ func (r *ParquetReporter) Flush(strideCounter int) error {
 	if !exists || writer == nil {
 		return nil
 	}
+	// TODO: verify that writer.Close() closes the underlying filehandle.
 	defer writer.Close()
 	return writer.Flush()
 }

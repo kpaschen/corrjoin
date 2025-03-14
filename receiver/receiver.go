@@ -19,14 +19,26 @@ import (
 var (
 	receivedSamples = prometheus.NewCounter(
 		prometheus.CounterOpts{
-			Name: "received_samples_total",
+			Name: "corrjoin_received_samples_total",
 			Help: "Total number of received samples.",
 		},
 	)
 	requestedCorrelationBatches = prometheus.NewCounter(
 		prometheus.CounterOpts{
-			Name: "requested_correlation_batches_total",
+			Name: "corrjoin_requested_correlation_batches_total",
 			Help: "Total number of times a correlation batch computation has been requested.",
+		},
+	)
+	numberOfTimeseries = prometheus.NewCounter(
+		prometheus.GaugeOpts{
+			name: "corrjoin_number_of_timeseries",
+			Help: "number of timeseries",
+		},
+	)
+	constantTimeseries = prometheus.NewCounter(
+		prometheus.GaugeOpts{
+			name: "corrjoin_constant_timeseries",
+			Help: "number of constant timeseries",
 		},
 	)
 	correlationDurationHist = prometheus.NewHistogram(
@@ -49,7 +61,7 @@ var (
 
 	strideOverruns = prometheus.NewCounter(
 		prometheus.CounterOpts{
-			Name: "stride_computation_overruns",
+			Name: "corrjoin_stride_computation_overruns",
 			Help: "Number of times a correlation stride computation has overrun",
 		},
 	)
@@ -61,6 +73,8 @@ func init() {
 	prometheus.MustRegister(correlationDurationHist)
 	prometheus.MustRegister(correlationDuration)
 	prometheus.MustRegister(strideOverruns)
+	prometheus.MustRegister(numberOfTimeseries)
+	prometheus.MustRegister(constantTimeseries)
 }
 
 type tsProcessor struct {
@@ -120,6 +134,13 @@ func (t *tsProcessor) ReceivePrometheusData(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	w.WriteHeader(http.StatusOK)
+}
+
+func (t *tsProcessor) Shutdown() error {
+	if t.reporter != nil {
+		return t.reporter.Flush()
+	}
+	return nil
 }
 
 func NewTsProcessor(corrjoinConfig settings.CorrjoinSettings) *tsProcessor {
@@ -240,7 +261,9 @@ func NewTsProcessor(corrjoinConfig settings.CorrjoinSettings) *tsProcessor {
 					}
 					stride := correlationResult.StrideCounter
 					processor.reporter.RecordTimeseriesIds(stride, processor.accumulator.Tsids)
+					numberOfTimeseries.Set(float64(len(processor.accumulator.Tsids)))
 					processor.reporter.AddConstantRows(stride, processor.window.ConstantRows)
+					constantTimeseries.Set(float64(len(processor.window.ConstantRows)))
 					err := processor.reporter.Flush(stride)
 					if err != nil {
 						log.Printf("failed to flush results writer: %e\n", err)

@@ -128,6 +128,7 @@ func main() {
 			log.Printf("correlation service listening on port %s\n", cfg.prometheusAddress)
 			if err := prometheusServer.ListenAndServe(); err != nil {
 				if err != http.ErrServerClosed {
+					processor.Shutdown()
 					log.Fatal(err)
 				}
 			}

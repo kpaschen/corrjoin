@@ -66,11 +66,6 @@ func (s *InProcessComparer) Compare(index1 int, index2 int) error {
 		return fmt.Errorf("asked for comparison but there is no current stride")
 	}
 	if IsConstantRow(index1, s.constantRows) || IsConstantRow(index2, s.constantRows) {
-		if IsConstantRow(index1, s.constantRows) {
-			log.Printf("%d is constant\n", index1)
-		} else {
-			log.Printf("%d is constant\n", index2)
-		}
 		return nil
 	}
 	pearson, err := s.baseComparer.Compare(index1, index2)
@@ -116,6 +111,7 @@ func (s *InProcessComparer) StopStride(strideCounter int) error {
 		StrideCounter:   s.strideCounter,
 	}
 
+	s.baseComparer.RecordStats()
 	log.Printf("stride %d complete, stats: %+v\n", strideCounter, s.baseComparer.stats)
 
 	return nil
