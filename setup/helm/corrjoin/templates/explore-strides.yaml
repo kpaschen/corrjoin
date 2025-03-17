@@ -12,7 +12,7 @@ data:
             {
               "datasource": {
                 "type": "yesoreyeram-infinity-datasource",
-                "uid": "PC3988D4F1D04C00"
+                "uid": "PC3988D4F1D604C00"
               },
               "enable": true,
               "hide": false,
@@ -77,7 +77,7 @@ data:
           {
             "datasource": {
               "type": "yesoreyeram-infinity-datasource",
-              "uid": "PC3988D4F1D04C00"
+              "uid": "PC3988D4F1D604C00"
             },
             "fieldConfig": {
               "defaults": {
@@ -139,7 +139,7 @@ data:
                               "index": 2,
                               "text": "Error"
                             },
-                            "      ": {
+                            "6": {
                               "color": "purple",
                               "index": 3,
                               "text": "Deleted"
@@ -236,7 +236,7 @@ data:
                 "columns": [],
                 "datasource": {
                   "type": "yesoreyeram-infinity-datasource",
-                  "uid": "PC3988D4F1D04C00"
+                  "uid": "PC3988D4F1D604C00"
                 },
                 "filters": [],
                 "format": "table",
@@ -260,7 +260,7 @@ data:
           {
             "datasource": {
               "type": "yesoreyeram-infinity-datasource",
-              "uid": "PC3988D4F1D04C00"
+              "uid": "PC3988D4F1D604C00"
             },
             "fieldConfig": {
               "defaults": {
@@ -304,7 +304,7 @@ data:
                       "value": [
                         {
                           "title": "",
-                          "url": "d/explore/stride-exploration?var-Stride=${Stride:queryparam}?var-Subgraph=${__data.fields.id}"
+                          "url": "https://corrjoin.nephometrics.com/d/explore/stride-exploration?var-Stride=${Stride:queryparam}?var-Subgraph=${__data.fields.id}"
                         }
                       ]
                     }
@@ -364,7 +364,7 @@ data:
                 "columns": [],
                 "datasource": {
                   "type": "yesoreyeram-infinity-datasource",
-                  "uid": "PC3988D4F1D04C00"
+                  "uid": "PC3988D4F1D604C00"
                 },
                 "filters": [],
                 "format": "table",
@@ -389,7 +389,7 @@ data:
           {
             "datasource": {
               "type": "yesoreyeram-infinity-datasource",
-              "uid": "PC3988D4F1D04C00"
+              "uid": "PC3988D4F1D604C00"
             },
             "fieldConfig": {
               "defaults": {
@@ -478,7 +478,7 @@ data:
                 "columns": [],
                 "datasource": {
                   "type": "yesoreyeram-infinity-datasource",
-                  "uid": "PC3988D4F1D04C00"
+                  "uid": "PC3988D4F1D604C00"
                 },
                 "filters": [],
                 "format": "table",
@@ -511,7 +511,7 @@ data:
           {
             "datasource": {
               "type": "yesoreyeram-infinity-datasource",
-              "uid": "PC3988D4F1D04C00"
+              "uid": "PC3988D4F1D604C00"
             },
             "fieldConfig": {
               "defaults": {
@@ -650,7 +650,7 @@ data:
                 "columns": [],
                 "datasource": {
                   "type": "yesoreyeram-infinity-datasource",
-                  "uid": "PC3988D4F1D04C00"
+                  "uid": "PC3988D4F1D604C00"
                 },
                 "filters": [],
                 "format": "table",
@@ -685,7 +685,7 @@ data:
           {
             "datasource": {
               "type": "yesoreyeram-infinity-datasource",
-              "uid": "PC3988D4F1D04C00"
+              "uid": "PC3988D4F1D604C00"
             },
             "fieldConfig": {
               "defaults": {
@@ -828,7 +828,7 @@ data:
                 "columns": [],
                 "datasource": {
                   "type": "yesoreyeram-infinity-datasource",
-                  "uid": "PC3988D4F1D04C00"
+                  "uid": "PC3988D4F1D604C00"
                 },
                 "filters": [],
                 "format": "table",
@@ -861,7 +861,7 @@ data:
           {
             "datasource": {
               "type": "yesoreyeram-infinity-datasource",
-              "uid": "PC3988D4F1D04C00"
+              "uid": "PC3988D4F1D604C00"
             },
             "fieldConfig": {
               "defaults": {
@@ -971,7 +971,7 @@ data:
                 "columns": [],
                 "datasource": {
                   "type": "yesoreyeram-infinity-datasource",
-                  "uid": "PC3988D4F1D04C00"
+                  "uid": "PC3988D4F1D604C00"
                 },
                 "filters": [],
                 "format": "table",
@@ -992,7 +992,7 @@ data:
                 "columns": [],
                 "datasource": {
                   "type": "yesoreyeram-infinity-datasource",
-                  "uid": "PC3988D4F1D04C00"
+                  "uid": "PC3988D4F1D604C00"
                 },
                 "filters": [],
                 "format": "table",
@@ -1014,7 +1014,7 @@ data:
                 "columns": [],
                 "datasource": {
                   "type": "yesoreyeram-infinity-datasource",
-                  "uid": "PC3988D4F1D04C00"
+                  "uid": "PC3988D4F1D604C00"
                 },
                 "filters": [],
                 "format": "table",
@@ -1035,7 +1035,7 @@ data:
                 "columns": [],
                 "datasource": {
                   "type": "yesoreyeram-infinity-datasource",
-                  "uid": "PC3988D4F1D04C00"
+                  "uid": "PC3988D4F1D604C00"
                 },
                 "filters": [],
                 "format": "table",
@@ -1056,7 +1056,7 @@ data:
                 "columns": [],
                 "datasource": {
                   "type": "yesoreyeram-infinity-datasource",
-                  "uid": "PC3988D4F1D04C00"
+                  "uid": "PC3988D4F1D604C00"
                 },
                 "filters": [],
                 "format": "table",
@@ -1080,7 +1080,7 @@ data:
           {
             "datasource": {
               "type": "yesoreyeram-infinity-datasource",
-              "uid": "PC3988D4F1D04C00"
+              "uid": "PC3988D4F1D604C00"
             },
             "fieldConfig": {
               "defaults": {
@@ -1161,7 +1161,7 @@ data:
                 "columns": [],
                 "datasource": {
                   "type": "yesoreyeram-infinity-datasource",
-                  "uid": "PC3988D4F1D04C00"
+                  "uid": "PC3988D4F1D604C00"
                 },
                 "filters": [],
                 "format": "table",
@@ -1219,7 +1219,7 @@ data:
           {
             "datasource": {
               "type": "yesoreyeram-infinity-datasource",
-              "uid": "PC3988D4F1D04C00"
+              "uid": "PC3988D4F1D604C00"
             },
             "fieldConfig": {
               "defaults": {},
@@ -1243,7 +1243,7 @@ data:
                 "columns": [],
                 "datasource": {
                   "type": "yesoreyeram-infinity-datasource",
-                  "uid": "PC3988D4F1D04C00"
+                  "uid": "PC3988D4F1D604C00"
                 },
                 "filters": [],
                 "format": "table",
@@ -1264,7 +1264,7 @@ data:
                 "columns": [],
                 "datasource": {
                   "type": "yesoreyeram-infinity-datasource",
-                  "uid": "PC3988D4F1D04C00"
+                  "uid": "PC3988D4F1D604C00"
                 },
                 "filters": [],
                 "format": "table",
@@ -1294,7 +1294,7 @@ data:
               "h": 5,
               "w": 8,
               "x": 0,
-              "y": 7      
+              "y": 76
             },
             "id": 2,
             "options": {
@@ -1320,12 +1320,12 @@ data:
             {
               "allowCustomValue": false,
               "current": {
-                "text": "13",
-                "value": "13"
+                "text": "5",
+                "value": "5"
               },
               "datasource": {
                 "type": "yesoreyeram-infinity-datasource",
-                "uid": "PC3988D4F1D04C00"
+                "uid": "PC3988D4F1D604C00"
               },
               "definition": "",
               "description": "",
@@ -1367,8 +1367,8 @@ data:
             },
             {
               "current": {
-                "text": "484",
-                "value": "484"
+                "text": "392",
+                "value": "392"
               },
               "name": "Subgraph",
               "options": [],
@@ -1378,12 +1378,12 @@ data:
             {
               "allowCustomValue": false,
               "current": {
-                "text": "2025-03-13T11:45:00.000Z",
-                "value": "2025-03-13T11:45:00.000Z"
+                "text": "2025-03-17T11:00:19.000Z",
+                "value": "2025-03-17T11:00:19.000Z"
               },
               "datasource": {
                 "type": "yesoreyeram-infinity-datasource",
-                "uid": "PC3988D4F1D04C00"
+                "uid": "PC3988D4F1D604C00"
               },
               "definition": "",
               "hide": 2,
@@ -1416,12 +1416,12 @@ data:
             {
               "allowCustomValue": false,
               "current": {
-                "text": "2025-03-13T11:11:41.000Z",
-                "value": "2025-03-13T11:11:41.000Z"
+                "text": "2025-03-17T10:27:00.000Z",
+                "value": "2025-03-17T10:27:00.000Z"
               },
               "datasource": {
                 "type": "yesoreyeram-infinity-datasource",
-                "uid": "PC3988D4F1D04C00"
+                "uid": "PC3988D4F1D604C00"
               },
               "definition": "",
               "hide": 2,
@@ -1453,9 +1453,10 @@ data:
             },
             {
               "current": {
-                "text": "8557 ",
-                "value": "8557 "
+                "text": "12479",
+                "value": "12479"
               },
+              "multi": true,
               "name": "Timeseries",
               "options": [],
               "query": "",
@@ -1471,6 +1472,6 @@ data:
         "timezone": "utc",
         "title": "Explore Strides",
         "uid": "explore-strides",
-        "version": 5,
+        "version": 2,
         "weekStart": ""
       }
