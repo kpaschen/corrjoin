@@ -664,7 +664,13 @@ func (c *CorrelationExplorer) GetTimeline(w http.ResponseWriter, r *http.Request
 			continue
 		}
 		log.Printf("requesting correlated timeseries for stride %d and ts %d\n", st.ID, metricRowIds[0])
-		correlatesMap, err := c.retrieveCorrelatedTimeseries(st, metricRowIds[0], metricRowIds, 20)
+		var otherRowIds []int
+		if len(metricRowIds) == 1 {
+			otherRowIds = []int{}
+		} else {
+			otherRowIds = metricRowIds[1 : len(metricRowIds)-1]
+		}
+		correlatesMap, err := c.retrieveCorrelatedTimeseries(st, metricRowIds[0], otherRowIds, 20)
 		if err != nil {
 			log.Printf("error retrieving correlates for timeseries %d and stride %d: %v\n", metricRowIds[0], st.ID, err)
 			continue

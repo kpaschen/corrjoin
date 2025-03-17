@@ -89,7 +89,7 @@ func (p *ParquetExplorer) Initialize(filename string) error {
 }
 
 func (p *ParquetExplorer) Delete() error {
-  p.file = nil
+	p.file = nil
 	return nil
 }
 
