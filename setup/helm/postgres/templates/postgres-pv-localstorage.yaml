@@ -1,0 +1,37 @@
+{{- if not .Values.cni.useCeph -}}
+{{- if .Values.cni.createPv -}}
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+   name: postgres-data
+spec:
+   accessModes:
+      - ReadWriteOnce
+   storageClassName: local-storage
+   capacity:
+      storage: 2Gi
+   volumeMode: Filesystem
+   nodeAffinity:
+     required:
+       nodeSelectorTerms:
+         - matchExpressions:
+           - key: postgresVolumeMounted
+             operator: Exists
+   local:
+      path: /tmp/postgres
+   persistentVolumeReclaimPolicy: Retain
+---
+{{- end -}}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+   name: postgres-data
+   namespace: postgres
+spec:
+   storageClassName: local-storage
+   accessModes:
+      - ReadWriteOnce
+   resources:
+      requests:
+         storage: 2Gi
+{{- end -}}

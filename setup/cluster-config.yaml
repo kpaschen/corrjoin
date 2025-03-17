@@ -21,6 +21,11 @@ nodes:
             nodeRegistration:
                name: "N1"
         - role: worker
+          labels:
+             postgresVolumeMounted: true
+          extraMounts:
+             - hostPath: /tmp/postgres
+               containerPath: /tmp/postgres
           extraPortMappings:
           - containerPort: 80
             hostPort: 80

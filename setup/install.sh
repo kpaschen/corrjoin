@@ -20,6 +20,7 @@
 # more reading: https://github.com/kubernetes-retired/external-storage/tree/master/local-volume
 
 kubectl label node node2 resultsVolumeMounted=true
+kubectl label node node3 postgresVolumeMounted=true
 
 # There is a secret in this chart that has the grafana admin password, that's why I install
 # this chart before the prometheus operator.

@@ -1,0 +1,7 @@
+# Override this on the commandline
+password: editme
+
+cni:
+  useCeph: false
+  createPv: true
+

@@ -1,5 +1,9 @@
 #!/bin/sh
 
+# Make sure the directories for localstorage exist
+mkdir -p /tmp/corrjoinResults
+mkdir -p /tmp/postgres
+
 # 1. Create registry container unless it already exists
 reg_name='kind-registry'
 reg_port='5001'
@@ -87,3 +91,13 @@ helm upgrade --install prometheus prometheus-community/kube-prometheus-stack -f 
 
 # Install receiver service monitor after the prometheus stack crds are there.
 kubectl apply -f receiver-service-monitor.yaml
+
+# Install postgres so mattermost can use it
+ns_exists=$(kubectl get namespace -o name | grep postgres)
+if [ -z $ns_exists ]; then 
+   kubectl create ns postgres
+fi
+(
+cd helm/postgres &&
+helm upgrade --install --create-namespace postgres . -f values-local.yaml
+)
