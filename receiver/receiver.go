@@ -29,15 +29,15 @@ var (
 			Help: "Total number of times a correlation batch computation has been requested.",
 		},
 	)
-	numberOfTimeseries = prometheus.NewCounter(
+	numberOfTimeseries = prometheus.NewGauge(
 		prometheus.GaugeOpts{
-			name: "corrjoin_number_of_timeseries",
+			Name: "corrjoin_number_of_timeseries",
 			Help: "number of timeseries",
 		},
 	)
-	constantTimeseries = prometheus.NewCounter(
+	constantTimeseries = prometheus.NewGauge(
 		prometheus.GaugeOpts{
-			name: "corrjoin_constant_timeseries",
+			Name: "corrjoin_constant_timeseries",
 			Help: "number of constant timeseries",
 		},
 	)
@@ -138,7 +138,7 @@ func (t *tsProcessor) ReceivePrometheusData(w http.ResponseWriter, r *http.Reque
 
 func (t *tsProcessor) Shutdown() error {
 	if t.reporter != nil {
-		return t.reporter.Flush()
+		return t.reporter.Flush(-1) // Flush all writers
 	}
 	return nil
 }

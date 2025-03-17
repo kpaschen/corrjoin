@@ -373,6 +373,9 @@ func (c *CorrelationExplorer) retrieveEdges(stride *Stride, graphId int) ([]expl
 		return nil, fmt.Errorf("failed to open edges file for graph id %d and stride %d: %v",
 			graphId, stride.ID, err)
 	}
+  defer edgeFile.Close()
+
+  // TODO: read this piecewise for larger files?
 	edgeContents, _ := ioutil.ReadAll(edgeFile)
 	var results []explorerlib.Edge
 	json.Unmarshal(edgeContents, &results)
@@ -388,6 +391,7 @@ func (c *CorrelationExplorer) extractEdges(stride *Stride) error {
 	if err != nil {
 		return err
 	}
+  defer parquetExplorer.Delete()
 	subgraphs := stride.subgraphs
 	if subgraphs == nil {
 		return fmt.Errorf("missing subgraphs for stride %d\n", stride.ID)
@@ -508,6 +512,7 @@ func (c *CorrelationExplorer) readResultFile(filename string, stride *Stride) er
 	if err != nil {
 		return err
 	}
+  defer parquetExplorer.Delete()
 	log.Printf("reading metrics from %s\n", filename)
 	err = parquetExplorer.GetMetrics(&stride.metricsCacheByRowId)
 	if err != nil {

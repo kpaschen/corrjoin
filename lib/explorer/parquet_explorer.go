@@ -88,6 +88,11 @@ func (p *ParquetExplorer) Initialize(filename string) error {
 	return nil
 }
 
+func (p *ParquetExplorer) Delete() error {
+  p.file = nil
+	return nil
+}
+
 // Reduced schema type for reading just metrics information from parquet.
 type metricRow struct {
 	ID                int               `parquet:"id"`

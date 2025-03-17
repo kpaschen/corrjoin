@@ -181,11 +181,23 @@ func (r *ParquetReporter) AddCorrelatedPairs(result datatypes.CorrjoinResult) er
 
 func (r *ParquetReporter) Flush(strideCounter int) error {
 	log.Printf("flushing parquet writer for stride %d\n", strideCounter)
-	writer, exists := r.strideWriters[strideCounter]
-	if !exists || writer == nil {
-		return nil
-	}
-	// TODO: verify that writer.Close() closes the underlying filehandle.
-	defer writer.Close()
-	return writer.Flush()
+
+  if strideCounter != -1 {
+	   writer, exists := r.strideWriters[strideCounter]
+	   if !exists || writer == nil {
+		   return nil
+	   }
+	   // TODO: verify that writer.Close() closes the underlying filehandle.
+	   defer writer.Close()
+	   return writer.Flush()
+  } else {
+     // Flush all writers
+     for _, writer := range r.strideWriters {
+        if writer == nil { continue }
+        defer writer.Close()
+        err := writer.Flush()
+        if err != nil { continue }
+     }
+  }
+  return nil
 }

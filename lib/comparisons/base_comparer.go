@@ -13,15 +13,15 @@ var (
 	// This isn't called 'pearson' because a comparer could implement
 	// a comparison function besides pearson.
 	// If we want to support multiple comparison functions, could use a label here.
-	comparisons = prometheus.NewCounter(
+	comparisons = prometheus.NewGauge(
 		prometheus.GaugeOpts{
-			name: "corrjoin_comparison_calls",
+			Name: "corrjoin_comparison_calls",
 			Help: "number of times a comparison was computed",
 		},
 	)
-	correlated_pairs = prometheus.NewCounter(
+	correlated_pairs = prometheus.NewGauge(
 		prometheus.GaugeOpts{
-			name: "corrjoin_correlated_pairs",
+			Name: "corrjoin_correlated_pairs",
 			Help: "number of correlated pairs found",
 		},
 	)
