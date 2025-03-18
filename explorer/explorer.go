@@ -670,17 +670,20 @@ func (c *CorrelationExplorer) GetTimeline(w http.ResponseWriter, r *http.Request
 		} else {
 			otherRowIds = metricRowIds[1 : len(metricRowIds)-1]
 		}
+		log.Printf("otherRowIds: %v\n", otherRowIds)
 		correlatesMap, err := c.retrieveCorrelatedTimeseries(st, metricRowIds[0], otherRowIds, 20)
 		if err != nil {
 			log.Printf("error retrieving correlates for timeseries %d and stride %d: %v\n", metricRowIds[0], st.ID, err)
 			continue
 		}
+		log.Printf("correlates map: %v\n", correlatesMap)
 		for i, rowid := range metricRowIds {
 			if i == 0 {
 				continue
 			}
 			pearson, exists := correlatesMap[rowid]
 			if !exists {
+				log.Printf("%d is missing from correlates map %v\n", rowid, correlatesMap)
 				resp = append(resp, TimelineResponse{
 					Time:   st.EndTimeString,
 					Metric: rowid,
