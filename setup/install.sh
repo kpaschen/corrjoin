@@ -11,9 +11,9 @@
 #helm install --create-namespace --namespace rook-ceph rook-ceph-cluster rook-release/rook-ceph-cluster -f rook/ceph-values.yaml
 
 # If using local-storage, need to pepare local storage volumes.
-# On each node, either:
-# mkdir /mnt/disks/$vol
-# mount -t tmpfs -o size=5G $vol /mnt/disks/$vol
+# On each node, either (replace 'tmp1' with whatever you want to name your volume):
+# mkdir /mnt/disks/tmp1
+# mount -t tmpfs -o size=20G tmp1 /mnt/disks/tmp1
 # or (if you have a volume mounted at /dev/sdb):
 # mkdir /mnt/disks/ssd1
 # mount /dev/sdb /mnt/disks/ssd1

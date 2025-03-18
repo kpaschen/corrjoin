@@ -140,10 +140,10 @@ func (r *ParquetReporter) RecordTimeseriesIds(strideCounter int, tsids []lib.TsI
 	return err
 }
 
-func (r *ParquetReporter) AddConstantRows(strideCounter int, constantRows []bool) error {
+func (r *ParquetReporter) AddConstantRows(strideCounter int, constantRows []bool) (int, error) {
 	writer, exists := r.strideWriters[strideCounter]
 	if !exists || writer == nil {
-		return fmt.Errorf("missing writer for timeseries")
+		return 0, fmt.Errorf("missing writer for timeseries")
 	}
 	newRows := make([]Timeseries, 0, int(len(constantRows)/10))
 	for rowid, isConstant := range constantRows {
@@ -160,8 +160,9 @@ func (r *ParquetReporter) AddConstantRows(strideCounter int, constantRows []bool
 		log.Printf("recorded %d constant rows for stride %d\n", n, strideCounter)
 	} else {
 		log.Printf("error recording constant rows: %v\n", err)
+    return 0, err
 	}
-	return err
+	return n, err
 }
 
 func (r *ParquetReporter) AddCorrelatedPairs(result datatypes.CorrjoinResult) error {

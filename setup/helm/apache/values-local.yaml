@@ -1,0 +1,9 @@
+serviceAccount:
+  name: apache-sa
+
+cni:
+  useCeph: false
+  createPv: true
+
+port: 8888
+servername: corrjoin.nephometrics.com

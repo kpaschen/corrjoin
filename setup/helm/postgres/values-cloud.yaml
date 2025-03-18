@@ -6,8 +6,10 @@ serviceAccount:
 
 cni:
   useCeph: false
-  createPv: true
+  createPv: false
 
 mmdb:
   dbuser: ps_user
+  mmuser: mmuser
+  mmpassword: matter
   name: mattermost_main

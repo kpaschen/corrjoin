@@ -97,7 +97,50 @@ ns_exists=$(kubectl get namespace -o name | grep postgres)
 if [ -z $ns_exists ]; then 
    kubectl create ns postgres
 fi
+
+# The postgres chart also contains the mattermost db secret, so make sure
+# that namespace also exists.
+ns_exists=$(kubectl get namespace -o name | grep mattermost)
+if [ -z $ns_exists ]; then 
+   kubectl create ns mattermost
+fi
 (
 cd helm/postgres &&
 helm upgrade --install postgres . -f values-local.yaml
 )
+
+# Login to postgres and create db and user
+#kubectl -n postgres exec -it <postgres pod> -- /bin/sh
+#psql ps_db ps_user
+#create database mattermost_main;
+#\connect mattermost_main;
+#create user mmuser with password 'matter';
+#grant all privileges on database mattermost to mmuser;
+#grant usage, create on schema public to mmuser;
+#\q
+
+# Install mattermost
+repo_exists=$(helm repo list -o json | yq '.[] | select(.name == "mattermost") .url')
+if [ -z $repo_exists ]; then
+   helm repo add mattermost https://helm.mattermost.com
+fi
+helm repo update
+ns_exists=$(kubectl get namespace -o name | grep mattermost-operator)
+if [ -z $ns_exists ]; then 
+   kubectl create ns mattermost-operator
+fi
+helm upgrade --install mattermost-operator mattermost/mattermost-operator -n mattermost-operator -f mattermost-config.yaml
+
+kubectl apply -f mattermost-installation.yaml
+
+# Set up apache in kubernetes.
+# This is so we can attach an apache exporter to it for monitoring.
+ns_exists=$(kubectl get namespace -o name | grep apache)
+if [ -z $ns_exists ]; then 
+   kubectl create ns apache
+fi
+(
+cd helm/apache &&
+helm upgrade --install apache . -f values-local.yaml
+)
+

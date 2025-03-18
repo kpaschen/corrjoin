@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: apache
+  namespace: apache
+  labels:
+    app: apache
+spec:
+  ports:
+    - port: {{ .Values.port }}
+  selector:
+    app: apache

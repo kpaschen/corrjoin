@@ -14,13 +14,13 @@ spec:
         app: postgres
     spec:
       serviceAccountName: {{ .Values.serviceAccount.name }}
-#      securityContext:
-#        runAsNonRoot: true
+      nodeSelector:
+         postgresVolumeMounted: 'true'
       containers:
         - name: postgres
           securityContext:
             allowPrivilegeEscalation: false
-          image: 'postgres:14'
+          image: 'docker.io/library/postgres:14'
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 5432

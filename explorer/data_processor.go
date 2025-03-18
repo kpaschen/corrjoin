@@ -333,6 +333,8 @@ func (c *CorrelationExplorer) retrieveCorrelatedTimeseries(stride *Stride, tsRow
 		return ret, err
 	}
 
+  log.Printf("obtained edges for row %d: %v\n", tsRowId, edges)
+
 	ctr := 0
 	for _, e := range edges {
 		if e.Pearson > 0 && (e.Source == tsRowId || e.Target == tsRowId) {
