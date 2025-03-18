@@ -6,7 +6,6 @@ metadata:
   labels:
     app: postgres
 spec:
-  type: NodePort
   ports:
     - port: 5432
   selector:

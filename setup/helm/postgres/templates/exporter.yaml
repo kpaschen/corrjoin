@@ -1,0 +1,27 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres-exporter
+  namespace: postgres
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres-exporter
+  template:
+    metadata:
+      labels:
+        app: postgres-exporter
+    spec:
+      serviceAccountName: {{ .Values.serviceAccount.name }}
+      containers:
+        - name: postgres-exporter
+          securityContext:
+             allowPrivilegeEscalation: false
+          image: quay.io/prometheuscommunity/postgres-exporter
+          ports:
+            - name: metrics
+              containerPort: 9187
+          envFrom:
+            - configMapRef:
+                 name: postgres-secret

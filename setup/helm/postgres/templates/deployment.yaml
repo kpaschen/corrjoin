@@ -13,8 +13,13 @@ spec:
       labels:
         app: postgres
     spec:
+      serviceAccountName: {{ .Values.serviceAccount.name }}
+#      securityContext:
+#        runAsNonRoot: true
       containers:
         - name: postgres
+          securityContext:
+            allowPrivilegeEscalation: false
           image: 'postgres:14'
           imagePullPolicy: IfNotPresent
           ports:

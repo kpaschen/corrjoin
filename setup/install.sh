@@ -14,7 +14,7 @@
 # On each node, either:
 # mkdir /mnt/disks/$vol
 # mount -t tmpfs -o size=5G $vol /mnt/disks/$vol
-# or:
+# or (if you have a volume mounted at /dev/sdb):
 # mkdir /mnt/disks/ssd1
 # mount /dev/sdb /mnt/disks/ssd1
 # more reading: https://github.com/kubernetes-retired/external-storage/tree/master/local-volume
@@ -50,3 +50,12 @@ scp traefik.tgz ubuntu@$BASTION:/home/ubuntu
 # Login to BASTION, unpack traefik.tgz and run start-traefik.sh
 #  Make sure port 443 is open in the security rules for the bastion
 
+# Install postgres (needed for Mattermost)
+ns_exists=$(kubectl get namespace -o name | grep postgres)
+if [ -z $ns_exists ]; then 
+   kubectl create ns postgres
+fi
+(
+cd helm/postgres &&
+helm upgrade --install postgres . -f values-cloud.yaml
+)

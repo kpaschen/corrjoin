@@ -1,6 +1,9 @@
 # Override this on the commandline
 password: editme
 
+serviceAccount:
+  name: postgres-sa
+
 cni:
   useCeph: false
   createPv: true

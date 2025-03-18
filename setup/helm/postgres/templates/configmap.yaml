@@ -9,3 +9,6 @@ data:
   POSTGRES_DB: ps_db
   POSTGRES_USER: ps_user
   POSTGRES_PASSWORD: {{ .Values.password }}
+  DATA_SOURCE_URI: "postgres.postgres:5432/postgres?sslmode=disable"
+  DATA_SOURCE_USER: ps_user
+  DATA_SOURCE_PASS: {{ .Values.password }}

@@ -99,5 +99,5 @@ if [ -z $ns_exists ]; then
 fi
 (
 cd helm/postgres &&
-helm upgrade --install --create-namespace postgres . -f values-local.yaml
+helm upgrade --install postgres . -f values-local.yaml
 )

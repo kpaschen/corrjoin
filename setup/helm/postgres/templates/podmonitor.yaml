@@ -1,0 +1,13 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: postgres-monitor
+  namespace: postgres
+  labels:
+     app.kubernetes.io/instance: prometheus
+spec:
+  selector:
+    matchLabels:
+      app: postgres-exporter
+  podMetricsEndpoints:
+  - port: metrics
