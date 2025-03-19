@@ -62,20 +62,25 @@ data:
     help: "https://kind.sigs.k8s.io/docs/user/local-registry/"
 EOF
 
-# Enable metrics server
-
+# Add all the helm repositories we need
 repo_exists=$(helm repo list -o json | yq '.[] | select(.name == "metrics-server") .url')
 if [ -z $repo_exists ]; then
    helm repo add metrics-server https://kubernetes-sigs.github.io/metrics-server
 fi
-helm repo update
-helm upgrade --install --set args={--kubelet-insecure-tls} metrics-server metrics-server/metrics-server --namespace kube-system
-
 repo_exists=$(helm repo list -o json | yq '.[] | select(.name == "prometheus-community") .url')
 if [ -z $repo_exists ]; then
    helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
 fi
+repo_exists=$(helm repo list -o json | yq '.[] | select(.name == "mattermost") .url')
+if [ -z $repo_exists ]; then
+   helm repo add mattermost https://helm.mattermost.com
+fi
+helm repo update
 
+# Enable metrics server
+helm upgrade --install --set args={--kubelet-insecure-tls} metrics-server metrics-server/metrics-server --namespace kube-system
+
+# Install the correlation join system
 (
 cd helm/corrjoin &&
 helm upgrade --install corrjoin . -f values-local.yaml
@@ -86,7 +91,6 @@ ns_exists=$(kubectl get namespace -o name | grep monitoring)
 if [ -z $ns_exists ]; then 
    kubectl create ns monitoring
 fi
-helm repo update
 helm upgrade --install prometheus prometheus-community/kube-prometheus-stack -f prometheus-values.yaml
 
 # Install receiver service monitor after the prometheus stack crds are there.
@@ -109,22 +113,7 @@ cd helm/postgres &&
 helm upgrade --install postgres . -f values-local.yaml
 )
 
-# Login to postgres and create db and user
-#kubectl -n postgres exec -it <postgres pod> -- /bin/sh
-#psql ps_db ps_user
-#create database mattermost_main;
-#\connect mattermost_main;
-#create user mmuser with password 'matter';
-#grant all privileges on database mattermost to mmuser;
-#grant usage, create on schema public to mmuser;
-#\q
-
 # Install mattermost
-repo_exists=$(helm repo list -o json | yq '.[] | select(.name == "mattermost") .url')
-if [ -z $repo_exists ]; then
-   helm repo add mattermost https://helm.mattermost.com
-fi
-helm repo update
 ns_exists=$(kubectl get namespace -o name | grep mattermost-operator)
 if [ -z $ns_exists ]; then 
    kubectl create ns mattermost-operator
@@ -132,6 +121,12 @@ fi
 helm upgrade --install mattermost-operator mattermost/mattermost-operator -n mattermost-operator -f mattermost-config.yaml
 
 kubectl apply -f mattermost-installation.yaml
+
+(
+cd apache
+docker build -f Dockerfile -t localhost:5001/mmapache:latest .
+docker push localhost:5001/mmapache:latest
+)
 
 # Set up apache in kubernetes.
 # This is so we can attach an apache exporter to it for monitoring.

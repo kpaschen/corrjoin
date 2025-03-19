@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: apache-exporter
+  namespace: apache
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: apache-exporter
+  template:
+    metadata:
+      labels:
+        app: apache-exporter
+    spec:
+      serviceAccountName: {{ .Values.serviceAccount.name }}
+      containers:
+        - name: apache-exporter
+          securityContext:
+            allowPrivilegeEscalation: false
+          image: 'docker.io/lusotycoon/apache-exporter:latest'
+          imagePullPolicy: IfNotPresent
+          args: [ "--insecure", "--scrape_uri=http://apache.apache:{{ .Values.metricsPort }}/server-status?auto",
+            "--web.listen-address=:{{ .Values.exporterPort }}",
+            "--telemetry.endpoint=/metrics"] 
+          ports:
+            - name: metrics
+              containerPort: {{ .Values.exporterPort }}
+ 

@@ -14,20 +14,16 @@ spec:
         app: apache
     spec:
       serviceAccountName: {{ .Values.serviceAccount.name }}
+      initContainers:
       containers:
         - name: apache
           securityContext:
             allowPrivilegeEscalation: false
-          image: 'docker.io/library/httpd:2.4.63'
-          imagePullPolicy: IfNotPresent
+          image: {{ .Values.image.repository }}/{{ .Values.image.image }}:{{ .Values.image.version }}
+          imagePullPolicy: Always
           ports:
             - containerPort: {{ .Values.port }}
-          volumeMounts:
-          - name: apache-config
-            #mountPath: /usr/local/apache2/conf/httpd.conf
-            mountPath: /configs
-      volumes:
-        - name: apache-config
-          configMap:
-             name: apache-config
+              name: mattermost
+            - containerPort: {{ .Values.metricsPort }}
+              name: metrics
  

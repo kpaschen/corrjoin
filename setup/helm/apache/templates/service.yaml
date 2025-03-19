@@ -8,5 +8,8 @@ metadata:
 spec:
   ports:
     - port: {{ .Values.port }}
+      name: mattermost
+    - port: {{ .Values.metricsPort }}
+      name: metrics
   selector:
     app: apache

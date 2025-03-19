@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+   namespace: postgres
+   name: dbsetup
+data:
+   dbsetup.sql: |
+      create database mattermost_main;
+      \connect mattermost_main;
+      create user mmuser with password 'matter';
+      grant all privileges on database mattermost to mmuser;
+      grant usage, create on schema public to mmuser;
+   dbsetup.sh: |
+      #!/usr/bin/bash
+      while [ -z "${POSTGRES_SERVICE_HOST}" ]; do
+         echo waiting for postgres
+         sleep 2
+      done
+      psql "sslmode=disable dbname=${POSTGRES_DB} user=${POSTGRES_USER} password=${POSTGRES_PASSWORD} hostaddr=${POSTGRES_SERVICE_HOST}" -f /scripts/dbsetup.sql
+

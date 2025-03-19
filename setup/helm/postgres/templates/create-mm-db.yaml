@@ -1,0 +1,30 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  namespace: postgres
+  name: create-mmdb
+spec:
+  template:
+     spec:
+        containers:
+          - name: psql-client
+            securityContext:
+               allowPrivilegeEscalation: false
+            envFrom:
+              - configMapRef:
+                  name: postgres-secret
+            # TODO: replace this with a smaller image.
+            image: docker.io/library/postgres:14
+            command: [ "sh", "/scripts/dbsetup.sh" ]
+            volumeMounts: 
+            - name: create-mmdb-scripts
+              mountPath: /scripts
+        restartPolicy: Never
+        volumes:
+          - name: create-mmdb-scripts
+            configMap:
+              name: dbsetup
+       
+  
+
+
