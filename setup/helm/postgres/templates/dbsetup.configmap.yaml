@@ -11,10 +11,5 @@ data:
       grant all privileges on database mattermost to mmuser;
       grant usage, create on schema public to mmuser;
    dbsetup.sh: |
-      #!/usr/bin/bash
-      while [ -z "${POSTGRES_SERVICE_HOST}" ]; do
-         echo waiting for postgres
-         sleep 2
-      done
       psql "sslmode=disable dbname=${POSTGRES_DB} user=${POSTGRES_USER} password=${POSTGRES_PASSWORD} hostaddr=${POSTGRES_SERVICE_HOST}" -f /scripts/dbsetup.sql
 

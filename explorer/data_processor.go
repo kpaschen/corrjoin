@@ -174,7 +174,7 @@ func (c *CorrelationExplorer) scanResultFiles() error {
 				continue
 			}
 			if stride == nil {
-				log.Printf("found a file and i do not have a stride for it yet\n")
+				log.Printf("found file %s and i do not have a stride for it yet\n", e.Name())
 				stride, err = parseStrideFromFilename(e.Name())
 				if err != nil {
 					log.Printf("failed to parse stride info from filename: %e\n", err)
@@ -334,6 +334,7 @@ func (c *CorrelationExplorer) retrieveCorrelatedTimeseries(stride *Stride, tsRow
 	}
 
   log.Printf("obtained edges for row %d: %v\n", tsRowId, edges)
+  log.Printf("onlyconsider is %v\n", onlyConsider)
 
 	ctr := 0
 	for _, e := range edges {
@@ -494,6 +495,8 @@ func (c *CorrelationExplorer) addStrideCacheEntry(stride *Stride) {
 			return
 		}
 		if s.Status == StrideDeleted {
+      log.Printf("removing deleted stride for time %v from cache\n", s.StartTime)
+      s = nil
 			c.strideCache[i] = stride
 			return
 		}
@@ -505,6 +508,10 @@ func (c *CorrelationExplorer) addStrideCacheEntry(stride *Stride) {
 	if oldestEntry == -1 {
 		log.Printf("no entry found for stride %d with start time %v\n", stride.ID, stride.StartTime)
 	}
+  if c.strideCache[oldestEntry] != nil {
+     log.Printf("evicting stride from time %v from cache\n", c.strideCache[oldestEntry].StartTime)
+     c.strideCache[oldestEntry] = nil
+  }
 	c.strideCache[oldestEntry] = stride
 }
 

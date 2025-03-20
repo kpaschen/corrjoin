@@ -14,8 +14,9 @@ spec:
         app: postgres
     spec:
       serviceAccountName: {{ .Values.serviceAccount.name }}
-      nodeSelector:
-         postgresVolumeMounted: 'true'
+      {{- if .Values.postgresNodeSelector }}
+      {{- toYaml .Values.postgresNodeSelector | nindent 6 }}
+      {{- end }}
       containers:
         - name: postgres
           securityContext:

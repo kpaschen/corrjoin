@@ -14,8 +14,9 @@ spec:
       labels:
         app: corrjoin
     spec:
-      nodeSelector:
-        resultsVolumeMounted: "true"
+      {{- if .Values.receiverNodeSelector }}
+      {{- toYaml .Values.receiverNodeSelector | nindent 6 }}
+      {{- end }}
       securityContext:
         fsGroup: 1001
       volumes:

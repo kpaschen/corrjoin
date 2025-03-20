@@ -30,47 +30,36 @@ for Grafana visualizations.
 
 ## Getting started
 
-Run the unit tests:
-
-`go test ./...`
-
-Build the docker container:
-
-`docker build -f Dockerfile-receiver -t receiver:v0.1 .`
-
-Bring up the system in a local kind cluster:
+Bring up a local kind cluster:
 
 `(cd setup && ./setup-local.sh)`
 
-If this fails:
-- make sure `kind` is on your path
-- login to ghcr.io like this:
+If this fails, make sure `kind` is on your path.
 
- `echo $tok | docker login ghcr.io -u $your_github_username --password-stdin`
+Bring up the receiver + explorer as well as a kube-prometheus-stack.
+I publish a docker image at `ghcr.io/kpaschen/corrjoin`. You can use that or
+build your own image locally like this:
 
-where `tok` is a github access token.
+`docker build -f Dockerfile-receiver -t receiver:v0.1 .`
+
+Either way, edit the values-local.yaml file in `setup/helm/corrjoin` so it has
+the right image settings.
+
+`(cd setup && ./install-corrjoin.sh)`
 
 ## Running in a Kubernetes cluster
 
 You can run the system outside of a Kubernetes cluster; all you need is a Prometheus instance sending data
 to wherever your receiver process is running. But a Kubernetes cluster makes this easy to set up, and it is
 a great source of timeseries data.
-
-I run this in a cluster set up with _kubespray_, but really any cluster will do.
-You should have persistent storage available on at least one worker node.
-The receiver + explorer need about 4-6GB of memory even in a smallish cluster.
-
-The script in `setup/install.sh` has the steps I go through for setting up a cluster. Note a few steps are
-commented out; you should take a look and see e.g. whether you have rook/ceph or some other storage provider
-and make changes accordingly.
+The receiver + explorer need about 4GB of memory even in a smallish cluster.
+Grafana will happily use 8GB.
 
 The configuration for Prometheus and Grafana is in `prometheus-values.yaml`. This is just a values file for
 the kube-prometheus-stack helm chart.
-
-There are two custom Grafana dashboards in `helm/corrjoin/templates` that you can adapt.
+There are custom Grafana dashboards in `helm/corrjoin/templates` that you can adapt.
 
 The Grafana admin password is stored in a secret and you can configure it by overriding the `grafana.password` value in the file `setup/helm/corrjoin/values-cloud.yaml`.
-
 The helm chart in `setup/helm/corrjoin` sets up the receiver and explorer system.
 
 ### Make sure you have enough persistent storage
@@ -86,8 +75,28 @@ The first two dependencies are probably self-explanatory; the third one comes ab
 is applied at the row group level, so if you have many small row groups, you have worse compression. On the other
 hand, large row groups need more memory, so it's a balance. That's why there is a commandline parameter.
 
-For the systems I have experimented with (30-60k timeseries, correlation threshold 0.90-0.99, row group size 10k),
+For the systems I have experimented with (30-60k timeseries, correlation threshold 0.90-0.99, row group size 20k),
 the parquet files are 0.5-1.2GB in size. If you write one every half hour, you're using 1-2GB of disk space per hour. I usually keep only the latest 10 parquet files around, so 30GB of disk space should be enough.
+
+### Watch out for OOMKills
+
+In some Kubernetes installations, the receiver/explorer process gets Oomkilled. So far, this appears to be related to the cached bytes in
+the cgroup not being reclaimed. I am debugging this; for now, the system works fine in a Kind cluster. If you have insights, please
+share them.
+
+### Creating more interesting time series
+
+With the above setup, your cluster will be mostly quiet, so you'll have a lot of constant time series.
+If you're just testing and need to generate a bit of load, I have a loadtesting setup.
+
+The loadtesting setup installs Mattermost (a chat server) with a Postgres DB and an Apache reverse proxy in the cluster.
+The apache reverse proxy is not set up as an Ingress server, and it runs _inside_ the cluster; its main purpose is to
+export additional time series.
+
+I then run a loadtesting tool published by the Mattermost team.
+All the details are in the setup script in `setup/install-loadtestenv.sh`.
+You should probably take a look at the script before running it, since it wasnts a few parameters to be configured
+via environment variables.
 
 ## Getting value out of the data
 
@@ -95,12 +104,11 @@ the parquet files are 0.5-1.2GB in size. If you write one every half hour, you'r
 
 Some time series are poor targets for correlation analysis; if you know about such series, it helps if you
 drop them before processing.
-
 The sample prometheus-values.yaml file has a remote write configuration that lets you do that.
 
 ### Exploring the data
 
-The corrjoin helm chart has a Grafana dashboard called `Stride Exploration` that lets you browse the available
+The corrjoin helm chart has a Grafana dashboard called `Explore Strides` that lets you browse the available
 data by time window (stride). 
 
 You can think of the correlation results as a temporal graph. There is a version of the graph at every stride.
@@ -111,9 +119,19 @@ coefficient. We only represent edges that are above the configured threshold.
 When you look at the data for a stride, you can see a list of _subgraphs_. Basically, the graph of metrics for a
 stride is usually not connected, but it consists of subgraphs that are not connected with each other. Often,
 there will be a lot of subgraphs with two or three nodes in them, and a few subgraphs with a lot (maybe several thousand) nodes.
-
 You can select a subgraph to list the metrics in it, and then select metrics that you want to see e.g. timeseries
-graphs for.
+graphs for. Note that the API only returns 150 nodes and the Grafana graph rendering is most useful for below 20 nodes.
+I am evaluating better graph visualization options.
+
+There is a second dashboard for a more targeted exploration, and it is called `Explore Metrics`. This lets you select
+metrics by their name, so you could look for metrics that track memory usage for example. You can then select one or more
+of them via the menu at the top and compare their correlation relation with each other over time.
+
+The `Explore Metrics` dashboard can also consume a time series identifier as a URL parameter. You can use this for example
+with Grafana _Panel Links_. The `experiments` dashboard has a Panel at the bottom showing `process_cpu_seconds` metrics. Click on
+any of them and you'll get a little popup with a link `Explore correlated timeseries` at the bottom. Clicking on that link
+will take you to the `Explore Metrics` dashboard prepopulated with the time series you just clicked on.
+
 
 ### How is this useful?
 

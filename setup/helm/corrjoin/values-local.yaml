@@ -26,4 +26,8 @@ corrjoin:
    correlationThreshold: 99
    maxRows: 0
 
+receiverNodeSelector:
+   nodeSelector:
+      resultsVolumeMounted: "true"
+
 prometheusURL: "http://prometheus-kube-prometheus-prometheus.monitoring:9090"

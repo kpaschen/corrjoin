@@ -1,0 +1,24 @@
+apiVersion: v1
+kind: Pod
+metadata:
+   name: mmloadtest
+   namespace: default
+   labels:
+      app: mmloadtest
+spec:
+   initContainers:
+      - name: agentsetup
+        image: {{ .Values.image.repository }}/{{ .Values.image.image }}:{{ .Values.image.version }} 
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        command: ["go", "run", "./cmd/ltagent", "init"]
+   containers:
+      - name: mmloadtest
+        image: {{ .Values.image.repository }}/{{ .Values.image.image }}:{{ .Values.image.version }} 
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        command: ["go", "run", "./cmd/ltapi"]
+        #command: ["sh", "-c", "--"]
+        #args: ["while true; do sleep 30; done"]
+        ports:
+        - containerPort: 4000
+          name: api
+ 

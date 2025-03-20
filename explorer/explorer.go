@@ -307,7 +307,7 @@ func (c *CorrelationExplorer) getStride(params url.Values) (*Stride, error) {
 			if stride == nil {
 				continue
 			}
-			if stride.Status == StrideDeleted {
+			if stride.Status != StrideProcessed {
 				continue
 			}
 			if stride.ID == int(s) {
@@ -335,7 +335,7 @@ func (c *CorrelationExplorer) getStride(params url.Values) (*Stride, error) {
 		if stride == nil {
 			continue
 		}
-		if stride.Status == StrideDeleted {
+		if stride.Status != StrideProcessed {
 			continue
 		}
 		if timeTo >= stride.StartTime && timeTo <= stride.EndTime {
@@ -353,7 +353,6 @@ func (c *CorrelationExplorer) getStride(params url.Values) (*Stride, error) {
 // Note the keys are not quoted, that's why you cannot just unmarshal this with json.
 // we assume there are no nested objects and parse this as just a key-value map.
 func parseUrlDataIntoMetric(urlValue string, dropLabels map[string]bool) (*model.Metric, error) {
-	log.Printf("input value is %s\n", urlValue)
 	if len(urlValue) == 0 {
 		return nil, fmt.Errorf("empty url value")
 	}
@@ -380,8 +379,6 @@ func parseUrlDataIntoMetric(urlValue string, dropLabels map[string]bool) (*model
 		}
 	}
 
-	log.Printf("parsed url data into metric %+v\n", ret)
-
 	return &ret, nil
 }
 
@@ -403,7 +400,6 @@ func (c *CorrelationExplorer) getMetrics(params url.Values, stride *Stride) ([]i
 	}
 	metrics, err := c.getMetricsByRowId(params, stride)
 	if err == nil && metrics != nil && len(metrics) > 0 {
-		log.Printf("getMetrics: found %d metrics by row using params %v\n", len(metrics), params)
 		ret := make([]int, len(metrics), len(metrics))
 		for i, m := range metrics {
 			ret[i] = m.RowId
@@ -415,7 +411,6 @@ func (c *CorrelationExplorer) getMetrics(params url.Values, stride *Stride) ([]i
 	if !ok {
 		return nil, fmt.Errorf("missing ts parameter")
 	}
-	log.Printf("in getMetrics, parsing %s into metric\n", labelset[0])
 	modelMetric, err := parseUrlDataIntoMetric(labelset[0], c.dropLabels)
 
 	if err != nil {
@@ -424,13 +419,11 @@ func (c *CorrelationExplorer) getMetrics(params url.Values, stride *Stride) ([]i
 	}
 
 	fp := modelMetric.Fingerprint()
-	fmt.Printf("metric is %+v and fingerprint is %d\n", modelMetric, fp)
 	rowid, exists := stride.metricsCache[uint64(fp)]
 	if !exists {
 		log.Printf("metric not found in cache\n")
 		return nil, nil
 	}
-	log.Printf("returning row id %d\n", rowid)
 	return []int{rowid}, nil
 }
 
@@ -446,7 +439,6 @@ func (c *CorrelationExplorer) getMetricsByRowId(params url.Values, stride *Strid
 	if err != nil {
 		return nil, err
 	}
-	log.Printf("found %d tsids for params %v\n", len(tsids), params)
 	ret := make([]*explorerlib.Metric, len(tsids), len(tsids))
 	for i, tsid := range tsids {
 		metric, exists := stride.metricsCacheByRowId[int(tsid)]
@@ -547,8 +539,7 @@ func (c *CorrelationExplorer) GetTimeseries(w http.ResponseWriter, r *http.Reque
 	}
 
 	promQLQuery := metrics[index].ComputePrometheusQuery()
-	// make a request like this: 'http://prometheus:9090/api/v1/query_range?query=up&start=2015-07-01T20:10:30.781Z&end=2015-07-01T20:11:00.781Z&step=15s'
-	// TODO: maybe use the client api instead?
+	// TODO: use the client api instead?
 	requestURL := fmt.Sprintf("%s/api/v1/query_range?query=%s&start=%s&end=%s&step=15s",
 		c.prometheusBaseURL,
 		promQLQuery,
@@ -568,7 +559,6 @@ func (c *CorrelationExplorer) GetTimeseries(w http.ResponseWriter, r *http.Reque
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	// log.Printf("response body: %s\n", resBody)
 
 	var parsedResponse PromQueryResponse
 	err = json.Unmarshal([]byte(resBody), &parsedResponse)
@@ -626,7 +616,6 @@ func (c *CorrelationExplorer) GetTimeline(w http.ResponseWriter, r *http.Request
 		return
 	}
 	if stride == nil {
-		log.Printf("GetTimeline: stride is nil\n")
 		http.Error(w, fmt.Sprintf("no stride found for time"), http.StatusNotFound)
 		return
 	}
@@ -663,20 +652,17 @@ func (c *CorrelationExplorer) GetTimeline(w http.ResponseWriter, r *http.Request
 		if st.Status != StrideProcessed {
 			continue
 		}
-		log.Printf("requesting correlated timeseries for stride %d and ts %d\n", st.ID, metricRowIds[0])
 		var otherRowIds []int
 		if len(metricRowIds) == 1 {
 			otherRowIds = []int{}
 		} else {
 			otherRowIds = metricRowIds[1 : len(metricRowIds)-1]
 		}
-		log.Printf("otherRowIds: %v\n", otherRowIds)
 		correlatesMap, err := c.retrieveCorrelatedTimeseries(st, metricRowIds[0], otherRowIds, 20)
 		if err != nil {
 			log.Printf("error retrieving correlates for timeseries %d and stride %d: %v\n", metricRowIds[0], st.ID, err)
 			continue
 		}
-		log.Printf("correlates map: %v\n", correlatesMap)
 		for i, rowid := range metricRowIds {
 			if i == 0 {
 				continue
@@ -718,8 +704,6 @@ func (c *CorrelationExplorer) GetMetricInfo(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	log.Printf("using stride %d\n", stride.ID)
-
 	metricRowIds, err := c.getMetrics(params, stride)
 	if err != nil {
 		log.Printf("failed to identify metrics from request: %v\n", err)
@@ -749,7 +733,6 @@ func (c *CorrelationExplorer) GetMetricInfo(w http.ResponseWriter, r *http.Reque
 				subgraphId = -1
 			}
 		}
-		log.Printf("metric %d is in subgraph %d\n", rowid, subgraphId)
 		resp = append(resp, metricInfoResponse{
 			Stride:      stride.ID,
 			Rowid:       rowid,
@@ -789,13 +772,19 @@ func (c *CorrelationExplorer) GetCorrelatedSeries(w http.ResponseWriter, r *http
 		return
 	}
 
-	correlatesMap, err := c.retrieveCorrelatedTimeseries(stride, metricRowIds[0], metricRowIds, 20)
+  var otherRowIds []int
+  if len(metricRowIds) == 1 {
+     otherRowIds = []int{}
+  } else {
+     otherRowIds = metricRowIds[1:len(metricRowIds)-1]
+  }
+
+	correlatesMap, err := c.retrieveCorrelatedTimeseries(stride, metricRowIds[0], otherRowIds, 20)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
 	if len(correlatesMap) == 0 {
-		log.Printf("correlates map for %d is empty\n", metricRowIds[0])
 		resp := correlatedTimeseriesResponse{
 			Correlates: make([]CorrelatedResponse, 0),
 		}
@@ -824,8 +813,6 @@ func (c *CorrelationExplorer) GetCorrelatedSeries(w http.ResponseWriter, r *http
 			Pearson:     pearson,
 		})
 	}
-
-	log.Printf("returning %d correlated ts for ts %d and stride %d\n", len(resp.Correlates), metricRowIds[0], stride.ID)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)

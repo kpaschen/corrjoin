@@ -1,0 +1,10 @@
+image:
+  repository: "localhost:5001"
+  image: "mmloadtest"
+  version: "latest"
+
+serviceAccount:
+  name: mmloadtest-sa
+
+port: 80
+metricsPort: 8888

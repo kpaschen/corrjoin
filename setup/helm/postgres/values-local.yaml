@@ -11,3 +11,8 @@ cni:
 mmdb:
   dbuser: ps_user
   name: mattermost_main
+
+postgresNodeSelector:
+   nodeSelector:
+      postgresVolumeMounted: "true"
+

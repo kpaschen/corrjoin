@@ -10,7 +10,7 @@ cni:
   useCeph: false
   createPv: true
 
-port: 80
-metricsPort: 8888
+port: 8888
+metricsPort: 9999
 exporterPort: 9117
 servername: corrjoin.nephometrics.com
