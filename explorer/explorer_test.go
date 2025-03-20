@@ -1,29 +1,135 @@
 package explorer
 
 import (
+	"fmt"
+	explorerlib "github.com/kpaschen/corrjoin/lib/explorer"
 	"testing"
+	"time"
 )
 
-func TestComputePrometheusGraphURL(t *testing.T) {
-	m := Metric{
-		Data: make(map[string]interface{}),
-	}
-	m.computePrometheusGraphURL("http://localhost:9090", "", "")
-	if m.PrometheusGraphURL != "http://localhost:9090/graph" {
-		t.Errorf("unexpected prometheus graph url %s", m.PrometheusGraphURL)
+func TestScanResultFiles(t *testing.T) {
+	explorer := CorrelationExplorer{
+		FilenameBase: "./testdata",
+		strideCache:  make([]*Stride, STRIDE_CACHE_SIZE, STRIDE_CACHE_SIZE),
 	}
 
-	m.Data["__name__"] = "node_cpu_seconds_total"
-	m.Data["namespace"] = "default"
-	m.Data["cpu"] = "0"
+	err := explorer.scanResultFiles()
+	if err != nil {
+		t.Errorf("unexpected: %e", err)
+	}
 
-	targetURL := "http://localhost:9090/graph?g0.expr=node_cpu_seconds_total%7Bnamespace%3D%22default%22%2C+cpu%3D%220%22%7D&g0.tab=0&g0.display_mode=lines&g0.show_exemplars=0&g0.range_input=10m&g0.end_input=2024-09-24+08%3A52%3A15&g0.moment_input=2024-09-24+08%3A52%3A15"
+	strideCount := len(explorer.strideCache)
+	if strideCount == 0 {
+		t.Errorf("no strides")
+	}
 
-	// Two versions of target url because order in maps is nondeterministic.
-	targetURL2 := "http://localhost:9090/graph?g0.expr=node_cpu_seconds_total%7Bcpu%3D%220%22%2C+namespace%3D%22default%22%7D&g0.tab=0&g0.display_mode=lines&g0.show_exemplars=0&g0.range_input=10m&g0.end_input=2024-09-24+08%3A52%3A15&g0.moment_input=2024-09-24+08%3A52%3A15"
+	allStridesAreNil := true
+	for strideId, stride := range explorer.strideCache {
+		if stride == nil {
+			continue
+		}
+		allStridesAreNil = false
+		entries := len(stride.metricsCacheByRowId)
+		if entries == 0 {
+			t.Errorf("no metrics for stride %d", strideId)
+		}
+		fpEntries := len(stride.metricsCache)
+		if fpEntries == 0 {
+			t.Errorf("no entries in cache by fp")
+		}
+		if fpEntries != entries {
+			t.Errorf("cache count mismatch: %d in cache by rowid vs %d in cache by fp", entries, fpEntries)
+		}
 
-	m.computePrometheusGraphURL("http://localhost:9090", "10m", "2024-09-24 08:52:15")
-	if m.PrometheusGraphURL != targetURL && m.PrometheusGraphURL != targetURL2 {
-		t.Errorf("expected %s but got %s\n", targetURL, m.PrometheusGraphURL)
+	}
+
+	if allStridesAreNil {
+		t.Errorf("all strides are nil")
+	}
+
+}
+
+func TestScanStrideAgain(t *testing.T) {
+	explorer := CorrelationExplorer{
+		FilenameBase: "./testdata",
+		strideCache:  make([]*Stride, STRIDE_CACHE_SIZE, STRIDE_CACHE_SIZE),
+	}
+
+	err := explorer.scanResultFiles()
+	if err != nil {
+		t.Errorf("unexpected: %e", err)
+	}
+
+	// Scan again so we do the exists -> read transition now
+	err = explorer.scanResultFiles()
+	if err != nil {
+		t.Errorf("unexpected: %e", err)
+	}
+}
+
+func TestGetTimeseriesById(t *testing.T) {
+	explorer := CorrelationExplorer{
+		// FilenameBase:         "/tmp/corrjoinResults",
+		FilenameBase: "./testdata",
+		strideCache:  make([]*Stride, STRIDE_CACHE_SIZE, STRIDE_CACHE_SIZE),
+	}
+
+	err := explorer.scanResultFiles()
+	if err != nil {
+		t.Errorf("unexpected: %e", err)
+	}
+
+	stride := explorer.strideCache[0]
+	if stride == nil {
+		t.Fatalf("no stride")
+	}
+
+	params := make(map[string]([]string))
+
+	params["timeTo"] = []string{"1738598499834"}
+
+	rowids, err := explorer.getMetrics(params, stride)
+	if err == nil {
+		t.Errorf("expected error but got rowids %v", rowids)
+	}
+
+	sampleEntry, ok := stride.metricsCacheByRowId[10]
+	if !ok {
+		t.Errorf("entry rowid 10 is missing")
+	}
+
+	fmt.Printf("sample entry: %+v\n", sampleEntry)
+}
+
+func TestGetTimeOverride(t *testing.T) {
+	explorer := CorrelationExplorer{
+		FilenameBase: "./tmp",
+		strideCache:  make([]*Stride, STRIDE_CACHE_SIZE, STRIDE_CACHE_SIZE),
+	}
+	params := make(map[string]([]string))
+	params["timeTo"] = []string{"now"}
+	from, to, err := explorer.getTimeOverride(params)
+	if err != nil {
+		t.Errorf("unexpected: %v", err)
+	}
+	fmt.Printf("from based on now: %s, to: %s, err: %v\n", from, to, err)
+
+	now := time.Now().UTC()
+	toParsed, err := time.Parse(explorerlib.FORMAT, to)
+	if err != nil {
+		t.Errorf("unexpected: %v", err)
+	}
+	difference := now.Sub(toParsed)
+	if difference > time.Duration(1*time.Minute) {
+		t.Errorf("timeTo should be close to now but there is a %+v difference", difference)
+	}
+
+	fromParsed, err := time.Parse(explorerlib.FORMAT, from)
+	if err != nil {
+		t.Errorf("unexpected: %v", err)
+	}
+	difference = toParsed.Sub(fromParsed)
+	if difference != time.Duration(10*time.Minute) {
+		t.Errorf("difference between 'from' and 'to' should be 10m but is %+v", difference)
 	}
 }

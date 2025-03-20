@@ -1,0 +1,27 @@
+apiVersion: installation.mattermost.com/v1beta1
+kind: Mattermost
+metadata:
+  name: mm-corrjoin
+  namespace: mattermost
+spec:
+  replicas: 1
+  size: 100users
+  ingress:
+    enabled: false
+    host: corrjoin.nephometrics.com
+  version: 9.3.0
+  database:
+    external:
+       secret: mattermost-postgres 
+  fileStore:
+     local:
+        enabled: true
+        storageSize: 10Gi
+  mattermostEnv:
+    - name: MM_TEAMSETTINGS_ENABLEUSERCREATION
+      value: "true"
+    - name: MM_TEAMSETTINGS_ENABLEOPENSERVER
+      value: "true"
+    # This makes it possible to use mmctl to create the initial admin account.
+    - name: MM_SERVICESETTINGS_ENABLELOCALMODE
+      value: "true"

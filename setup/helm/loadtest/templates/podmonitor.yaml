@@ -1,0 +1,12 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: loadtest-monitor
+  labels:
+     app.kubernetes.io/instance: prometheus
+spec:
+  selector:
+    matchLabels:
+      app: mmloadtest
+  podMetricsEndpoints:
+  - port: api

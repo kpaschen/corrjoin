@@ -1,5 +1,34 @@
 package explorer
 
+import (
+	explorerlib "github.com/kpaschen/corrjoin/lib/explorer"
+)
+
+type StrideState int
+
+const (
+	StrideExists = iota
+	StrideRead
+	StrideProcessing
+	StrideProcessed
+	StrideRetrying
+	StrideError
+	StrideDeleted
+)
+
+var strideStateName = map[StrideState]string{
+	StrideExists:    "exists",
+	StrideRead:      "read",
+	StrideProcessed: "processed",
+	StrideRetrying:  "retrying",
+	StrideError:     "error",
+	StrideDeleted:   "deleted",
+}
+
+func (s StrideState) String() string {
+	return strideStateName[s]
+}
+
 // Stride collects metadata about a stride.
 type Stride struct {
 	ID              int
@@ -7,44 +36,32 @@ type Stride struct {
 	EndTime         int64
 	StartTimeString string
 	EndTimeString   string
-	Clusters        ClusterAssignments
-	Status          string
+	Status          StrideState
 	Filename        string
-	idsFile         string
+	subgraphs       *explorerlib.SubgraphMemberships
+
+	// Maps metric fingerprints to rowids
+	metricsCache map[uint64](int)
+	// Maps rowids to metric structs.
+	// The metrics cache is on the stride because
+	// 1. rowids can change after a restart
+	// 2. the metric struct also records whether a metric was constant
+	metricsCacheByRowId map[int](*explorerlib.Metric)
 }
 
-// ClusterAssignments summarizes a cluster.
-type ClusterAssignments struct {
-	// Rows maps timeseries ids to cluster ids
-	Rows map[int64]int
-	// Sizes holds the size of each cluster
-	Sizes         map[int]int
-	nextClusterId int
-
-	// TODO: a map of clusterid -> cluster name
-	// TODO: a graph representation of each cluster?
+type PromQueryResponse struct {
+	Status string `json:"status"`
+	Data   Data   `json:"data"`
 }
 
-// Row is actually a Timeseries
-type Row struct {
-	TimeseriesID   int64
-	TimeseriesName Metric
-	Filename       string
+// Data contains the result type and the actual result.
+type Data struct {
+	ResultType string   `json:"resultType"`
+	Result     []Result `json:"result"`
 }
 
-// Correlations are the correlation results for one Row (timeseries) and one
-// stride. Correlated contains the other timeseries that this one is correlated
-// with, and Timeseries contains the names and urls of those timeseries.
-type Correlations struct {
-	Row        int64
-	Correlated map[int64]float64
-	Timeseries map[int64]Metric
-	strideKey  string
-}
-
-// A Metric actually a prometheus timeseries spec
-type Metric struct {
-	empty              bool
-	Data               map[string]interface{}
-	PrometheusGraphURL string
+// Result represents each time series in the response.
+type Result struct {
+	Metric map[string]string `json:"metric"`
+	Values [][]interface{}   `json:"values"`
 }

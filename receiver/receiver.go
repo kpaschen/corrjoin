@@ -19,14 +19,26 @@ import (
 var (
 	receivedSamples = prometheus.NewCounter(
 		prometheus.CounterOpts{
-			Name: "received_samples_total",
+			Name: "corrjoin_received_samples_total",
 			Help: "Total number of received samples.",
 		},
 	)
 	requestedCorrelationBatches = prometheus.NewCounter(
 		prometheus.CounterOpts{
-			Name: "requested_correlation_batches_total",
+			Name: "corrjoin_requested_correlation_batches_total",
 			Help: "Total number of times a correlation batch computation has been requested.",
+		},
+	)
+	numberOfTimeseries = prometheus.NewGauge(
+		prometheus.GaugeOpts{
+			Name: "corrjoin_number_of_timeseries",
+			Help: "number of timeseries",
+		},
+	)
+	constantTimeseries = prometheus.NewGauge(
+		prometheus.GaugeOpts{
+			Name: "corrjoin_constant_timeseries",
+			Help: "number of constant timeseries",
 		},
 	)
 	correlationDurationHist = prometheus.NewHistogram(
@@ -35,7 +47,7 @@ var (
 			Help:                            "Duration of correlation computation calls.",
 			Buckets:                         prometheus.DefBuckets,
 			NativeHistogramBucketFactor:     1.1,
-			NativeHistogramMaxBucketNumber:  100,
+			NativeHistogramMaxBucketNumber:  10,
 			NativeHistogramMinResetDuration: 1 * time.Hour,
 		},
 	)
@@ -46,6 +58,13 @@ var (
 			Help: "Duration of correlation computation calls.",
 		},
 	)
+
+	strideOverruns = prometheus.NewCounter(
+		prometheus.CounterOpts{
+			Name: "corrjoin_stride_computation_overruns",
+			Help: "Number of times a correlation stride computation has overrun",
+		},
+	)
 )
 
 func init() {
@@ -53,17 +72,22 @@ func init() {
 	prometheus.MustRegister(requestedCorrelationBatches)
 	prometheus.MustRegister(correlationDurationHist)
 	prometheus.MustRegister(correlationDuration)
+	prometheus.MustRegister(strideOverruns)
+	prometheus.MustRegister(numberOfTimeseries)
+	prometheus.MustRegister(constantTimeseries)
 }
 
 type tsProcessor struct {
-	accumulator      *corrjoin.TimeseriesAccumulator
-	settings         *settings.CorrjoinSettings
-	window           *corrjoin.TimeseriesWindow
-	observationQueue chan (*corrjoin.Observation)
-	resultsChannel   chan (*datatypes.CorrjoinResult)
-	bufferChannel    chan (*corrjoin.ObservationResult)
-	comparer         comparisons.Engine
-	strideStartTimes map[int]time.Time
+	accumulator                 *corrjoin.TimeseriesAccumulator
+	settings                    *settings.CorrjoinSettings
+	window                      *corrjoin.TimeseriesWindow
+	observationQueue            chan (*corrjoin.Observation)
+	resultsChannel              chan (*datatypes.CorrjoinResult)
+	bufferChannel               chan (*corrjoin.ObservationResult)
+	comparer                    comparisons.Engine
+	requestProcessingStartTimes map[int]time.Time
+	strideStartTimes            map[int]time.Time
+	reporter                    *reporter.ParquetReporter
 }
 
 func (t *tsProcessor) observeTs(req *prompb.WriteRequest) error {
@@ -80,9 +104,10 @@ func (t *tsProcessor) observeTs(req *prompb.WriteRequest) error {
 		sampleCounter := 0
 		for _, s := range ts.Samples {
 			t.observationQueue <- &corrjoin.Observation{
-				MetricName: metricName,
-				Value:      s.Value,
-				Timestamp:  time.Unix(s.Timestamp/1000, 0).UTC(),
+				MetricFingerprint: (uint64)(metric.Fingerprint()),
+				MetricName:        metricName,
+				Value:             s.Value,
+				Timestamp:         time.Unix(s.Timestamp/1000, 0).UTC(),
 			}
 			sampleCounter++
 		}
@@ -111,12 +136,17 @@ func (t *tsProcessor) ReceivePrometheusData(w http.ResponseWriter, r *http.Reque
 	w.WriteHeader(http.StatusOK)
 }
 
-func NewTsProcessor(corrjoinConfig settings.CorrjoinSettings, strideLength int,
-	reporter reporter.Reporter) *tsProcessor {
+func (t *tsProcessor) Shutdown() error {
+	if t.reporter != nil {
+		return t.reporter.Flush(-1) // Flush all writers
+	}
+	return nil
+}
+
+func NewTsProcessor(corrjoinConfig settings.CorrjoinSettings) *tsProcessor {
 
 	// The observation queue is how we hand timeseries data to the accumulator.
 	observationQueue := make(chan *corrjoin.Observation, 1)
-	//defer close(observationQueue)
 
 	// The buffer channel is how the accumulator lets us know there are enough
 	// timeseries data in the buffer for a stride.
@@ -124,21 +154,23 @@ func NewTsProcessor(corrjoinConfig settings.CorrjoinSettings, strideLength int,
 
 	// The results channel is where we hear about correlated timeseries.
 	resultsChannel := make(chan *datatypes.CorrjoinResult, 1)
-	//defer close(resultsChannel)
 
 	comparer := &comparisons.InProcessComparer{}
 	comparer.Initialize(corrjoinConfig, resultsChannel)
 
 	processor := &tsProcessor{
-		accumulator: corrjoin.NewTimeseriesAccumulator(strideLength, time.Now().UTC(),
-			corrjoinConfig.SampleInterval, bufferChannel),
-		settings:         &corrjoinConfig,
-		window:           corrjoin.NewTimeseriesWindow(corrjoinConfig, comparer),
-		observationQueue: observationQueue,
-		resultsChannel:   resultsChannel,
-		bufferChannel:    bufferChannel,
-		comparer:         comparer,
-		strideStartTimes: make(map[int]time.Time),
+		accumulator: corrjoin.NewTimeseriesAccumulator(corrjoinConfig.StrideLength,
+			time.Now().UTC(), corrjoinConfig.SampleInterval, corrjoinConfig.MaxRows, bufferChannel),
+		settings:                    &corrjoinConfig,
+		observationQueue:            observationQueue,
+		window:                      corrjoin.NewTimeseriesWindow(corrjoinConfig, comparer),
+		resultsChannel:              resultsChannel,
+		bufferChannel:               bufferChannel,
+		comparer:                    comparer,
+		strideStartTimes:            make(map[int]time.Time),
+		requestProcessingStartTimes: make(map[int]time.Time),
+		reporter: reporter.NewParquetReporter(
+			corrjoinConfig.ResultsDirectory, corrjoinConfig.MaxRowsPerRowGroup),
 	}
 
 	go func() {
@@ -162,28 +194,53 @@ func NewTsProcessor(corrjoinConfig settings.CorrjoinSettings, strideLength int,
 					log.Printf("got an observation request\n")
 					requestedCorrelationBatches.Inc()
 					requestStart := time.Now()
-					// TODO: this is a hack because ShiftBuffer only returns after the window
-					// is done processing. Fix this when I add the lock to the window.
-					processor.strideStartTimes[processor.window.StrideCounter+1] = requestStart
-					reporter.Initialize(corrjoinConfig, processor.window.StrideCounter+1,
-						processor.accumulator.CurrentStrideStartTs,
-						processor.accumulator.CurrentStrideMaxTs,
-						processor.accumulator.Tsids)
-					// TODO: this has to return quickly.
+					stride := processor.window.StrideCounter + 1
 
-					err := processor.window.ShiftBuffer(observationResult.Buffers, resultsChannel)
-					// TODO: check for error type.
-					// If window is busy, hold the observationResult
+					processor.strideStartTimes[stride] = observationResult.CurrentStrideStartTs
+
+					stridesPerWindow := processor.settings.WindowSize / processor.settings.StrideLength
+					if stride < stridesPerWindow {
+						log.Printf("got data for stride %d but that is not enough for filling the window\n", stride)
+					} else {
+						firstStride := stride - stridesPerWindow + 1
+						log.Printf("got a result for stride %d. There are %d strides per window, so I think the first stride for this window should be %d\n", stride, stridesPerWindow, firstStride)
+
+						windowStart := processor.strideStartTimes[firstStride]
+						windowEnd := observationResult.CurrentStrideMaxTs
+
+						log.Printf("that gives us a window span from %v to %v aka %s to %s\n",
+							windowStart, windowEnd,
+							windowStart.UTC().Format("20060102150405"),
+							windowEnd.UTC().Format("20060102150405"))
+
+						// This creates the output file for an entire window, not just for the stride.
+						processor.reporter.InitializeStride(stride, windowStart, windowEnd)
+					}
+
+					err, willRunComputation := processor.window.ShiftBuffer(observationResult.Buffers)
+
 					if err != nil {
-						log.Printf("failed to process window: %v", err)
+						// TODO: if window is busy, hold the observationResult
+						switch err.(type) {
+						case corrjoin.WindowIsBusyError:
+							strideOverruns.Inc()
+							log.Printf("computation time overrun on stride %d\n", processor.window.StrideCounter)
+						default:
+							log.Printf("failed to process window: %v", err)
+						}
+					}
+					if err == nil && willRunComputation {
+						processor.requestProcessingStartTimes[stride] = requestStart
+						log.Printf("started processing stride %d\n", processor.window.StrideCounter)
 					}
 				}
 			case <-time.After(10 * time.Minute):
-				log.Printf("got no timeseries data for 10 minutes")
+				log.Printf("got no stride data for 10 minutes")
 			}
 		}
 	}()
 
+	// All writing to the reporter happens from this goroutine.
 	go func() {
 		log.Println("waiting for correlation results")
 		for {
@@ -193,7 +250,7 @@ func NewTsProcessor(corrjoinConfig settings.CorrjoinSettings, strideLength int,
 					log.Printf("empty correlation result, done with stride %d\n",
 						correlationResult.StrideCounter)
 					requestEnd := time.Now()
-					requestStart, ok := processor.strideStartTimes[correlationResult.StrideCounter]
+					requestStart, ok := processor.requestProcessingStartTimes[correlationResult.StrideCounter]
 					if !ok {
 						log.Printf("missing start time for stride %d?\n", correlationResult.StrideCounter)
 					} else {
@@ -202,9 +259,22 @@ func NewTsProcessor(corrjoinConfig settings.CorrjoinSettings, strideLength int,
 						correlationDuration.Set(float64(elapsed.Milliseconds()))
 						log.Printf("correlation batch processed in %d milliseconds\n", elapsed.Milliseconds())
 					}
-					reporter.Flush()
+					stride := correlationResult.StrideCounter
+					processor.reporter.RecordTimeseriesIds(stride, processor.accumulator.Tsids)
+					numberOfTimeseries.Set(float64(len(processor.accumulator.Tsids)))
+					constant, err := processor.reporter.AddConstantRows(stride, processor.window.ConstantRows)
+          if err != nil {
+             log.Printf("failed to record constant rows: %v\n", err)
+          } else {
+					   constantTimeseries.Set(float64(constant))
+          }
+					err = processor.reporter.Flush(stride)
+					if err != nil {
+						log.Printf("failed to flush results writer: %e\n", err)
+					}
+					log.Printf("finished recording data for stride %d\n", stride)
 				} else {
-					err := reporter.AddCorrelatedPairs(*correlationResult)
+					err := processor.reporter.AddCorrelatedPairs(*correlationResult)
 					if err != nil {
 						log.Printf("failed to log results: %v\n", err)
 					}

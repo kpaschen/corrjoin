@@ -1,0 +1,15 @@
+# Override this on the commandline
+password: editme
+
+serviceAccount:
+  name: postgres-sa
+
+cni:
+  useCeph: false
+  createPv: false
+
+mmdb:
+  dbuser: ps_user
+  mmuser: mmuser
+  mmpassword: matter
+  name: mattermost_main

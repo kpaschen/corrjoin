@@ -8,14 +8,22 @@ import (
 )
 
 type Observation struct {
-	MetricName string
-	Value      float64
-	Timestamp  time.Time
+	MetricFingerprint uint64
+	MetricName        string
+	Value             float64
+	Timestamp         time.Time
+}
+
+type TsId struct {
+	MetricFingerprint uint64
+	MetricName        string
 }
 
 type ObservationResult struct {
-	Buffers [][]float64
-	Err     error
+	Buffers              [][]float64
+	Err                  error
+	CurrentStrideStartTs time.Time
+	CurrentStrideMaxTs   time.Time
 }
 
 // A TimeseriesAccumulator keeps track of timeseries data as it arrives.
@@ -23,19 +31,18 @@ type ObservationResult struct {
 // rowid and it accumulates data until it has reached the stride length.
 // When it reaches the stride length, it sends the collected buffers to
 // a channel.
-// TODO: return quickly if there is a computation ongoing at the time the
-// stride is reached.
 
 type TimeseriesAccumulator struct {
+	// This is the number of observations in a stride.
 	stride int
 
-	// rowmap maps the timeseries names to row ids
-	rowmap map[string]int
+	// rowmap maps the timeseries fingerprints to row ids
+	rowmap map[uint64]int
 
 	// The ids of the timeseries, in order.
 	// A tsid is a json serialization of the metric name and the labels.
 	// invariant: rowmap[Tsids[i]] == i for 0 <= i <= maxRow
-	Tsids []string
+	Tsids []TsId
 
 	// buffers maps rowids to observations
 	// This is a map because it is possible for a timeseries that we have
@@ -43,10 +50,11 @@ type TimeseriesAccumulator struct {
 	// this an array of arrays.
 	buffers              map[int]([]float64)
 	maxRow               int
-	CurrentStrideStartTs time.Time
-	CurrentStrideMaxTs   time.Time
+	currentStrideStartTs time.Time
+	currentStrideMaxTs   time.Time
 	sampleTime           int
 	strideDuration       time.Duration
+	maxRows              int
 
 	bufferChannel chan<- *ObservationResult
 }
@@ -59,30 +67,36 @@ func maxTime(startTime time.Time, strideDuration time.Duration) time.Time {
 }
 
 func NewTimeseriesAccumulator(stride int, startTime time.Time, sampleInterval int,
+	maxRows int,
 	bc chan<- *ObservationResult) *TimeseriesAccumulator {
 	strideDuration, _ := time.ParseDuration(fmt.Sprintf("%ds", stride*sampleInterval))
-	return &TimeseriesAccumulator{
+	acc := &TimeseriesAccumulator{
 		stride:               stride,
-		rowmap:               make(map[string]int),
-		Tsids:                make([]string, 0, 5000), // TODO: initialize capacity based on a config value.
+		rowmap:               make(map[uint64]int),
+		Tsids:                make([]TsId, 0, 5000),
 		buffers:              make(map[int][]float64),
 		maxRow:               0,
 		sampleTime:           sampleInterval,
-		CurrentStrideStartTs: startTime,
-		CurrentStrideMaxTs:   maxTime(startTime, strideDuration),
+		currentStrideStartTs: startTime,
+		currentStrideMaxTs:   maxTime(startTime, strideDuration),
 		strideDuration:       strideDuration,
 		bufferChannel:        bc,
+		maxRows:              maxRows,
 	}
+	log.Printf("created accumulator with start time %v and end time %v\n",
+		acc.currentStrideStartTs.UTC().Format("20060102150405"),
+		acc.currentStrideMaxTs.UTC().Format("20060102150405"))
+	return acc
 }
 
 func (a *TimeseriesAccumulator) computeSlotIndex(timestamp time.Time) (int, error) {
-	if timestamp.After(a.CurrentStrideMaxTs) {
+	if timestamp.After(a.currentStrideMaxTs) {
 		return -1, nil
 	}
-	if timestamp.Before(a.CurrentStrideStartTs) {
+	if timestamp.Before(a.currentStrideStartTs) {
 		return -2, fmt.Errorf("backfill timestamp, ignore")
 	}
-	diff := timestamp.Sub(a.CurrentStrideStartTs).Seconds()
+	diff := timestamp.Sub(a.currentStrideStartTs).Seconds()
 	return int(diff / float64(a.sampleTime)), nil
 }
 
@@ -93,8 +107,10 @@ func (a *TimeseriesAccumulator) extractMatrixData() *ObservationResult {
 		a.buffers[i] = make([]float64, 0, a.stride)
 	}
 	return &ObservationResult{
-		Buffers: ret,
-		Err:     nil,
+		Buffers:              ret,
+		Err:                  nil,
+		CurrentStrideStartTs: a.currentStrideStartTs,
+		CurrentStrideMaxTs:   a.currentStrideMaxTs,
 	}
 }
 
@@ -124,31 +140,39 @@ func (a *TimeseriesAccumulator) AddObservation(observation *Observation) {
 		return
 	}
 	if slot < 0 {
-		a.CurrentStrideStartTs = observation.Timestamp
-		a.CurrentStrideMaxTs = maxTime(observation.Timestamp, a.strideDuration)
-		slot, err = a.computeSlotIndex(observation.Timestamp)
-		if err != nil {
-			a.bufferChannel <- &ObservationResult{Buffers: nil, Err: err}
-			return
-		}
-		if slot < 0 {
-			panic("got negative timestamp after resetting buffers")
-		}
-
+		// observation.Timestamp is after the end of the current stride. Send
+		// data for the current stride for processing and start collecting data
+		// for the next stride.
 		a.completeRows()
 
 		log.Printf("publish %d rows to channel\n", len(a.buffers))
 		a.bufferChannel <- a.extractMatrixData()
+
+		// Now prepare for the next stride.
+		a.currentStrideStartTs = observation.Timestamp
+		a.currentStrideMaxTs = maxTime(observation.Timestamp, a.strideDuration)
+		log.Printf("updated accumulator for next stride with start time %v and end time %v\n",
+			a.currentStrideStartTs.UTC().Format("20060102150405"),
+			a.currentStrideMaxTs.UTC().Format("20060102150405"))
+		slot, err = a.computeSlotIndex(observation.Timestamp)
+		if err != nil {
+			log.Printf("failed to compute slot index: %v\n", err)
+			panic(err)
+		}
+		if slot < 0 {
+			panic("got negative timestamp after resetting buffers")
+		}
 	}
 
-	rowid, ok := a.rowmap[observation.MetricName]
-	if !ok {
+	rowid, ok := a.rowmap[observation.MetricFingerprint]
+	if !ok && (a.maxRows <= 0 || a.maxRow < a.maxRows) {
 		rowid = a.maxRow
-		a.rowmap[observation.MetricName] = rowid
+		a.rowmap[observation.MetricFingerprint] = rowid
 		a.buffers[rowid] = make([]float64, 0, colcount)
-		a.Tsids = append(a.Tsids, observation.MetricName)
-		if a.Tsids[rowid] != observation.MetricName {
-			log.Printf("tsid for %d is %s but should be %s\n", rowid, a.Tsids[rowid], observation.MetricName)
+		a.Tsids = append(a.Tsids,
+			TsId{MetricName: observation.MetricName, MetricFingerprint: observation.MetricFingerprint})
+		if a.Tsids[rowid].MetricFingerprint != observation.MetricFingerprint {
+			log.Printf("tsid for %d is %d but should be %d\n", rowid, a.Tsids[rowid].MetricFingerprint, observation.MetricFingerprint)
 			panic("code bug")
 		}
 		a.maxRow += 1

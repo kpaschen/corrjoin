@@ -1,0 +1,65 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: correlation-processor
+  labels:
+    app: corrjoin
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: corrjoin
+  template:
+    metadata:
+      labels:
+        app: corrjoin
+    spec:
+      {{- if .Values.receiverNodeSelector }}
+      {{- toYaml .Values.receiverNodeSelector | nindent 6 }}
+      {{- end }}
+      securityContext:
+        fsGroup: 1001
+      volumes:
+         - name: results-store
+           persistentVolumeClaim:
+              claimName: receiver-results
+      containers:
+      - name: receiver
+        image: {{ .Values.image.repository }}/{{ .Values.image.image }}:{{ .Values.image.version }}
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        command: ["/webroot/app"]
+        env:
+        - name: GOGC
+          value: "80"
+        - name: GOMEMLIMIT
+          value: "3GiB"
+        - name: GODEBUG
+          value: "madvdontneed=1"
+        args: ["-svdDimensions", {{ .Values.corrjoin.svdDimensions | quote }},
+           "-windowSize", {{ .Values.corrjoin.windowSize | quote }},
+           "-stride", {{ .Values.corrjoin.stride | quote }},
+            "-comparer", "inprocess",
+            "-correlationThreshold", {{ .Values.corrjoin.correlationThreshold | quote }},
+            "-sampleInterval", {{ .Values.corrjoin.sampleInterval | quote }},
+           "-prometheusURL", {{ .Values.prometheusURL }},
+           "-maxRows", {{ .Values.corrjoin.maxRows | quote }},
+           "-labeldrop", "prometheus|prometheus_replica|id|image",
+           "-parquetMaxRowsPerRowGroup", "20000"]
+        resources:
+           limits:
+              cpu: "1"
+              memory: "4Gi"
+           requests:
+              cpu: "1"
+              memory: "4Gi"
+        ports:
+        - containerPort: 9201
+          name: api
+        - containerPort: 9203
+          name: metrics
+        - containerPort: 9205
+          name: explorer
+        volumeMounts:
+           - name: results-store
+             mountPath: /tmp/corrjoinResults
+

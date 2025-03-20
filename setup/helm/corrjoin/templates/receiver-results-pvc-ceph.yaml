@@ -1,0 +1,15 @@
+{{- if .Values.cni.useCeph -}}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+   name: receiver-results
+   namespace: default
+spec:
+   volumeName: receiver-results
+   storageClassName: ceph-filesystem
+   accessModes:
+      - ReadWriteMany
+   resources:
+      requests:
+         storage: 10Gi
+{{- end -}}

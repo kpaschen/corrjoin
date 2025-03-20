@@ -3,8 +3,8 @@ package reporter
 import (
 	"encoding/csv"
 	"fmt"
+	"github.com/kpaschen/corrjoin/lib"
 	"github.com/kpaschen/corrjoin/lib/datatypes"
-	"github.com/kpaschen/corrjoin/lib/settings"
 	"log"
 	"os"
 	"path/filepath"
@@ -13,7 +13,7 @@ import (
 
 type CsvReporter struct {
 	filenameBase     string
-	tsids            []string
+	tsids            []lib.TsId
 	strideStartTimes map[int]string
 	strideEndTimes   map[int]string
 }
@@ -26,14 +26,17 @@ func NewCsvReporter(filenameBase string) *CsvReporter {
 	}
 }
 
-func (c *CsvReporter) Initialize(config settings.CorrjoinSettings, strideCounter int,
-	strideStart time.Time, strideEnd time.Time, tsids []string) {
+func (c *CsvReporter) InitializeStride(strideCounter int, strideStart time.Time, strideEnd time.Time,
+	tsids []lib.TsId) {
 	c.tsids = tsids
 	c.strideStartTimes[strideCounter] = strideStart.UTC().Format("20060102150405")
 	c.strideEndTimes[strideCounter] = strideEnd.UTC().Format("20060102150405")
 	log.Printf("initializing with strideCounter %d, start time %s (%s), end time %s (%s)\n",
 		strideCounter, c.strideStartTimes[strideCounter], strideStart.UTC().String(),
 		c.strideEndTimes[strideCounter], strideEnd.UTC().String())
+}
+
+func (c *CsvReporter) RecordTimeseriesIds(strideCounter int, tsids []lib.TsId) {
 	idsfile := filepath.Join(c.filenameBase, fmt.Sprintf("tsids_%d_%s.csv", strideCounter,
 		c.strideStartTimes[strideCounter]))
 	file, err := os.OpenFile(idsfile, os.O_WRONLY|os.O_CREATE, 0640)
@@ -44,7 +47,7 @@ func (c *CsvReporter) Initialize(config settings.CorrjoinSettings, strideCounter
 	defer file.Close()
 	writer := csv.NewWriter(file)
 	for i, tsid := range tsids {
-		record := []string{fmt.Sprintf("%d", i), tsid}
+		record := []string{fmt.Sprintf("%d", i), tsid.MetricName}
 		err = writer.Write(record)
 		if err != nil {
 			log.Printf("failed to write record: %e\n", err)
@@ -102,7 +105,7 @@ func (c *CsvReporter) AddCorrelatedPairs(result datatypes.CorrjoinResult) error 
 	return err
 }
 
-func (c *CsvReporter) Flush() error {
+func (c *CsvReporter) Flush(_ int) error {
 	// This reporter does no internal buffering, so Flush is a noop.
 	return nil
 }

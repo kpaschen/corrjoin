@@ -1,0 +1,33 @@
+correlationServiceAddress: "http://correlation-service.default:9205"
+
+image:
+   repository: "localhost:5001"
+   pullPolicy: "Always"
+   image: "receiver"
+   version: "v0.1"
+
+serviceAccount:
+   create: true
+   name: "corrjoin-sa"
+
+grafana:
+   # You probably want to override this on the commandline.
+   password: editme
+
+cni:
+  useCeph: false
+  createPv: true
+
+corrjoin:
+   svdDimensions: 5
+   windowSize: 100
+   stride: 50
+   sampleInterval: 20
+   correlationThreshold: 99
+   maxRows: 0
+
+receiverNodeSelector:
+   nodeSelector:
+      resultsVolumeMounted: "true"
+
+prometheusURL: "http://prometheus-kube-prometheus-prometheus.monitoring:9090"

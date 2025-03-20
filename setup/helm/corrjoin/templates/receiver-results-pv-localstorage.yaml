@@ -1,0 +1,41 @@
+{{- if not .Values.cni.useCeph -}}
+{{- if .Values.cni.createPv -}}
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+   name: receiver-results
+spec:
+   accessModes:
+      - ReadWriteOnce
+   storageClassName: local-storage
+   capacity:
+      storage: 1Gi
+   volumeMode: Filesystem
+   nodeAffinity:
+     required:
+       nodeSelectorTerms:
+         - matchExpressions:
+           - key: resultsVolumeMounted
+             operator: Exists
+   local:
+      path: /tmp/corrjoinResults
+   persistentVolumeReclaimPolicy: Retain
+---
+{{- end -}}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+   name: receiver-results
+   namespace: default
+spec:
+   storageClassName: local-storage
+   accessModes:
+      - ReadWriteOnce
+   resources:
+      requests:
+{{- if .Values.cni.createPv }}
+         storage: 1Gi
+{{- else }}
+         storage: 20Gi
+{{- end -}}
+{{- end -}}

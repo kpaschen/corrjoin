@@ -5,9 +5,28 @@ import (
 	"github.com/kpaschen/corrjoin/lib/comparisons"
 	"github.com/kpaschen/corrjoin/lib/settings"
 	"github.com/kpaschen/corrjoin/lib/utils"
+	"github.com/prometheus/client_golang/prometheus"
 	"log"
 	"math"
+	"time"
 )
+
+var (
+	bucketSizeHist = prometheus.NewHistogram(
+		prometheus.HistogramOpts{
+			Name:                            "correlation_bucket_size_histogram",
+			Help:                            "Size of correlation buckets.",
+			Buckets:                         prometheus.DefBuckets,
+			NativeHistogramBucketFactor:     1.1,
+			NativeHistogramMaxBucketNumber:  100,
+			NativeHistogramMinResetDuration: 1 * time.Hour,
+		},
+	)
+)
+
+func init() {
+	prometheus.MustRegister(bucketSizeHist)
+}
 
 // A Bucket is an n-dimensional epsilon-tree leaf.
 // The coordinates are a list of the bucket indices on each level of
@@ -127,8 +146,9 @@ func (s *BucketingScheme) CorrelationCandidates() error {
 
 // candidatesForBucket processes rowPairs for a Bucket and its neighbours.
 func (s *BucketingScheme) candidatesForBucket(bucket *Bucket) error {
-	utils.ReportMemory(fmt.Sprintf("starting on bucket %s with %d members\n",
-		BucketName(bucket.coordinates), len(bucket.members)))
+	//utils.ReportMemory(fmt.Sprintf("starting on bucket %s with %d members\n",
+	//		BucketName(bucket.coordinates), len(bucket.members)))
+	bucketSizeHist.Observe(float64(len(bucket.members)))
 	for i := 0; i < len(bucket.members); i++ {
 		r1 := bucket.members[i]
 		for j := i + 1; j < len(bucket.members); j++ {
@@ -144,17 +164,15 @@ func (s *BucketingScheme) candidatesForBucket(bucket *Bucket) error {
 		}
 	}
 
-	n := neighbourCoordinates(bucket.coordinates)
-	log.Printf("bucket %s has %d neighbours\n", BucketName(bucket.coordinates), len(n))
-	for _, d := range n {
-		name := BucketName(d)
-		neighbour, exists := s.buckets[name]
-		if exists {
+	neighbourCount := 0
+	for otherName, otherBucket := range s.buckets {
+		if isLeftNeighbour(bucket.coordinates, otherBucket.coordinates) {
+			neighbourCount++
 			for _, r1 := range bucket.members {
-				for _, r2 := range neighbour.members {
+				for _, r2 := range otherBucket.members {
 					if r1 == r2 {
 						return fmt.Errorf("element %d is in buckets %s and %s", r1,
-							BucketName(bucket.coordinates), name)
+							BucketName(bucket.coordinates), otherName)
 					}
 					err := s.comparer.Compare(r1, r2)
 					if err != nil {
@@ -164,8 +182,34 @@ func (s *BucketingScheme) candidatesForBucket(bucket *Bucket) error {
 			}
 		}
 	}
-	log.Printf("done with bucket %s\n", BucketName(bucket.coordinates))
+	//log.Printf("bucket %s of size %d has been compared to %d neighbours\n",
+	//		BucketName(bucket.coordinates), len(bucket.members), neighbourCount)
 	return nil
+}
+
+// A bucket is a "left" neighbour of another bucket if it is a neighbour along any dimension,
+// and if its string representation is alphabetically smaller than the other bucket's.
+// So for instance [0,0,1] is a left neighbour of [0,1,1] but not a left neighbour of [0,0,0].
+func isLeftNeighbour(input []int, maybeNeighbour []int) bool {
+	if len(input) != len(maybeNeighbour) {
+		return false
+	}
+
+	oneDiffFound := false
+	for i, inputCoordinate := range input {
+		neighbourCoordinate := maybeNeighbour[i]
+		diff := inputCoordinate - neighbourCoordinate
+		if diff > 1 || diff < -1 {
+			return false
+		}
+		if !oneDiffFound && diff > 0 {
+			return false
+		}
+		if diff != 0 {
+			oneDiffFound = true
+		}
+	}
+	return oneDiffFound
 }
 
 func neighbourCoordinates(input []int) [][]int {

@@ -1,0 +1,32 @@
+correlationServiceAddress: "http://correlation-service.default:9205"
+
+image:
+   repository: "ghcr.io/kpaschen"
+   pullPolicy: "Always"
+   version: cluster-explorer
+   image: corrjoin
+
+serviceAccount:
+   create: true
+   name: "corrjoin-sa"
+
+grafana:
+   # You probably want to override this on the commandline.
+   password: correlations!
+
+# I don't currently have enough cpu in the cluster to run ceph.
+cni:
+  useCeph: false
+  createPv: false  
+
+corrjoin:
+  svdDimensions: 5
+  windowSize: 100
+  stride: 50
+  correlationThreshold: 99
+  sampleInterval: 20
+  parquetMaxRowsPerRowGroup: 20000
+  maxRows: 0
+
+prometheusURL: "http://prometheus-kube-prometheus-prometheus.monitoring:9090"
+

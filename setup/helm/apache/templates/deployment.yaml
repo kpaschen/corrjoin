@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: apache
+  namespace: apache
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: apache
+  template:
+    metadata:
+      labels:
+        app: apache
+    spec:
+      serviceAccountName: {{ .Values.serviceAccount.name }}
+      initContainers:
+      containers:
+        - name: apache
+          securityContext:
+            allowPrivilegeEscalation: false
+          image: {{ .Values.image.repository }}/{{ .Values.image.image }}:{{ .Values.image.version }}
+          imagePullPolicy: Always
+          ports:
+            - containerPort: {{ .Values.port }}
+              name: mattermost
+            - containerPort: {{ .Values.metricsPort }}
+              name: metrics
+ 

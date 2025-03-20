@@ -1,0 +1,7 @@
+apiVersion: v2
+name: corrjoin
+description: Correlation Join computations
+
+type: application
+version: 0.0.1
+appVersion: "0.0.1"

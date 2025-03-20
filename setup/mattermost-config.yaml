@@ -1,0 +1,21 @@
+mattermostOperator:
+  enabled: true
+  replicas: 1
+  rbac:
+    create: true
+  serviceAccount:
+    create: true
+  env:
+    maxReconcilingInstallations: 20
+    maxReconcilingConcurrency: 10
+    requeueOnLimitDelay: 20s
+  image:
+    repository: mattermost/mattermost-operator
+    tag: v1.22.0
+    pullPolicy: IfNotPresent
+  args:
+    - --enable-leader-election
+    - --metrics-addr=0.0.0.0:8383
+
+  privateRegistry:
+    enabled: false

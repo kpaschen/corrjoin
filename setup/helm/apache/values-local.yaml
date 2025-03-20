@@ -1,0 +1,16 @@
+image:
+  repository: "localhost:5001"
+  image: "mmapache"
+  version: "latest"
+
+serviceAccount:
+  name: apache-sa
+
+cni:
+  useCeph: false
+  createPv: true
+
+port: 8888
+metricsPort: 9999
+exporterPort: 9117
+servername: corrjoin.nephometrics.com

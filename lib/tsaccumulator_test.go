@@ -11,7 +11,7 @@ func TestComputeSlotIndex(t *testing.T) {
 	now := time.Now()
 	replies := make(chan *ObservationResult, 1)
 	defer close(replies)
-	acc := NewTimeseriesAccumulator(6, now, 5, replies)
+	acc := NewTimeseriesAccumulator(6, now, 5, 100, replies)
 
 	s0, err := acc.computeSlotIndex(now)
 	if err != nil {
@@ -37,21 +37,24 @@ func TestAddObservation(t *testing.T) {
 	now := time.Now()
 	replies := make(chan *ObservationResult, 1)
 	defer close(replies)
-	acc := NewTimeseriesAccumulator(6, now, 5, replies)
+	acc := NewTimeseriesAccumulator(6, now, 5, 100, replies)
 	acc.AddObservation(&Observation{
-		MetricName: "ts1",
-		Value:      0.1,
-		Timestamp:  now.Add(time.Second * 2),
+		MetricFingerprint: uint64(1),
+		MetricName:        "ts1",
+		Value:             0.1,
+		Timestamp:         now.Add(time.Second * 2),
 	})
 	acc.AddObservation(&Observation{
-		MetricName: "ts1",
-		Value:      0.2,
-		Timestamp:  now.Add(time.Second * 6),
+		MetricFingerprint: uint64(1),
+		MetricName:        "ts1",
+		Value:             0.2,
+		Timestamp:         now.Add(time.Second * 6),
 	})
 	acc.AddObservation(&Observation{
-		MetricName: "ts2",
-		Value:      0.3,
-		Timestamp:  now.Add(time.Second * 7),
+		MetricFingerprint: uint64(2),
+		MetricName:        "ts2",
+		Value:             0.3,
+		Timestamp:         now.Add(time.Second * 7),
 	})
 
 	// Expect two rows in the buffers, one with two entries, the other with
@@ -59,13 +62,13 @@ func TestAddObservation(t *testing.T) {
 	if len(acc.buffers) != 2 {
 		t.Errorf("expected two buffer rows but got %+v\n", acc.buffers)
 	}
-	b1 := acc.rowmap["ts1"]
+	b1 := acc.rowmap[uint64(1)]
 
 	if acc.buffers[b1][0] != 0.1 || acc.buffers[b1][1] != 0.2 {
 		t.Errorf("buffer for ts1 should be 0.1, 0.2, ... but got %+v\n", acc.buffers[b1])
 	}
 
-	b2 := acc.rowmap["ts2"]
+	b2 := acc.rowmap[uint64(2)]
 
 	if acc.buffers[b2][0] != 0.0 || acc.buffers[b2][1] != 0.3 {
 		t.Errorf("buffer for ts2 should be 0.0, 0.3, ... but got %+v\n", acc.buffers[b2])
@@ -76,26 +79,30 @@ func TestAddObservation_newStride(t *testing.T) {
 	now := time.Now()
 	replies := make(chan *ObservationResult, 1)
 	defer close(replies)
-	acc := NewTimeseriesAccumulator(2, now, 5, replies)
+	acc := NewTimeseriesAccumulator(2, now, 5, 100, replies)
 	acc.AddObservation(&Observation{
-		MetricName: "ts1",
-		Value:      0.1,
-		Timestamp:  now.Add(time.Second * 2),
+		MetricFingerprint: uint64(1),
+		MetricName:        "ts1",
+		Value:             0.1,
+		Timestamp:         now.Add(time.Second * 2),
 	})
 	acc.AddObservation(&Observation{
-		MetricName: "ts1",
-		Value:      0.2,
-		Timestamp:  now.Add(time.Second * 5),
+		MetricFingerprint: uint64(1),
+		MetricName:        "ts1",
+		Value:             0.2,
+		Timestamp:         now.Add(time.Second * 5),
 	})
 	acc.AddObservation(&Observation{
-		MetricName: "ts2",
-		Value:      0.4,
-		Timestamp:  now.Add(time.Second * 5),
+		MetricFingerprint: uint64(2),
+		MetricName:        "ts2",
+		Value:             0.4,
+		Timestamp:         now.Add(time.Second * 5),
 	})
 	acc.AddObservation(&Observation{
-		MetricName: "ts1",
-		Value:      0.3,
-		Timestamp:  now.Add(time.Second * 10),
+		MetricFingerprint: uint64(1),
+		MetricName:        "ts1",
+		Value:             0.3,
+		Timestamp:         now.Add(time.Second * 10),
 	})
 
 	select {
@@ -117,26 +124,30 @@ func TestAddObservation_interpolate(t *testing.T) {
 	now := time.Now()
 	replies := make(chan *ObservationResult, 1)
 	defer close(replies)
-	acc := NewTimeseriesAccumulator(6, now, 2, replies)
+	acc := NewTimeseriesAccumulator(6, now, 2, 100, replies)
 	acc.AddObservation(&Observation{
-		MetricName: "ts1",
-		Value:      0.1,
-		Timestamp:  now.Add(time.Second * 2),
+		MetricFingerprint: uint64(1),
+		MetricName:        "ts1",
+		Value:             0.1,
+		Timestamp:         now.Add(time.Second * 2),
 	})
 	acc.AddObservation(&Observation{
-		MetricName: "ts2",
-		Value:      0.4,
-		Timestamp:  now.Add(time.Second * 2),
+		MetricFingerprint: uint64(2),
+		MetricName:        "ts2",
+		Value:             0.4,
+		Timestamp:         now.Add(time.Second * 2),
 	})
 	acc.AddObservation(&Observation{
-		MetricName: "ts1",
-		Value:      0.2,
-		Timestamp:  now.Add(time.Second * 7),
+		MetricFingerprint: uint64(1),
+		MetricName:        "ts1",
+		Value:             0.2,
+		Timestamp:         now.Add(time.Second * 7),
 	})
 	acc.AddObservation(&Observation{
-		MetricName: "ts1",
-		Value:      0.3,
-		Timestamp:  now.Add(time.Second * 20),
+		MetricFingerprint: uint64(1),
+		MetricName:        "ts1",
+		Value:             0.3,
+		Timestamp:         now.Add(time.Second * 20),
 	})
 	select {
 	case buffers := <-replies:

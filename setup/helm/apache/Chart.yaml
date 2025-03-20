@@ -1,0 +1,7 @@
+apiVersion: v2
+name: apache
+description: Run apache and apache exporter
+
+type: application
+version: 0.0.1
+appVersion: "0.0.1"

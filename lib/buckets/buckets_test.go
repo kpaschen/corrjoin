@@ -70,6 +70,33 @@ func TestNeighbourCoordinates(t *testing.T) {
 	}
 }
 
+func TestIsLeftNeighbour(t *testing.T) {
+	n := isLeftNeighbour([]int{1, 2, 3}, []int{1, 2, 3})
+	if n {
+		t.Errorf("a bucket cannot be its own neighbour")
+	}
+	n = isLeftNeighbour([]int{1, 2, 3}, []int{1, 2, 3, 4})
+	if n {
+		t.Errorf("buckets of different length cannot be neighbours")
+	}
+	n = isLeftNeighbour([]int{1, 2, 3}, []int{1, 2, 5})
+	if n {
+		t.Errorf("buckets this far apart cannot be neighbours")
+	}
+	n = isLeftNeighbour([]int{1, 2, 3}, []int{1, -2, 3})
+	if n {
+		t.Errorf("buckets this far apart cannot be neighbours")
+	}
+	n = isLeftNeighbour([]int{2, 2, 3}, []int{1, 2, 3})
+	if n {
+		t.Errorf("not a left neighbour")
+	}
+	n = isLeftNeighbour([]int{1, 2, 3}, []int{2, 2, 3})
+	if !n {
+		t.Errorf("missed a left neighbour")
+	}
+}
+
 func TestCorrelationCandidates(t *testing.T) {
 	scheme, resultChannel := setupBucketingScheme()
 	scheme.Initialize()

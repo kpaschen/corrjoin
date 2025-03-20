@@ -9,30 +9,24 @@ import (
 	"testing"
 )
 
-var (
-	config = settings.CorrjoinSettings{
-		Algorithm: settings.ALGO_NONE,
-	}
-	comparer = &comparisons.InProcessComparer{}
-)
-
 func TestNormalizeWindow(t *testing.T) {
-	config.WindowSize = 3
-	config.MaxRowsForSvd = 2
+	config := settings.CorrjoinSettings{
+		Algorithm:     settings.ALGO_NONE,
+		WindowSize:    3,
+		MaxRowsForSvd: 2,
+	}
+	comparer := &comparisons.InProcessComparer{}
 	results := make(chan *datatypes.CorrjoinResult, 1)
 	defer close(results)
 	comparer.Initialize(config, results)
-	tswindow := &TimeseriesWindow{
-		settings: config,
-		comparer: comparer,
-	}
+	tswindow := NewTimeseriesWindow(config, comparer)
 	bufferWindow := [][]float64{
 		[]float64{0.1, 0.2, 0.3},
 		[]float64{1.1, 1.2, 1.3},
 		[]float64{2.1, 2.2, 2.3},
 	}
 
-	err := tswindow.ShiftBuffer(bufferWindow, results)
+	err, _ := tswindow.ShiftBuffer(bufferWindow)
 	if err != nil {
 		t.Errorf("unexpected: %v", err)
 	}
@@ -54,6 +48,7 @@ func TestNormalizeWindow(t *testing.T) {
 		t.Errorf("normalization should have left the raw data alone but bufferWindow is %v and buffers are %v",
 			bufferWindow, tswindow.buffers)
 	}
+	tswindow.unlockWindow()
 }
 
 func matrixEqual(a [][]float64, b [][]float64, epsilon float64) bool {
@@ -73,22 +68,108 @@ func matrixEqual(a [][]float64, b [][]float64, epsilon float64) bool {
 	return true
 }
 
-func TestShiftBuffer(t *testing.T) {
-	config.WindowSize = 3
+func TestShiftBufferWithRowExtend(t *testing.T) {
+	config := settings.CorrjoinSettings{
+		Algorithm:  settings.ALGO_NONE,
+		WindowSize: 9,
+	}
+	comparer := &comparisons.InProcessComparer{}
 	results := make(chan *datatypes.CorrjoinResult, 1)
 	defer close(results)
 	comparer.Initialize(config, results)
-	tswindow := &TimeseriesWindow{
-		settings: config,
-		comparer: comparer,
+	tswindow := NewTimeseriesWindow(config, comparer)
+	bufferWindow := [][]float64{
+		[]float64{0.1, 0.2, 0.3},
+		[]float64{1.1, 1.2, 1.3},
+		[]float64{2.1, 2.2, 2.3},
 	}
+	err, ready := tswindow.ShiftBuffer(bufferWindow)
+	if err != nil {
+		t.Errorf("unexpected: %v", err)
+	}
+	if ready {
+		t.Errorf("window of size 9 should not be ready with three columns")
+	}
+	bufferWindow = [][]float64{
+		[]float64{0.4, 0.5, 0.6},
+		[]float64{1.4, 1.5, 1.6},
+		[]float64{2.4, 2.5, 2.6},
+		[]float64{3.4, 3.5, 3.6},
+	}
+	err, ready = tswindow.ShiftBuffer(bufferWindow)
+	if err != nil {
+		t.Errorf("unexpected: %v", err)
+	}
+	if ready {
+		t.Errorf("window of size 9 should not be ready with three columns")
+	}
+}
+
+func TestShiftBufferMultipleTimes(t *testing.T) {
+	config := settings.CorrjoinSettings{
+		Algorithm:  settings.ALGO_NONE,
+		WindowSize: 9,
+	}
+	comparer := &comparisons.InProcessComparer{}
+	results := make(chan *datatypes.CorrjoinResult, 1)
+	defer close(results)
+	comparer.Initialize(config, results)
+	tswindow := NewTimeseriesWindow(config, comparer)
+	bufferWindow := [][]float64{
+		[]float64{0.1, 0.2, 0.3},
+		[]float64{1.1, 1.2, 1.3},
+		[]float64{2.1, 2.2, 2.3},
+	}
+	err, ready := tswindow.ShiftBuffer(bufferWindow)
+	if err != nil {
+		t.Errorf("unexpected: %v", err)
+	}
+	if ready {
+		t.Errorf("window of size 9 should not be ready with three columns")
+	}
+	bufferWindow = [][]float64{
+		[]float64{0.4, 0.5, 0.6},
+		[]float64{1.4, 1.5, 1.6},
+		[]float64{2.4, 2.5, 2.6},
+	}
+	err, ready = tswindow.ShiftBuffer(bufferWindow)
+	if err != nil {
+		t.Errorf("unexpected: %v", err)
+	}
+	if ready {
+		t.Errorf("window of size 9 should not be ready with six columns")
+	}
+	bufferWindow = [][]float64{
+		[]float64{0.7, 0.8, 0.9},
+		[]float64{1.7, 1.8, 1.9},
+		[]float64{2.7, 2.8, 2.9},
+	}
+	err, ready = tswindow.ShiftBuffer(bufferWindow)
+	if err != nil {
+		t.Errorf("unexpected: %v", err)
+	}
+	if !ready {
+		t.Errorf("window of size 9 should be ready with nine columns")
+	}
+}
+
+func TestShiftBuffer(t *testing.T) {
+	config := settings.CorrjoinSettings{
+		Algorithm:  settings.ALGO_NONE,
+		WindowSize: 3,
+	}
+	comparer := &comparisons.InProcessComparer{}
+	results := make(chan *datatypes.CorrjoinResult, 1)
+	defer close(results)
+	comparer.Initialize(config, results)
+	tswindow := NewTimeseriesWindow(config, comparer)
 	bufferWindow := [][]float64{
 		[]float64{0.1, 0.2, 0.3},
 		[]float64{1.1, 1.2, 1.3},
 		[]float64{2.1, 2.2, 2.3},
 	}
 
-	err := tswindow.ShiftBuffer(bufferWindow, results)
+	err, _ := tswindow.ShiftBuffer(bufferWindow)
 
 	if err != nil {
 		t.Errorf("unexpected error %v shifting buffer into time series window", err)
@@ -101,7 +182,8 @@ func TestShiftBuffer(t *testing.T) {
 	wrongSizeBuffer := [][]float64{
 		[]float64{0.4, 0.5},
 	}
-	err = tswindow.ShiftBuffer(wrongSizeBuffer, results)
+	tswindow.unlockWindow()
+	err, _ = tswindow.ShiftBuffer(wrongSizeBuffer)
 	if err == nil {
 		t.Errorf("expected error for mismatched buffer shift")
 	}
@@ -111,7 +193,7 @@ func TestShiftBuffer(t *testing.T) {
 		[]float64{1.4},
 		[]float64{2.4},
 	}
-	err = tswindow.ShiftBuffer(strideBuffer, results)
+	err, _ = tswindow.ShiftBuffer(strideBuffer)
 	if err != nil {
 		t.Errorf("unexpected error %v shifting buffer into ts window", err)
 	}
@@ -128,22 +210,23 @@ func TestShiftBuffer(t *testing.T) {
 }
 
 func TestPAA(t *testing.T) {
-	config.WindowSize = 4
-	config.SvdDimensions = 2
+	config := settings.CorrjoinSettings{
+		Algorithm:     settings.ALGO_NONE,
+		WindowSize:    4,
+		SvdDimensions: 2,
+	}
+	comparer := &comparisons.InProcessComparer{}
 	results := make(chan *datatypes.CorrjoinResult, 1)
 	defer close(results)
 	comparer.Initialize(config, results)
-	tswindow := &TimeseriesWindow{
-		settings: config,
-		comparer: comparer,
-	}
+	tswindow := NewTimeseriesWindow(config, comparer)
 	bufferWindow := [][]float64{
 		[]float64{0.1, 0.2, 0.3, 0.4},
 		[]float64{1.1, 1.2, 1.3, 1.4},
 		[]float64{2.1, 2.2, 2.3, 2.4},
 	}
 
-	// tswindow.ShiftBuffer(bufferWindow, results)
+	// tswindow.ShiftBuffer(bufferWindow)
 
 	tswindow.buffers = bufferWindow
 	// Cheat a little just to make the values easier to check.
@@ -171,23 +254,24 @@ func TestSVD(t *testing.T) {
 	// Input matrix A has 2 rows, 3 columns
 	// U should be 2x2, V should be 3x3
 	// But we compute ThinV, so V is only 3x2 because there's just 2 nonzero eigenvalues.
-	config.WindowSize = 3
-	config.SvdDimensions = 3
-	config.SvdOutputDimensions = 2
-	config.MaxRowsForSvd = 10000
+	config := settings.CorrjoinSettings{
+		Algorithm:           settings.ALGO_NONE,
+		WindowSize:          3,
+		SvdDimensions:       3,
+		SvdOutputDimensions: 2,
+		MaxRowsForSvd:       10000,
+	}
+	comparer := &comparisons.InProcessComparer{}
 	results := make(chan *datatypes.CorrjoinResult, 1)
 	defer close(results)
 	comparer.Initialize(config, results)
-	tswindow := &TimeseriesWindow{
-		settings: config,
-		comparer: comparer,
-	}
+	tswindow := NewTimeseriesWindow(config, comparer)
 	bufferWindow := [][]float64{
 		[]float64{3.0, 2.0, 2.0},
 		[]float64{2.0, 3.0, -2.0},
 	}
 
-	tswindow.ShiftBuffer(bufferWindow, results)
+	tswindow.ShiftBuffer(bufferWindow)
 	tswindow.postPAA = bufferWindow
 
 	svd, err := tswindow.sVD()
@@ -221,23 +305,24 @@ func TestCorrelationPairs(t *testing.T) {
 		[]float64{1.1, 1.2, 1.3, 1.4},
 		[]float64{2.3, -8.2, 1.3, 0.4},
 	}
-	config.WindowSize = 4
-	config.SvdDimensions = 4
-	config.SvdOutputDimensions = 4
-	config.EuclidDimensions = 3
-	config.CorrelationThreshold = 0.9
+	config := settings.CorrjoinSettings{
+		Algorithm:            settings.ALGO_NONE,
+		WindowSize:           4,
+		SvdDimensions:        4,
+		SvdOutputDimensions:  4,
+		EuclidDimensions:     3,
+		CorrelationThreshold: 0.9,
+	}
+	comparer := &comparisons.InProcessComparer{}
 	config.ComputeSettingsFields()
 	results := make(chan *datatypes.CorrjoinResult, 1)
 	defer close(results)
 	comparer.Initialize(config, results)
-	tswindow := &TimeseriesWindow{
-		settings: config,
-		buffers:  initialTsData,
-		comparer: comparer,
-	}
+	tswindow := NewTimeseriesWindow(config, comparer)
+	tswindow.buffers = initialTsData
 	tswindow.normalizeWindow()
 	tswindow.postSVD = tswindow.normalized
-	comparer.StartStride(tswindow.normalized, tswindow.constantRows, tswindow.StrideCounter)
+	comparer.StartStride(tswindow.normalized, tswindow.ConstantRows, tswindow.StrideCounter)
 	found := false
 	go func() {
 		for true {

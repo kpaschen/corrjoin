@@ -25,6 +25,9 @@ type CorrjoinSettings struct {
 	// Equals the window size.
 	WindowSize int // also OriginalColumnCount
 
+	// The number of columns in a stride.
+	StrideLength int
+
 	// The number of dimensions to choose from the output of SVD (aka kb)
 	SvdOutputDimensions int // == Dimensions
 
@@ -41,8 +44,23 @@ type CorrjoinSettings struct {
 	// matrices.
 	MaxRowsForSvd int
 
-	// How often we get new samples, in seconds.
+	// How often we expect new samples, in seconds.
 	SampleInterval int
+
+	// Number of rows per row group in Parquet.
+	// Bigger number mean more memory usage but better compression.
+	// 10000 works but outputs are about twice the size of an equivalent csv file.
+	// This is an int64 because the parquet library takes that type, not because I think
+	// anything > maxint32 is a good choice.
+	MaxRowsPerRowGroup int64
+
+	// This is mainly for debugging. You can limit the number of timeseries in the system,
+	// but the selection will be random. The system will process the first /MaxRows/ timeseries
+	// it sees and drop all others. If you want more control over the time series selection, use
+	// the label expression in the remote write config.
+	MaxRows int
+
+	ResultsDirectory string
 
 	Algorithm string
 }
@@ -57,7 +75,10 @@ func (s CorrjoinSettings) ComputeSettingsFields() CorrjoinSettings {
 		s.MaxRowsForSvd = 10000
 	}
 	if s.SampleInterval == 0 {
-		s.SampleInterval = 5
+		s.SampleInterval = 20
+	}
+	if s.MaxRowsPerRowGroup == 0 {
+		s.MaxRowsPerRowGroup = 100000
 	}
 	return s
 }
