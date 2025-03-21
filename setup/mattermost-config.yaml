@@ -8,9 +8,9 @@ mattermostOperator:
   env:
     maxReconcilingInstallations: 20
     maxReconcilingConcurrency: 10
-    requeueOnLimitDelay: 20s
+    requeuOnLimitDelay: 20s
   image:
-    repository: mattermost/mattermost-operator
+    repository: docker.io/mattermost/mattermost-operator
     tag: v1.22.0
     pullPolicy: IfNotPresent
   args:

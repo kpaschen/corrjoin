@@ -5,8 +5,6 @@
 # but you will need to add the remoteWrite spec to your prometheus.
 # You can find the remoteWrite spec in prometheus-values.yaml.
 
-set -euo pipefail
-
 # flavor determines the values file we use for helm.
 # The 'local' flavor uses localvolumes and is probably most useful for kind clusters.
 # The 'cloud' flavor can be used with a Kubernetes cluster in the cloud, but you
@@ -28,8 +26,8 @@ helm upgrade --install corrjoin . -f values-${flavor}.yaml
 )
 
 # Start kube-prometheus operator with local values file.
-ns_exists=$(kubectl get namespace -o name | grep monitoring)
-if [ -z $ns_exists ]; then 
+kubectl get namespace -o name monitoring
+if [ $? -ne 0 ]; then 
    kubectl create ns monitoring
 fi
 helm upgrade --install prometheus prometheus-community/kube-prometheus-stack -f prometheus-values.yaml

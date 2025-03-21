@@ -177,7 +177,7 @@ data:
                         "instant": true,
                         "interval": "",
                         "intervalFactor": 1,
-                        "legendFormat": "{{ version }}",
+                        "legendFormat": "apache info",
                         "step": 240
                      }
                   ],
@@ -583,7 +583,7 @@ data:
                         "expr": "apache_scoreboard{job=~\"$job\", instance=~\"$instance\"}",
                         "format": "time_series",
                         "intervalFactor": 1,
-                        "legendFormat": "{{ state }}",
+                        "legendFormat": "apache scoreboard",
                         "refId": "A",
                         "step": 240
                      }
@@ -677,7 +677,7 @@ data:
                         "expr": "apache_workers{job=~\"$job\", instance=~\"$instance\"}\n",
                         "format": "time_series",
                         "intervalFactor": 1,
-                        "legendFormat": "{{ state }}",
+                        "legendFormat": "apache workers",
                         "step": 240
                      }
                   ],

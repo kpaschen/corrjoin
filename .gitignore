@@ -23,6 +23,7 @@
 # Go workspace file
 go.work
 
+token
 openstack_config.txt
 venv/
 kubespray/

@@ -5,12 +5,14 @@ metadata:
   namespace: mattermost
 spec:
   replicas: 1
-  size: 100users
+  size: 10users
   ingress:
     enabled: false
     host: corrjoin.nephometrics.com
+  image: "docker.io/mattermost/mattermost-team-edition"
   version: 9.3.0
   database:
+    disableReadinessCheck: true
     external:
        secret: mattermost-postgres 
   fileStore:

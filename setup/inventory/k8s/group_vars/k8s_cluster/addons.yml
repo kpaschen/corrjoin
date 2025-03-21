@@ -46,6 +46,8 @@ local_volume_provisioner_storage_classes:
     mount_dir: /mnt/disks
     volume_mode: Filesystem
     fs_type: ext4
+    storage_class_extra_annotations:
+       storageclass.kubernetes.io/is-default-class: "true"
 #   fast-disks:
 #     host_dir: /mnt/fast-disks
 #     mount_dir: /mnt/fast-disks

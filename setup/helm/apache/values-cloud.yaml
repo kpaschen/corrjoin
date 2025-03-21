@@ -1,0 +1,16 @@
+image:
+  repository: "ghcr.io/kpaschen"
+  image: "mmapache"
+  version: "latest"
+
+serviceAccount:
+  name: apache-sa
+
+cni:
+  useCeph: false
+  createPv: false
+
+port: 8888
+metricsPort: 9999
+exporterPort: 9117
+servername: corrjoin.nephometrics.com

@@ -117,7 +117,7 @@ data:
                 "expr": "loadtest_http_request_time_bucket",
                 "fullMetaSearch": false,
                 "includeNullMetadata": false,
-                "legendFormat": "bucket {{le}}",
+                "legendFormat": "buckets",
                 "range": true,
                 "refId": "A",
                 "useBackend": false
@@ -235,7 +235,7 @@ data:
                 "hide": false,
                 "includeNullMetadata": true,
                 "instant": false,
-                "legendFormat": "loadtest error code {{status_code}} on path {{path}}",
+                "legendFormat": "loadtest error codes",
                 "range": true,
                 "refId": "B",
                 "useBackend": false

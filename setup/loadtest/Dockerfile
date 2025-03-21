@@ -3,7 +3,7 @@ FROM golang:1.23-alpine
 ENV GOPROXY="https://proxy.golang.org,direct"
 ENV GOBIN=/usr/local/bin
 
-RUN apk add --no-cache build-base bash make
+RUN apk add --no-cache build-base bash make git
 
 WORKDIR /loadtest
 COPY . .
