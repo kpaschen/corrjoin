@@ -109,12 +109,6 @@ cd helm/loadtest
 helm upgrade --install loadtest . -f values-${flavor}.yaml
 )
 
-# Once the mmloadtest pod is ready:
-# kubectl port-forward mmloadtest 4000:4000 &
-# curl -d "{\"LoadTestConfig\": $(cat config/config.json)}" http://localhost:4000/loadagent/create\?id\=lt0
-# curl -X POST http://localhost:4000/loadagent/lt0/run
-# curl -X POST http://localhost:4000/loadagent/lt0/addusers?amount=10
-# curl localhost:4000/metrics
-# curl -X POST http://localhost:4000/loadagent/lt0/removeusers?amount=10
-# curl -X POST http://localhost:4000/loadagent/lt0/stop
+echo "Now you can start the mattermost loadtest with './start-loadtest.sh'"
+
 

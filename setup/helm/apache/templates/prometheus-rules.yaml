@@ -1,0 +1,16 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: prometheus-apache-rules
+  namespace: apache
+  labels:
+    app: kube-prometheus-stack
+    app.kubernetes.io/instance: prometheus
+spec:
+  groups:
+  - name: apache-rules
+    rules:
+    - expr: |-
+        rate(apache_duration_ms_total[1m]) / rate(apache_accesses_total[1m])
+      record: 'apache_request_duration_ms:avg1m'
+

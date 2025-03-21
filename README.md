@@ -37,13 +37,13 @@ Bring up a local kind cluster:
 If this fails, make sure `kind` is on your path.
 
 Bring up the receiver + explorer as well as a kube-prometheus-stack.
-I publish a docker image at `ghcr.io/kpaschen/corrjoin`. You can use that or
-build your own image locally like this:
+I publish a docker image at `ghcr.io/kpaschen/corrjoin`. By default, that is 
+what will be used, but you can build your own image like this:
 
 `docker build -f Dockerfile-receiver -t receiver:v0.1 .`
 
-Either way, edit the values-local.yaml file in `setup/helm/corrjoin` so it has
-the right image settings.
+If you do that, publish your image to a container registry and make the environment variable
+`$IMAGEREGISTRY` point to that registry.
 
 `(cd setup && ./install-corrjoin.sh)`
 
@@ -53,7 +53,6 @@ You can run the system outside of a Kubernetes cluster; all you need is a Promet
 to wherever your receiver process is running. But a Kubernetes cluster makes this easy to set up, and it is
 a great source of timeseries data.
 The receiver + explorer need about 4GB of memory even in a smallish cluster.
-Grafana will happily use 8GB.
 
 The configuration for Prometheus and Grafana is in `prometheus-values.yaml`. This is just a values file for
 the kube-prometheus-stack helm chart.
@@ -95,7 +94,7 @@ export additional time series.
 
 I then run a loadtesting tool published by the Mattermost team.
 All the details are in the setup script in `setup/install-loadtestenv.sh`.
-You should probably take a look at the script before running it, since it wasnts a few parameters to be configured
+You should probably take a look at the script before running it, since it wants a few parameters to be configured
 via environment variables.
 
 ## Getting value out of the data
@@ -117,7 +116,7 @@ There is an edge between two metrics if they are correlated. The label on the ed
 coefficient. We only represent edges that are above the configured threshold.
 
 When you look at the data for a stride, you can see a list of _subgraphs_. Basically, the graph of metrics for a
-stride is usually not connected, but it consists of subgraphs that are not connected with each other. Often,
+stride is usually not connected, but it consists of multiple subgraphs. Often,
 there will be a lot of subgraphs with two or three nodes in them, and a few subgraphs with a lot (maybe several thousand) nodes.
 You can select a subgraph to list the metrics in it, and then select metrics that you want to see e.g. timeseries
 graphs for. Note that the API only returns 150 nodes and the Grafana graph rendering is most useful for below 20 nodes.
@@ -141,7 +140,7 @@ I usually have a few metrics for things with user-visible impact, like latency a
 It would probably be interesting to see which other time series are correlated with these "leading" metrics, perhaps
 also to see when the correlation appears or disappears.
 
-For example, let's say I discover that my web service's error rate becomes correlated with my database's latency
+For example, let's say I discover that my web service's latency becomes correlated with my database's latency
 when there are a lot of requests against the web service. That would be valuable information. Similarly, if I know
 my service's latency is not correlated with the cpu load on my nodes, that is also good to know.
 

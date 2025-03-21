@@ -1,0 +1,36 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: prometheus-postgres-rules
+  namespace: default
+  labels:
+    app: kube-prometheus-stack
+    app.kubernetes.io/instance: prometheus
+spec:
+  groups:
+  - name: postgres-rules
+    rules:
+    - expr: |-
+        rate(pg_stat_database_active_time_seconds_total[1m])
+      record: 'postgres_database_active_time_seconds:rate1m'
+    - expr: |-
+        rate(pg_stat_database_tup_fetched[1m])
+      record: 'postgres_tuples_fetched:rate1m'
+    - expr: |-
+        rate(pg_stat_database_tup_deleted[1m])
+      record: 'postgres_tuples_deleted:rate1m'
+    - expr: |-
+        rate(pg_stat_database_tup_inserted[1m])
+      record: 'postgres_tuples_inserted:rate1m'
+    - expr: |-
+        rate(pg_stat_database_tup_returned[1m])
+      record: 'postgres_tuples_returned:rate1m'
+    - expr: |-
+        rate(pg_stat_database_tup_updated[1m])
+      record: 'postgres_tuples_updated:rate1m'
+    - expr: |-
+        rate(pg_stat_database_xact_rollback[1m])
+      record: 'postgres_xact_rollback:rate1m'
+    - expr: |-
+        rate(pg_stat_database_xact_commit[1m])
+      record: 'postgres_xact_commit:rate1m'
