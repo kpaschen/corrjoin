@@ -17,7 +17,6 @@ while ! nc -vz localhost 4000 > /dev/null 2>&1 ; do
    sleep 0.1
 done
 
-echo "portforward is ok"
 
 curl -d "{\"LoadTestConfig\": $(cat loadtest/config.json)}" http://localhost:4000/loadagent/create\?id\=lt0
 curl -X POST http://localhost:4000/loadagent/lt0/run
