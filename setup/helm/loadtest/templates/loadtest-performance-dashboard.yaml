@@ -26,9 +26,168 @@ data:
         "editable": true,
         "fiscalYearStartMonth": 0,
         "graphTooltip": 0,
-        "id": 35,
+        "id": 36,
         "links": [],
         "panels": [
+          {
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            },
+            "fieldConfig": {
+              "defaults": {
+                "color": {
+                  "mode": "thresholds"
+                },
+                "mappings": [],
+                "thresholds": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "red",
+                      "value": 80
+                    }
+                  ]
+                }
+              },
+              "overrides": [
+                {
+                  "__systemRef": "hideSeriesFrom",
+                  "matcher": {
+                    "id": "byNames",
+                    "options": {
+                      "mode": "exclude",
+                      "names": [
+                        "buckets 10"
+                      ],
+                      "prefix": "All except:",
+                      "readOnly": true
+                    }
+                  },
+                  "properties": []
+                }
+              ]
+            },
+            "gridPos": {
+              "h": 8,
+              "w": 12,
+              "x": 0,
+              "y": 0
+            },
+            "id": 2,
+            "options": {
+              "colorMode": "value",
+              "graphMode": "area",
+              "justifyMode": "auto",
+              "orientation": "auto",
+              "percentChangeColorMode": "standard",
+              "reduceOptions": {
+                "calcs": [
+                  "lastNotNull"
+                ],
+                "fields": "",
+                "values": false
+              },
+              "showPercentChange": false,
+              "textMode": "auto",
+              "wideLayout": true
+            },
+            "pluginVersion": "11.5.2",
+            "targets": [
+              {
+                "disableTextWrap": false,
+                "editorMode": "code",
+                "expr": "histogram_quantile(0.95, sum by(le) (rate(loadtest_http_request_time_bucket[1m])))",
+                "format": "heatmap",
+                "fullMetaSearch": false,
+                "includeNullMetadata": false,
+                "legendFormat": "__auto",
+                "range": true,
+                "refId": "A",
+                "useBackend": false
+              }
+            ],
+            "title": "Loadtest request times: 95th percentile",
+            "type": "stat"
+          },
+          {
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            },
+            "fieldConfig": {
+              "defaults": {
+                "custom": {
+                  "hideFrom": {
+                    "legend": false,
+                    "tooltip": false,
+                    "viz": false
+                  },
+                  "scaleDistribution": {
+                    "type": "linear"
+                  }
+                }
+              },
+              "overrides": []
+            },
+            "gridPos": {
+              "h": 8,
+              "w": 12,
+              "x": 0,
+              "y": 8
+            },
+            "id": 4,
+            "options": {
+              "calculate": false,
+              "cellGap": 1,
+              "color": {
+                "exponent": 0.5,
+                "fill": "dark-orange",
+                "mode": "scheme",
+                "reverse": false,
+                "scale": "exponential",
+                "scheme": "RdBu",
+                "steps": 64
+              },
+              "exemplars": {
+                "color": "rgba(255,0,255,0.7)"
+              },
+              "filterValues": {
+                "le": 1e-9
+              },
+              "legend": {
+                "show": true
+              },
+              "rowsFrame": {
+                "layout": "auto"
+              },
+              "tooltip": {
+                "mode": "single",
+                "showColorScale": false,
+                "yHistogram": false
+              },
+              "yAxis": {
+                "axisPlacement": "left",
+                "reverse": false
+              }
+            },
+            "pluginVersion": "11.5.2",
+            "targets": [
+              {
+                "editorMode": "code",
+                "expr": "loadtest_http_request_time_bucket",
+                "legendFormat": "{{le}}",
+                "range": true,
+                "refId": "A"
+              }
+            ],
+            "title": "loadtest request time buckets",
+            "type": "heatmap"
+          },
           {
             "datasource": {
               "type": "prometheus",
@@ -93,9 +252,9 @@ data:
               "h": 8,
               "w": 12,
               "x": 0,
-              "y": 0
+              "y": 16
             },
-            "id": 2,
+            "id": 3,
             "options": {
               "legend": {
                 "calcs": [],
@@ -114,16 +273,16 @@ data:
               {
                 "disableTextWrap": false,
                 "editorMode": "builder",
-                "expr": "loadtest_http_request_time_bucket",
+                "expr": "rate(container_cpu_usage_seconds_total{namespace=\"mattermost\"}[$__rate_interval])",
                 "fullMetaSearch": false,
                 "includeNullMetadata": false,
-                "legendFormat": "buckets",
+                "legendFormat": "__auto",
                 "range": true,
                 "refId": "A",
                 "useBackend": false
               }
             ],
-            "title": "Loadtest request times",
+            "title": "mattermost pod cpu load",
             "type": "timeseries"
           },
           {
@@ -190,7 +349,7 @@ data:
               "h": 8,
               "w": 12,
               "x": 0,
-              "y": 8
+              "y": 24
             },
             "id": 1,
             "options": {
@@ -215,29 +374,14 @@ data:
                 },
                 "disableTextWrap": false,
                 "editorMode": "builder",
-                "expr": "loadtest_http_request_time_count",
-                "fullMetaSearch": false,
-                "includeNullMetadata": true,
-                "legendFormat": "loadtest requests",
-                "range": true,
-                "refId": "A",
-                "useBackend": false
-              },
-              {
-                "datasource": {
-                  "type": "prometheus",
-                  "uid": "prometheus"
-                },
-                "disableTextWrap": false,
-                "editorMode": "builder",
-                "expr": "loadtest_http_errors_total",
+                "expr": "loadtest_http_requests_total",
                 "fullMetaSearch": false,
                 "hide": false,
                 "includeNullMetadata": true,
                 "instant": false,
-                "legendFormat": "loadtest error codes",
+                "legendFormat": "{{method}} on {{path}} returned {{status_code}}",
                 "range": true,
-                "refId": "B",
+                "refId": "C",
                 "useBackend": false
               }
             ],
