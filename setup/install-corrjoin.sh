@@ -26,7 +26,7 @@ helm upgrade --install corrjoin . -f values-${flavor}.yaml
 )
 
 # Start kube-prometheus operator with local values file.
-kubectl get namespace -o name monitoring
+kubectl get namespace -o name monitoring 2>/dev/null
 if [ $? -ne 0 ]; then 
    kubectl create ns monitoring
 fi

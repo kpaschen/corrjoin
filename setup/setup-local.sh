@@ -2,8 +2,6 @@
 
 # Set up a local kind cluster.
 
-set -euo pipefail
-
 # Make sure the directories for localstorage exist
 mkdir -p /tmp/corrjoinResults
 mkdir -p /tmp/postgres

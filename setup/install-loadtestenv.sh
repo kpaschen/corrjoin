@@ -25,14 +25,14 @@ fi
 helm repo update
 
 # Install postgres so mattermost can use it
-kubectl get namespace -o name postgres
+kubectl get namespace -o name postgres 2>/dev/null
 if [ $? -ne 0 ]; then 
    kubectl create ns postgres
 fi
 
 # The postgres chart also contains the mattermost db secret, so make sure
 # that namespace also exists.
-kubectl get namespace -o name mattermost
+kubectl get namespace -o name mattermost 2>/dev/null
 if [ $? -ne 0 ]; then 
    kubectl create ns mattermost
 fi
@@ -42,7 +42,7 @@ helm upgrade --install postgres . -f values-${flavor}.yaml
 )
 
 # Install mattermost
-kubectl get namespace -o name mattermost-operator
+kubectl get namespace -o name mattermost-operator 2>/dev/null
 if [ $? -ne 0 ]; then 
    kubectl create ns mattermost-operator
 fi
@@ -61,7 +61,7 @@ fi
 
 # Set up apache in kubernetes.
 # This is so we can attach an apache exporter to it for monitoring.
-kubectl get namespace -o name apache
+kubectl get namespace -o name apache 2>/dev/null
 if [ $? -ne 0 ]; then 
    kubectl create ns apache
 fi

@@ -17,6 +17,7 @@ import (
 type ParquetExplorer struct {
 	filenameBase           string
 	file                   *parquet.File
+  pqfile                 *os.File
 	idIndex                int
 	correlatedIndex        int
 	pearsonIndex           int
@@ -74,13 +75,14 @@ func (p *ParquetExplorer) Initialize(filename string) error {
 
 	filepath := filepath.Join(p.filenameBase, filename)
 
-	pqfile, err := os.Open(filepath)
+  var err error
+	p.pqfile, err = os.Open(filepath)
 	if err != nil {
 		log.Printf("failed to open ts parquet file %s: %v\n", filename, err)
 		return err
 	}
-	stat, _ := pqfile.Stat()
-	p.file, err = parquet.OpenFile(pqfile, stat.Size())
+	stat, _ := p.pqfile.Stat()
+	p.file, err = parquet.OpenFile(p.pqfile, stat.Size())
 	if err != nil {
 		log.Printf("Parquet: failed to open ts parquet file %s: %v\n", filename, err)
 		return err
@@ -89,8 +91,12 @@ func (p *ParquetExplorer) Initialize(filename string) error {
 }
 
 func (p *ParquetExplorer) Delete() error {
+  var err error
+  if p.pqfile != nil {
+     err = p.pqfile.Close() 
+  }
 	p.file = nil
-	return nil
+	return err
 }
 
 // Reduced schema type for reading just metrics information from parquet.
