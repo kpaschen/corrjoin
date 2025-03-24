@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+   labels:
+      grafana_dashboard: "1"
+   name: corrjoin-stats
+data:
+  corrjoin-stats.json: |-
+  {{- (.Files.Get "files/corrjoin-stats.json") | nindent 4 }}
+

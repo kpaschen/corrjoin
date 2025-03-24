@@ -10,12 +10,12 @@ flavor=${FLAVOR:-local}
 # This needs to match the image.registry setting in your values-${flavor}.yaml files.
 imageregistry=${IMAGEREGISTRY:-localhost:5001}
 
-# Set BUILDTESTHOME to a nonempty value if you want to build the custom apache
+# Set BUILDLOCAL to a nonempty value if you want to build the custom apache
 # and load test images. If you do this, they will be pushed to $imageregistry.
 
 # Building the mattermost loadtesting tool involves checking it out from git.
 # LTHOME is the parent directory of where you want to check out the loadtesting code.
-# You only need this if you also set BUILDTESTHOME.
+# You only need this if you also set BUILDLOCAL.
 LTHOME=${LTHOME:-/home/developer/code}
 
 repo_exists=$(helm repo list -o json | yq '.[] | select(.name == "mattermost") .url')
@@ -50,7 +50,7 @@ helm upgrade --install mattermost-operator mattermost/mattermost-operator -n mat
 
 kubectl apply -f mattermost-installation.yaml
 
-if [ ! -z ${BUILDPACKAGES} ]; then
+if [ ! -z ${BUILDLOCAL} ]; then
 echo "building custom apache image"
 (
 cd apache
@@ -78,7 +78,7 @@ mmpod=$(kubectl -n mattermost get pods -o=name | grep mm-corrjoin)
 kubectl -n mattermost exec $mmpod -c mattermost -- /mattermost/bin/mmctl --local user create --email=nobody@nephometrics.com --username=mmadmin --password=mmadmin123
 kubectl -n mattermost exec $mmpod -c mattermost -- /mattermost/bin/mmctl --local roles system-admin mmadmin
 
-if [ ! -z "${BUILDPACKAGES}" ]; then
+if [ ! -z "${BUILDLOCAL}" ]; then
 echo "building custom apache mattermost load test image"
 mkdir -p $LTHOME
 (
@@ -100,7 +100,7 @@ docker push ${imageregistry}/mmloadtest:latest
 )
 fi
 
-kubectl get namespace -o name mattermost-lt
+kubectl get namespace -o name mattermost-lt 2> /dev/null
 if [ $? -ne 0 ]; then 
    kubectl create ns mattermost-lt
 fi
