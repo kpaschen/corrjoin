@@ -3,7 +3,7 @@ correlationServiceAddress: "http://correlation-service.default:9205"
 image:
    repository: "ghcr.io/kpaschen"
    pullPolicy: "Always"
-   version: main
+   version: dev
    image: corrjoin
 
 serviceAccount:
@@ -23,7 +23,7 @@ corrjoin:
   svdDimensions: 5
   windowSize: 100
   stride: 50
-  correlationThreshold: 99
+  correlationThreshold: 95
   sampleInterval: 20
   parquetMaxRowsPerRowGroup: 20000
   maxRows: 0

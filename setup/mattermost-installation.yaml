@@ -5,7 +5,7 @@ metadata:
   namespace: mattermost
 spec:
   replicas: 1
-  size: 10users
+  size: 200users
   ingress:
     enabled: false
     host: corrjoin.nephometrics.com

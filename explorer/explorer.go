@@ -167,7 +167,8 @@ func (c *CorrelationExplorer) GetSubgraphNodes(w http.ResponseWriter, r *http.Re
 			r := subgraphNodeResponse{
 				Id:       row,
 				Title:    string(metric.LabelSet["__name__"]),
-				MainStat: metric.MetricString(),
+				SubTitle: metric.MetricString(),
+				MainStat: fmt.Sprintf("%d", row),
 			}
 			resp = append(resp, r)
 			if len(resp) >= size {
@@ -356,6 +357,7 @@ func parseUrlDataIntoMetric(urlValue string, dropLabels map[string]bool) (*model
 	if len(urlValue) == 0 {
 		return nil, fmt.Errorf("empty url value")
 	}
+	log.Printf("parseUrlDataIntoMetric: got value %+v\n", urlValue)
 	if urlValue[0] != '{' {
 		return nil, fmt.Errorf("expected value to start with '{'")
 	}
@@ -703,6 +705,7 @@ func (c *CorrelationExplorer) GetMetricInfo(w http.ResponseWriter, r *http.Reque
 		http.Error(w, fmt.Sprintf("no stride found for time"), http.StatusNotFound)
 		return
 	}
+	log.Printf("GetMetricInfo: using stride %d\n", stride.ID)
 
 	metricRowIds, err := c.getMetrics(params, stride)
 	if err != nil {
@@ -772,12 +775,12 @@ func (c *CorrelationExplorer) GetCorrelatedSeries(w http.ResponseWriter, r *http
 		return
 	}
 
-  var otherRowIds []int
-  if len(metricRowIds) == 1 {
-     otherRowIds = []int{}
-  } else {
-     otherRowIds = metricRowIds[1:len(metricRowIds)-1]
-  }
+	var otherRowIds []int
+	if len(metricRowIds) == 1 {
+		otherRowIds = []int{}
+	} else {
+		otherRowIds = metricRowIds[1 : len(metricRowIds)-1]
+	}
 
 	correlatesMap, err := c.retrieveCorrelatedTimeseries(stride, metricRowIds[0], otherRowIds, 20)
 	if err != nil {

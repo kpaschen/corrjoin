@@ -17,7 +17,7 @@ import (
 type ParquetExplorer struct {
 	filenameBase           string
 	file                   *parquet.File
-  pqfile                 *os.File
+	pqfile                 *os.File
 	idIndex                int
 	correlatedIndex        int
 	pearsonIndex           int
@@ -75,7 +75,7 @@ func (p *ParquetExplorer) Initialize(filename string) error {
 
 	filepath := filepath.Join(p.filenameBase, filename)
 
-  var err error
+	var err error
 	p.pqfile, err = os.Open(filepath)
 	if err != nil {
 		log.Printf("failed to open ts parquet file %s: %v\n", filename, err)
@@ -91,10 +91,10 @@ func (p *ParquetExplorer) Initialize(filename string) error {
 }
 
 func (p *ParquetExplorer) Delete() error {
-  var err error
-  if p.pqfile != nil {
-     err = p.pqfile.Close() 
-  }
+	var err error
+	if p.pqfile != nil {
+		err = p.pqfile.Close()
+	}
 	p.file = nil
 	return err
 }

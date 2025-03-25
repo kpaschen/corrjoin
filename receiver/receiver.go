@@ -263,11 +263,11 @@ func NewTsProcessor(corrjoinConfig settings.CorrjoinSettings) *tsProcessor {
 					processor.reporter.RecordTimeseriesIds(stride, processor.accumulator.Tsids)
 					numberOfTimeseries.Set(float64(len(processor.accumulator.Tsids)))
 					constant, err := processor.reporter.AddConstantRows(stride, processor.window.ConstantRows)
-          if err != nil {
-             log.Printf("failed to record constant rows: %v\n", err)
-          } else {
-					   constantTimeseries.Set(float64(constant))
-          }
+					if err != nil {
+						log.Printf("failed to record constant rows: %v\n", err)
+					} else {
+						constantTimeseries.Set(float64(constant))
+					}
 					err = processor.reporter.Flush(stride)
 					if err != nil {
 						log.Printf("failed to flush results writer: %e\n", err)

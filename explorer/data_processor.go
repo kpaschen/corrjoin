@@ -333,9 +333,6 @@ func (c *CorrelationExplorer) retrieveCorrelatedTimeseries(stride *Stride, tsRow
 		return ret, err
 	}
 
-  log.Printf("obtained edges for row %d: %v\n", tsRowId, edges)
-  log.Printf("onlyconsider is %v\n", onlyConsider)
-
 	ctr := 0
 	for _, e := range edges {
 		if e.Pearson > 0 && (e.Source == tsRowId || e.Target == tsRowId) {
@@ -495,8 +492,8 @@ func (c *CorrelationExplorer) addStrideCacheEntry(stride *Stride) {
 			return
 		}
 		if s.Status == StrideDeleted {
-      log.Printf("removing deleted stride for time %v from cache\n", s.StartTime)
-      s = nil
+			log.Printf("removing deleted stride for time %v from cache\n", s.StartTime)
+			s = nil
 			c.strideCache[i] = stride
 			return
 		}
@@ -508,10 +505,10 @@ func (c *CorrelationExplorer) addStrideCacheEntry(stride *Stride) {
 	if oldestEntry == -1 {
 		log.Printf("no entry found for stride %d with start time %v\n", stride.ID, stride.StartTime)
 	}
-  if c.strideCache[oldestEntry] != nil {
-     log.Printf("evicting stride from time %v from cache\n", c.strideCache[oldestEntry].StartTime)
-     c.strideCache[oldestEntry] = nil
-  }
+	if c.strideCache[oldestEntry] != nil {
+		log.Printf("evicting stride from time %v from cache\n", c.strideCache[oldestEntry].StartTime)
+		c.strideCache[oldestEntry] = nil
+	}
 	c.strideCache[oldestEntry] = stride
 }
 

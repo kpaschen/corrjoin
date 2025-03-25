@@ -160,7 +160,7 @@ func (r *ParquetReporter) AddConstantRows(strideCounter int, constantRows []bool
 		log.Printf("recorded %d constant rows for stride %d\n", n, strideCounter)
 	} else {
 		log.Printf("error recording constant rows: %v\n", err)
-    return 0, err
+		return 0, err
 	}
 	return n, err
 }

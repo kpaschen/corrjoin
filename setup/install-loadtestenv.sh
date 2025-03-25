@@ -75,6 +75,7 @@ helm upgrade --install apache . -f values-${flavor}.yaml
 # First, we need to create an admin user for mattermost.
 mmpod=$(kubectl -n mattermost get pods -o=name | grep mm-corrjoin)
 
+# These can fail if the account already exists, that is not a problem.
 kubectl -n mattermost exec $mmpod -c mattermost -- /mattermost/bin/mmctl --local user create --email=nobody@nephometrics.com --username=mmadmin --password=mmadmin123
 kubectl -n mattermost exec $mmpod -c mattermost -- /mattermost/bin/mmctl --local roles system-admin mmadmin
 
