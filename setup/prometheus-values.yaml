@@ -3658,16 +3658,21 @@ prometheus:
     ## The remote_write spec configuration for Prometheus.
     ## ref: https://github.com/prometheus-operator/prometheus-operator/blob/main/Documentation/api.md#remotewritespec
     remoteWrite:
+      # Send time series data to the correlation service.
     - url: http://correlation-service.default:9201/api/v1/write
       writeRelabelConfigs:
+      # Drop histogram buckets and the alertmanager time series.
+      # Most histogram bucket time series are not useful for correlation analysis.
       - sourceLabels: ["__name__"]
         regex: "ALERTS.*|alertmanager_.*|.*_bucket"
         action: Drop
       - regex: "prometheus|prometheus_replica|id|image"
         action: LabelDrop
-      - sourceLabels: ["stage"]
-        regex: "ALPHA|BETA|DEPRECATED"
-        action: Drop
+      # Drop time series based on their lifecycle stage. This eliminates some duplicate time series
+      # from the correlation analysis.
+      #- sourceLabels: ["stage"]
+      #  regex: "ALPHA|BETA|DEPRECATED"
+      #  action: Drop
       queueConfig:
          sampleAgeLimit: 500s
 

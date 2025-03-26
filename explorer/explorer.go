@@ -213,11 +213,14 @@ func (c *CorrelationExplorer) GetSubgraphEdges(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	edges, err := c.retrieveEdges(stride, subgraphId)
-	if !ok {
-		http.Error(w, fmt.Errorf("no subgraph for id %d", subgraphId).Error(), http.StatusNotFound)
+	edges, err := c.retrieveEdges(stride, subgraphId, MAX_GRAPH_SIZE)
+	if err != nil {
+		log.Printf("failed to get edges for subgraph %d: %v\n", subgraphId, err)
+		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
+
+	log.Printf("retrieveEdges returned %d edges for subgraph %d\n", len(edges), subgraphId)
 
 	resp := make([]subgraphEdgeResponse, len(edges), len(edges))
 
@@ -609,6 +612,58 @@ func (c *CorrelationExplorer) GetTimeseries(w http.ResponseWriter, r *http.Reque
 	json.NewEncoder(w).Encode(resp)
 }
 
+func (c *CorrelationExplorer) extendTimeline(resp []TimelineResponse,
+	correlatesMap map[int]float32, knownTimeseries map[int]bool,
+	st *Stride) []TimelineResponse {
+
+	rowidsFound := make(map[int]bool)
+	newRowIds := make(map[int]bool)
+	for rowid, pearson := range correlatesMap {
+		alreadyKnown := knownTimeseries[rowid]
+		if !alreadyKnown {
+			knownTimeseries[rowid] = true
+			newRowIds[rowid] = true
+		}
+		rowidsFound[rowid] = true
+		resp = append(resp, TimelineResponse{
+			Time:   st.StartTimeString,
+			Metric: rowid,
+			State:  fmt.Sprintf("w %d: %f", st.ID, pearson),
+		})
+	}
+	// Insert '0' values for time series that were present in an earlier stride but are now missing.
+	for rowid, _ := range knownTimeseries {
+		_, ok := rowidsFound[rowid]
+		if !ok {
+			resp = append(resp, TimelineResponse{
+				Time:   st.StartTimeString,
+				Metric: rowid,
+				State:  fmt.Sprintf("w %d: 0.0", st.ID),
+			})
+		}
+	}
+	// insert '0' values for time series that are new in this stride.
+	for _, earlierStride := range c.strideCache {
+		if earlierStride == nil {
+			continue
+		}
+		if earlierStride.Status != StrideProcessed {
+			continue
+		}
+		if earlierStride.ID == st.ID {
+			break
+		}
+		for rowid, _ := range newRowIds {
+			resp = append(resp, TimelineResponse{
+				Time:   earlierStride.EndTimeString,
+				Metric: rowid,
+				State:  fmt.Sprintf("w %d: 0.0", earlierStride.ID),
+			})
+		}
+	}
+	return resp
+}
+
 func (c *CorrelationExplorer) GetTimeline(w http.ResponseWriter, r *http.Request) {
 	params := r.URL.Query()
 	stride, err := c.getStride(params)
@@ -635,17 +690,18 @@ func (c *CorrelationExplorer) GetTimeline(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	if len(metricRowIds) < 2 {
-		log.Printf("not computing timeline for isolated timeseries\n")
-		resp := make([]TimelineResponse, 0, 0)
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(resp)
-		return
+	resp := make([]TimelineResponse, 0, len(c.strideCache)*(len(metricRowIds)))
+
+	// If more than one metric row id is in the request, limit the response
+	// to just these. Otherwise we get all correlated pairs for the given row id.
+	var otherRowIds []int
+	if len(metricRowIds) == 1 {
+		otherRowIds = []int{}
+	} else {
+		otherRowIds = metricRowIds[1 : len(metricRowIds)-1]
 	}
 
-	resp := make([]TimelineResponse, 0, len(c.strideCache)*(len(metricRowIds)-1))
-
+	rowidsFromAllStrides := make(map[int]bool)
 	// Look up the Pearson correlation of the first selected timeseries with any of the others across all strides.
 	for _, st := range c.strideCache {
 		if st == nil {
@@ -654,37 +710,12 @@ func (c *CorrelationExplorer) GetTimeline(w http.ResponseWriter, r *http.Request
 		if st.Status != StrideProcessed {
 			continue
 		}
-		var otherRowIds []int
-		if len(metricRowIds) == 1 {
-			otherRowIds = []int{}
-		} else {
-			otherRowIds = metricRowIds[1 : len(metricRowIds)-1]
-		}
 		correlatesMap, err := c.retrieveCorrelatedTimeseries(st, metricRowIds[0], otherRowIds, 20)
 		if err != nil {
 			log.Printf("error retrieving correlates for timeseries %d and stride %d: %v\n", metricRowIds[0], st.ID, err)
 			continue
 		}
-		for i, rowid := range metricRowIds {
-			if i == 0 {
-				continue
-			}
-			pearson, exists := correlatesMap[rowid]
-			if !exists {
-				log.Printf("%d is missing from correlates map %v\n", rowid, correlatesMap)
-				resp = append(resp, TimelineResponse{
-					Time:   st.EndTimeString,
-					Metric: rowid,
-					State:  "0",
-				})
-			} else {
-				resp = append(resp, TimelineResponse{
-					Time:   st.EndTimeString,
-					Metric: rowid,
-					State:  fmt.Sprintf("%f", pearson),
-				})
-			}
-		}
+		resp = c.extendTimeline(resp, correlatesMap, rowidsFromAllStrides, st)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
