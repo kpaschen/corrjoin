@@ -213,7 +213,6 @@ func (c *CorrelationExplorer) scanResultFiles() error {
 					}
 					break
 				}
-				stride.convertMetricsCache()
 				log.Printf("added stride %d with %d timeseries", stride.ID, len(stride.metricsCache))
 				stride.Status = StrideRead
 				break
@@ -248,16 +247,6 @@ func directoryNameForStride(stride Stride) string {
 	return fmt.Sprintf("stride_%d_%d", stride.ID, stride.StartTime)
 }
 
-func (s *Stride) convertMetricsCache() {
-	for rowid, m := range s.metricsCacheByRowId {
-		if m.Fingerprint == 0 {
-			log.Printf("missing metrics fingerprint for row id %d, %v\n", rowid, *m)
-			continue
-		}
-		s.metricsCache[m.Fingerprint] = rowid
-	}
-}
-
 func parseStrideFromDirname(dirname string) (*Stride, error) {
 	var strideCounter int
 	var startTime int
@@ -288,28 +277,27 @@ func parseStrideFromFilename(filename string) (*Stride, error) {
 		return nil, err
 	}
 	return &Stride{
-		ID:                  strideCounter,
-		StartTime:           startT.UTC().Unix(),
-		StartTimeString:     startT.UTC().Format(explorerlib.FORMAT),
-		EndTime:             endT.UTC().Unix(),
-		EndTimeString:       endT.UTC().Format(explorerlib.FORMAT),
-		Status:              StrideExists,
-		Filename:            filename,
-		metricsCache:        make(map[uint64]int),
-		metricsCacheByRowId: make(map[int](*explorerlib.Metric)),
+		ID:              strideCounter,
+		StartTime:       startT.UTC().Unix(),
+		StartTimeString: startT.UTC().Format(explorerlib.FORMAT),
+		EndTime:         endT.UTC().Unix(),
+		EndTimeString:   endT.UTC().Format(explorerlib.FORMAT),
+		Status:          StrideExists,
+		Filename:        filename,
+		metricsCache:    make(map[uint64](*explorerlib.Metric)),
 	}, nil
 }
 
-func (c *CorrelationExplorer) retrieveCorrelatedTimeseries(stride *Stride, tsRowId int,
-	onlyConsider []int, maxResults int) (map[int]float32, error) {
+func (c *CorrelationExplorer) retrieveCorrelatedTimeseries(stride *Stride, tsRowId uint64,
+	onlyConsider []uint64, maxResults int) (map[uint64]float32, error) {
 
 	if stride == nil || stride.subgraphs == nil {
 		return nil, fmt.Errorf("stride has no subgraphs")
 	}
 
-	ret := make(map[int]float32)
+	ret := make(map[uint64]float32)
 
-	metric, exists := stride.metricsCacheByRowId[tsRowId]
+	metric, exists := stride.metricsCache[tsRowId]
 	if !exists {
 		return ret, fmt.Errorf("no metric with id %d", tsRowId)
 	}
@@ -332,7 +320,7 @@ func (c *CorrelationExplorer) retrieveCorrelatedTimeseries(stride *Stride, tsRow
 	ctr := 0
 	for _, e := range edges {
 		if e.Pearson > 0 && (e.Source == tsRowId || e.Target == tsRowId) {
-			var otherRowId int
+			var otherRowId uint64
 			if e.Source == tsRowId {
 				otherRowId = e.Target
 			} else {
@@ -410,8 +398,8 @@ func (c *CorrelationExplorer) retrieveEdges(stride *Stride, graphId int, maxNode
 		}
 
 		results = append(results, explorerlib.Edge{
-			Source:  int(source),
-			Target:  int(target),
+			Source:  uint64(source),
+			Target:  uint64(target),
 			Pearson: float32(pearson),
 		})
 		ctr++
@@ -546,7 +534,7 @@ func (c *CorrelationExplorer) readResultFile(filename string, stride *Stride) er
 	}
 	defer parquetExplorer.Delete()
 	log.Printf("reading metrics from %s\n", filename)
-	err = parquetExplorer.GetMetrics(&stride.metricsCacheByRowId)
+	err = parquetExplorer.GetMetrics(&stride.metricsCache)
 	if err != nil {
 		return err
 	}

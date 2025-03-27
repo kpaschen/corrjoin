@@ -89,7 +89,8 @@ func main() {
 					continue
 				}
 				result_ctr += len(correlationResult.CorrelatedPairs)
-				correlationReporter.AddCorrelatedPairs(*correlationResult)
+				// The csv reporter does not use the time series ids, so passing nil here is ok.
+				correlationReporter.AddCorrelatedPairs(*correlationResult, nil)
 			}
 		}
 	}()

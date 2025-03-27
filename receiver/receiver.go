@@ -262,7 +262,7 @@ func NewTsProcessor(corrjoinConfig settings.CorrjoinSettings) *tsProcessor {
 					stride := correlationResult.StrideCounter
 					processor.reporter.RecordTimeseriesIds(stride, processor.accumulator.Tsids)
 					numberOfTimeseries.Set(float64(len(processor.accumulator.Tsids)))
-					constant, err := processor.reporter.AddConstantRows(stride, processor.window.ConstantRows)
+					constant, err := processor.reporter.AddConstantRows(stride, processor.window.ConstantRows, processor.accumulator.Tsids)
 					if err != nil {
 						log.Printf("failed to record constant rows: %v\n", err)
 					} else {
@@ -274,7 +274,7 @@ func NewTsProcessor(corrjoinConfig settings.CorrjoinSettings) *tsProcessor {
 					}
 					log.Printf("finished recording data for stride %d\n", stride)
 				} else {
-					err := processor.reporter.AddCorrelatedPairs(*correlationResult)
+					err := processor.reporter.AddCorrelatedPairs(*correlationResult, processor.accumulator.Tsids)
 					if err != nil {
 						log.Printf("failed to log results: %v\n", err)
 					}

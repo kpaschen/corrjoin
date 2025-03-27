@@ -22,7 +22,7 @@ type Timeseries struct {
 	// Cannot make this optional, as then '0' will be written as null.
 	// Instead, when you want to say "no correlation information", leave the Pearson
 	// field blank and set Correlated to be the same as ID.
-	Correlated int `parquet:"correlated"`
+	Correlated uint64 `parquet:"correlated"`
 	// There is no float16 datatype in go, but maybe a fixed-precision representation would be best.
 	Pearson  float32 `parquet:"pearson,optional"`
 	Constant bool    `parquet:"constant,optional"`
@@ -77,7 +77,7 @@ func (r *ParquetReporter) InitializeStride(strideCounter int,
 	r.strideWriters[strideCounter] = parquet.NewGenericWriter[Timeseries](file, parquet.MaxRowsPerRowGroup(r.maxRowsPerRowGroup))
 }
 
-func extractRowsFromResult(result datatypes.CorrjoinResult) []Timeseries {
+func extractRowsFromResult(result datatypes.CorrjoinResult, tsids []lib.TsId) []Timeseries {
 	retsize := 2 * len(result.CorrelatedPairs)
 	ret := make([]Timeseries, retsize, retsize)
 
@@ -85,16 +85,18 @@ func extractRowsFromResult(result datatypes.CorrjoinResult) []Timeseries {
 	for pair, pearson := range result.CorrelatedPairs {
 		rowids := pair.RowIds()
 		ts1 := Timeseries{
-			ID:         rowids[0],
-			Correlated: rowids[1],
-			Pearson:    float32(pearson),
+			MetricFingerprint: tsids[rowids[0]].MetricFingerprint,
+			ID:                rowids[0],
+			Correlated:        tsids[rowids[1]].MetricFingerprint,
+			Pearson:           float32(pearson),
 		}
 		ret[ctr] = ts1
 		ctr++
 		ts2 := Timeseries{
-			ID:         rowids[1],
-			Correlated: rowids[0],
-			Pearson:    float32(pearson),
+			MetricFingerprint: tsids[rowids[1]].MetricFingerprint,
+			ID:                rowids[1],
+			Correlated:        tsids[rowids[0]].MetricFingerprint,
+			Pearson:           float32(pearson),
 		}
 		ret[ctr] = ts2
 		ctr++
@@ -118,12 +120,16 @@ func (r *ParquetReporter) RecordTimeseriesIds(strideCounter int, tsids []lib.TsI
 			log.Printf("failed to unmarshal tsid %s: %e\n", tsid.MetricName, err)
 			return err
 		}
+		if tsid.MetricFingerprint != (uint64)(metricModel.Fingerprint()) {
+			log.Printf("metric fingerprint mismatch %d vs. %d for metric %v\n", tsid.MetricFingerprint,
+				(uint64)(metricModel.Fingerprint()), metricModel)
+		}
 		row := Timeseries{
 			ID:                i,
-			Correlated:        i, // See above, this field is not optional.
+			Correlated:        tsid.MetricFingerprint, // See above, this field is not optional.
 			Metric:            string(metricModel["__name__"]),
 			Labels:            make(map[string]string),
-			MetricFingerprint: (uint64)(metricModel.Fingerprint()),
+			MetricFingerprint: tsid.MetricFingerprint,
 		}
 		for key, value := range metricModel {
 			if key == "__name__" {
@@ -140,7 +146,7 @@ func (r *ParquetReporter) RecordTimeseriesIds(strideCounter int, tsids []lib.TsI
 	return err
 }
 
-func (r *ParquetReporter) AddConstantRows(strideCounter int, constantRows []bool) (int, error) {
+func (r *ParquetReporter) AddConstantRows(strideCounter int, constantRows []bool, tsids []lib.TsId) (int, error) {
 	writer, exists := r.strideWriters[strideCounter]
 	if !exists || writer == nil {
 		return 0, fmt.Errorf("missing writer for timeseries")
@@ -149,9 +155,10 @@ func (r *ParquetReporter) AddConstantRows(strideCounter int, constantRows []bool
 	for rowid, isConstant := range constantRows {
 		if isConstant {
 			newRows = append(newRows, Timeseries{
-				ID:         rowid,
-				Correlated: rowid,
-				Constant:   isConstant,
+				MetricFingerprint: tsids[rowid].MetricFingerprint,
+				ID:                rowid,
+				Correlated:        tsids[rowid].MetricFingerprint,
+				Constant:          isConstant,
 			})
 		}
 	}
@@ -165,14 +172,14 @@ func (r *ParquetReporter) AddConstantRows(strideCounter int, constantRows []bool
 	return n, err
 }
 
-func (r *ParquetReporter) AddCorrelatedPairs(result datatypes.CorrjoinResult) error {
+func (r *ParquetReporter) AddCorrelatedPairs(result datatypes.CorrjoinResult, tsids []lib.TsId) error {
 	writer, exists := r.strideWriters[result.StrideCounter]
 	if !exists || writer == nil {
 		return fmt.Errorf("missing writer for timeseries")
 	}
 
 	// TODO: maybe stream these straight to the file and avoid the extra alloc.
-	rows := extractRowsFromResult(result)
+	rows := extractRowsFromResult(result, tsids)
 	_, err := writer.Write(rows)
 	if err != nil {
 		log.Printf("error writing correlation results: %v\n", err)

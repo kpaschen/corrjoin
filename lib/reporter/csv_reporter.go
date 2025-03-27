@@ -98,7 +98,7 @@ func (c *CsvReporter) AddConstantRows(strideCounter int, constantRows []bool) (i
 	return ctr, err
 }
 
-func (c *CsvReporter) AddCorrelatedPairs(result datatypes.CorrjoinResult) error {
+func (c *CsvReporter) AddCorrelatedPairs(result datatypes.CorrjoinResult, _ []lib.TsId) error {
 	startTime, ok := c.strideStartTimes[result.StrideCounter]
 	if !ok {
 		return fmt.Errorf("missing stride start time for %d", result.StrideCounter)

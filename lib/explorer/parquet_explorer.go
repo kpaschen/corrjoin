@@ -108,7 +108,7 @@ type metricRow struct {
 	Constant          bool              `parquet:"constant,optional"`
 }
 
-func (p *ParquetExplorer) GetMetrics(cache *map[int]*Metric) error {
+func (p *ParquetExplorer) GetMetrics(cache *map[uint64]*Metric) error {
 	reader := parquet.NewGenericReader[metricRow](p.file)
 	defer reader.Close()
 	for done := false; !done; {
@@ -125,17 +125,15 @@ func (p *ParquetExplorer) GetMetrics(cache *map[int]*Metric) error {
 			if i >= numRead {
 				break
 			}
-			// The MetricFingerprint gets written on the rows that have the metrics
-			// metadata, but not on the rows with the constant bit.
 			if result.Metric != "" {
-				m, exists := (*cache)[result.ID]
+				m, exists := (*cache)[result.MetricFingerprint]
 				if !exists {
 					m = &Metric{
 						RowId:       result.ID,
 						Fingerprint: result.MetricFingerprint,
 						LabelSet:    (model.LabelSet)(make(map[model.LabelName]model.LabelValue)),
 					}
-					(*cache)[result.ID] = m
+					(*cache)[result.MetricFingerprint] = m
 				} else {
 					log.Printf("metric found for row id %d and metric fp %d: %v\n", m.RowId, m.Fingerprint, m)
 					log.Printf("expanding with fingerprint %d, name %s, and labels %v\n",
@@ -152,14 +150,15 @@ func (p *ParquetExplorer) GetMetrics(cache *map[int]*Metric) error {
 				}
 			}
 			if result.Constant {
-				m, exists := (*cache)[result.ID]
+				m, exists := (*cache)[result.MetricFingerprint]
 				if !exists {
 					m = &Metric{
-						RowId:    result.ID,
-						Constant: true,
-						LabelSet: make(map[model.LabelName]model.LabelValue),
+						Fingerprint: result.MetricFingerprint,
+						RowId:       result.ID,
+						Constant:    true,
+						LabelSet:    make(map[model.LabelName]model.LabelValue),
 					}
-					(*cache)[result.ID] = m
+					(*cache)[result.MetricFingerprint] = m
 				} else {
 					m.Constant = true
 				}
@@ -169,7 +168,7 @@ func (p *ParquetExplorer) GetMetrics(cache *map[int]*Metric) error {
 	return nil
 }
 
-func (s *SubgraphMemberships) addPair(row1 int, row2 int) {
+func (s *SubgraphMemberships) addPair(row1 uint64, row2 uint64) {
 	c1, have1 := s.Rows[row1]
 	c2, have2 := s.Rows[row2]
 
@@ -221,7 +220,7 @@ func (s *SubgraphMemberships) addPair(row1 int, row2 int) {
 	}
 }
 
-func (s *SubgraphMemberships) GetGraphId(rowId int) int {
+func (s *SubgraphMemberships) GetGraphId(rowId uint64) int {
 	if s.Rows == nil {
 		return -1
 	}
@@ -237,7 +236,7 @@ func (p *ParquetExplorer) GetSubgraphs() (*SubgraphMemberships, error) {
 	reader := parquet.NewGenericReader[reporter.Timeseries](p.file)
 	defer reader.Close()
 	subgraphs := &SubgraphMemberships{
-		Rows:           make(map[int]int),
+		Rows:           make(map[uint64]int),
 		Sizes:          make(map[int]int),
 		nextSubgraphId: 0,
 	}
@@ -261,7 +260,7 @@ func (p *ParquetExplorer) GetSubgraphs() (*SubgraphMemberships, error) {
 			if !(result.Pearson > 0.0) {
 				continue
 			}
-			subgraphs.addPair(result.ID, result.Correlated)
+			subgraphs.addPair(result.MetricFingerprint, result.Correlated)
 		}
 	}
 	return subgraphs, nil
@@ -295,11 +294,11 @@ func (p *ParquetExplorer) GetEdges(edgeChan chan<- []*Edge) error {
 			if !(result.Pearson > 0.0) {
 				continue
 			}
-			if result.ID >= result.Correlated {
+			if result.MetricFingerprint >= result.Correlated {
 				continue
 			}
 			edgeBuf = append(edgeBuf, &Edge{
-				Source:  result.ID,
+				Source:  result.MetricFingerprint,
 				Target:  result.Correlated,
 				Pearson: result.Pearson,
 			})
@@ -309,14 +308,13 @@ func (p *ParquetExplorer) GetEdges(edgeChan chan<- []*Edge) error {
 	return nil
 }
 
-// TODO: parse into Metric
-func (p *ParquetExplorer) LookupMetric(timeSeriesId int) (map[string]string, error) {
+func (p *ParquetExplorer) LookupMetric(timeSeriesId uint64) (map[string]string, error) {
 	if p.file == nil {
 		return nil, fmt.Errorf("parquet explorer has no parquet file")
 	}
 	ret := make(map[string]string)
 	for _, rg := range p.file.RowGroups() {
-		idchunk := rg.ColumnChunks()[p.idIndex]
+		idchunk := rg.ColumnChunks()[p.metricFingerprintIndex]
 		ididx, _ := idchunk.ColumnIndex()
 		found := parquet.Find(ididx, parquet.ValueOf(timeSeriesId),
 			parquet.CompareNullsLast(idchunk.Type().Compare))
@@ -344,7 +342,7 @@ func (p *ParquetExplorer) LookupMetric(timeSeriesId int) (map[string]string, err
 				if i >= numRead {
 					break
 				}
-				if result.ID != timeSeriesId {
+				if result.MetricFingerprint != timeSeriesId {
 					continue
 				}
 				if result.Metric != "" {

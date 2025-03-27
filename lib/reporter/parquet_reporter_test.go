@@ -96,7 +96,7 @@ func TestAddCorrelatedPairs(t *testing.T) {
 	rp2 := datatypes.NewRowPair(0, 2)
 	results1.CorrelatedPairs[*rp2] = 0.99
 
-	err = rep.AddCorrelatedPairs(results1)
+	err = rep.AddCorrelatedPairs(results1, []lib.TsId{tsid1, tsid2, tsid2})
 	if err != nil {
 		t.Errorf("failed to add correlated pair")
 	}

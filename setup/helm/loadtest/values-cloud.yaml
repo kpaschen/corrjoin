@@ -11,4 +11,4 @@ serviceAccount:
 port: 80
 metricsPort: 8888
 
-enableStressPod: true
+enableStressPod: false

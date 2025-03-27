@@ -12,7 +12,7 @@ type Reporter interface {
 
 	RecordTimeseriesIds(strideCounter int, tsids []lib.TsId)
 
-	AddCorrelatedPairs(datatypes.CorrjoinResult) error
+	AddCorrelatedPairs(datatypes.CorrjoinResult, []lib.TsId) error
 
 	Flush(strideCounter int) error
 }
