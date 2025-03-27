@@ -99,6 +99,11 @@ cd ${LTHOME}/mattermost-load-test-ng
 docker build -f Dockerfile-lt -t ${imageregistry}/mmloadtest:latest .
 docker push ${imageregistry}/mmloadtest:latest
 )
+(
+cd loadtest
+docker build -f Dockerfile-stress -t ${imageregistry}/corrjoinstress:latest .
+docker push ${imageregistry}/corrjoinstress:latest
+)
 fi
 
 kubectl get namespace -o name mattermost-lt 2> /dev/null

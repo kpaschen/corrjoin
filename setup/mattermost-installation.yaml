@@ -5,7 +5,7 @@ metadata:
   namespace: mattermost
 spec:
   replicas: 1
-  size: 200users
+  size: 2000users
   ingress:
     enabled: false
     host: corrjoin.nephometrics.com
@@ -24,6 +24,10 @@ spec:
       value: "true"
     - name: MM_TEAMSETTINGS_ENABLEOPENSERVER
       value: "true"
+    - name: MM_TEAMSETTINGS_MAXUSERSPERTEAM
+      value: "2000"
+    - name: MM_TEAMSETTINGS_MAXCHANNELSPERTEAM
+      value: "2000"
     # This makes it possible to use mmctl to create the initial admin account.
     - name: MM_SERVICESETTINGS_ENABLELOCALMODE
       value: "true"

@@ -3,7 +3,7 @@ correlationServiceAddress: "http://correlation-service.default:9205"
 image:
    repository: "ghcr.io/kpaschen"
    pullPolicy: "Always"
-   version: dev
+   version: write-netcdf
    image: corrjoin
 
 serviceAccount:

@@ -62,6 +62,42 @@ func (c *CsvReporter) csvRecordFromCorrelatedPair(pair datatypes.RowPair, pearso
 		fmt.Sprintf("%f", pearson)}, nil
 }
 
+func (c *CsvReporter) AddConstantRows(strideCounter int, constantRows []bool) (int, error) {
+	startTime, ok := c.strideStartTimes[strideCounter]
+	if !ok {
+		return 0, fmt.Errorf("missing stride start time for %d", strideCounter)
+	}
+	endTime, ok := c.strideEndTimes[strideCounter]
+	if !ok {
+		return 0, fmt.Errorf("missing stride end time for %d", strideCounter)
+	}
+	filename := fmt.Sprintf("constant_rows_%d_%s-%s.csv", strideCounter, startTime, endTime)
+	resultsPath := filepath.Join(c.filenameBase, filename)
+	file, err := os.OpenFile(resultsPath, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0640)
+	if err != nil {
+		return 0, err
+	}
+	defer file.Close()
+	writer := csv.NewWriter(file)
+	ctr := 0
+	for i, isConstant := range constantRows {
+		if !isConstant {
+			continue
+		}
+		err = writer.Write([]string{fmt.Sprintf("%d", i)})
+		if err != nil {
+			return ctr, err
+		}
+		ctr++
+		if ctr%1000 == 0 {
+			writer.Flush()
+		}
+	}
+	writer.Flush()
+	err = writer.Error()
+	return ctr, err
+}
+
 func (c *CsvReporter) AddCorrelatedPairs(result datatypes.CorrjoinResult) error {
 	startTime, ok := c.strideStartTimes[result.StrideCounter]
 	if !ok {

@@ -18,9 +18,157 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 31,
+  "id": 3,
   "links": [],
   "panels": [
+    {
+      "datasource": {
+        "type": "yesoreyeram-infinity-datasource",
+        "uid": "PC3988D4F1D604C00"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "fillOpacity": 70,
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineWidth": 0,
+            "spanNulls": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "dark-red",
+                "value": null
+              },
+              {
+                "color": "purple",
+                "value": -2
+              },
+              {
+                "color": "dark-blue",
+                "value": 0
+              },
+              {
+                "color": "light-blue",
+                "value": 2
+              },
+              {
+                "color": "green",
+                "value": 10
+              },
+              {
+                "color": "yellow",
+                "value": 20
+              },
+              {
+                "color": "semi-dark-orange",
+                "value": 30
+              },
+              {
+                "color": "light-red",
+                "value": 100
+              },
+              {
+                "color": "semi-dark-red",
+                "value": 1000
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
+      "id": 15,
+      "options": {
+        "alignValue": "left",
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "mergeValues": false,
+        "rowHeight": 0.9,
+        "showValue": "auto",
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.5.2",
+      "targets": [
+        {
+          "columns": [],
+          "datasource": {
+            "type": "yesoreyeram-infinity-datasource",
+            "uid": "PC3988D4F1D604C00"
+          },
+          "filters": [],
+          "format": "table",
+          "global_query_id": "",
+          "parser": "uql",
+          "refId": "A",
+          "root_selector": "",
+          "source": "url",
+          "type": "json",
+          "url": "http://correlation-service.default:9205/getMetricHistory?strideId=${Stride}&tsid=${Timeseries}",
+          "url_options": {
+            "data": "",
+            "method": "GET"
+          }
+        }
+      ],
+      "title": "Size of subgraph for ${Timeseries} over time",
+      "transformations": [
+        {
+          "id": "groupingToMatrix",
+          "options": {
+            "columnField": "metric",
+            "rowField": "time",
+            "valueField": "state"
+          }
+        },
+        {
+          "id": "convertFieldType",
+          "options": {
+            "conversions": [
+              {
+                "destinationType": "time",
+                "targetField": "time\\metric"
+              }
+            ],
+            "fields": {}
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "fields": {},
+            "sort": [
+              {
+                "field": "time\\metric"
+              }
+            ]
+          }
+        }
+      ],
+      "type": "state-timeline"
+    },
     {
       "datasource": {
         "type": "yesoreyeram-infinity-datasource",
@@ -78,6 +226,23 @@
                 "value": true
               }
             ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "RowId"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Focus on this metric",
+                    "url": "d/explore-metrics/explore-metrics?var-Stride=${Stride}﻿&var-Timeseries=${__value.numeric}&var-Metric=${__data.fields.__name__}"
+                  }
+                ]
+              }
+            ]
           }
         ]
       },
@@ -85,7 +250,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 0
+        "y": 8
       },
       "id": 10,
       "options": {
@@ -184,6 +349,16 @@
               {
                 "id": "custom.width",
                 "value": 80
+              },
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "targetBlank": true,
+                    "title": "Explore subgraph",
+                    "url": "/d/explore-strides/explore-strides?var-Stride=${Stride}﻿&var-Subgraph=${__data.fields.subgraphId}&var-Timeseries=${__data.fields.rowid}"
+                  }
+                ]
               }
             ]
           },
@@ -282,10 +457,10 @@
         ]
       },
       "gridPos": {
-        "h": 7,
-        "w": 19,
+        "h": 4,
+        "w": 12,
         "x": 0,
-        "y": 8
+        "y": 16
       },
       "id": 14,
       "options": {
@@ -368,13 +543,44 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "labels"
+            },
+            "properties": [
+              {
+                "id": "custom.hidden",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "rowid"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "targetBlank": true,
+                    "title": "Explore Subgraph for this metric",
+                    "url": "d/explore-strides/explore-strides?var-Stride=${Stride}&var-Timeseries=${Timeseries}"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 15
+        "y": 20
       },
       "id": 11,
       "options": {
@@ -414,6 +620,15 @@
         }
       ],
       "title": "timeseries correlated with ${Timeseries} in stride ${Stride}",
+      "transformations": [
+        {
+          "id": "extractFields",
+          "options": {
+            "delimiter": ",",
+            "source": "labels"
+          }
+        }
+      ],
       "type": "table"
     },
     {
@@ -425,7 +640,7 @@
         "h": 5,
         "w": 8,
         "x": 0,
-        "y": 23
+        "y": 28
       },
       "id": 2,
       "options": {

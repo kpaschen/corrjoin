@@ -34,3 +34,4 @@ helm upgrade --install prometheus prometheus-community/kube-prometheus-stack -f 
 
 # Install receiver service monitor after the prometheus stack crds are there.
 kubectl apply -f receiver-service-monitor.yaml
+kubectl apply -f lv-podmonitor.yaml
