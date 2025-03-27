@@ -17,28 +17,20 @@ if __name__ == "__main__":
 
    outputfile = args.outputfile
    if not outputfile:
-      print("outputfile not specified, writing to {args.inputfile}.hdf5")
+      print(f"outputfile not specified, writing to {args.inputfile}.hdf5")
    outputfile = args.inputfile + ".hdf5"
 
    with open(args.inputfile, 'r', encoding='utf-8') as input_csv:
-     # list of columns (labels) that should be indexed
      df_cols_to_index = input_csv.readline().split(",")
 
    cols = [ x.strip() for x in df_cols_to_index ]
-   print(f"headers: {cols}")
-   # Make sure there is a minimum item size
-   item_size = {
-    # 'col_0': 50
-   }
 
-   hdf_key = 'hdf_key'
    store = pd.HDFStore(outputfile)
 
-   for chunk in pd.read_csv(args.inputfile, chunksize=500000):
-      # don't index data columns in each iteration - we'll do it later ...
-      store.append(hdf_key, chunk, data_columns=cols, index=False, min_itemsize=item_size)
-      # index data columns in HDFStore
-      print(f"Done chunk: {datetime.datetime.now()}")
+   # Make sure there is a minimum item size
+   item_size = {}
+   for chunk in pd.read_csv(args.inputfile, chunksize=5000):
+      store.append('hdf_key', chunk, data_columns=cols, index=False, min_itemsize=item_size)
 
-   store.create_table_index(hdf_key, columns=df_cols_to_index, optlevel=9, kind='full')
+   store.create_table_index('hdf_key', columns=df_cols_to_index, optlevel=9, kind='full')
    store.close()
