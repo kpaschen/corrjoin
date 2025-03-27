@@ -493,6 +493,71 @@ func (c *CorrelationExplorer) getTimeOverride(params url.Values) (string, string
 	return timeFromString, timeToString, nil
 }
 
+func (c *CorrelationExplorer) GetMetricHistory(w http.ResponseWriter, r *http.Request) {
+	params := r.URL.Query()
+	log.Printf("processing history request with parameters %+v\n", params)
+	stride, err := c.getStride(params)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if stride == nil {
+		http.Error(w, fmt.Sprintf("no stride found for time"), http.StatusNotFound)
+		return
+	}
+	metrics, err := c.getMetricsByRowId(params, stride)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if metrics == nil || len(metrics) == 0 {
+		http.Error(w, "missing metrics", http.StatusNotFound)
+		return
+	}
+	resp := make([]TimelineResponse, 0, len(metrics)*len(c.strideCache))
+	for _, st := range c.strideCache {
+		if st == nil {
+			continue
+		}
+		if st.Status != StrideProcessed {
+			continue
+		}
+		for _, m := range metrics {
+			if m.Constant {
+				resp = append(resp, TimelineResponse{
+					Time:   st.StartTimeString,
+					Metric: m.RowId,
+					State:  "-1",
+				})
+			} else {
+				if st.subgraphs == nil {
+					continue
+				}
+				graphId, exists := st.subgraphs.Rows[m.RowId]
+				if !exists {
+					// Metric is not correlated with anything.
+					resp = append(resp, TimelineResponse{
+						Time:   st.StartTimeString,
+						Metric: m.RowId,
+						State:  "0",
+					})
+				} else {
+					size := st.subgraphs.Sizes[graphId]
+					resp = append(resp, TimelineResponse{
+						Time:   st.StartTimeString,
+						Metric: m.RowId,
+						State:  fmt.Sprintf("%d", size),
+					})
+				}
+			}
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(resp)
+}
+
 func (c *CorrelationExplorer) GetTimeseries(w http.ResponseWriter, r *http.Request) {
 	params := r.URL.Query()
 	log.Printf("processing timeseries request with parameters %+v\n", params)
@@ -628,7 +693,7 @@ func (c *CorrelationExplorer) extendTimeline(resp []TimelineResponse,
 		resp = append(resp, TimelineResponse{
 			Time:   st.StartTimeString,
 			Metric: rowid,
-			State:  fmt.Sprintf("w %d: %f", st.ID, pearson),
+			State:  fmt.Sprintf("%f", pearson),
 		})
 	}
 	// Insert '0' values for time series that were present in an earlier stride but are now missing.
@@ -638,7 +703,7 @@ func (c *CorrelationExplorer) extendTimeline(resp []TimelineResponse,
 			resp = append(resp, TimelineResponse{
 				Time:   st.StartTimeString,
 				Metric: rowid,
-				State:  fmt.Sprintf("w %d: 0.0", st.ID),
+				State:  "0.0",
 			})
 		}
 	}
@@ -655,9 +720,9 @@ func (c *CorrelationExplorer) extendTimeline(resp []TimelineResponse,
 		}
 		for rowid, _ := range newRowIds {
 			resp = append(resp, TimelineResponse{
-				Time:   earlierStride.EndTimeString,
+				Time:   earlierStride.StartTimeString,
 				Metric: rowid,
-				State:  fmt.Sprintf("w %d: 0.0", earlierStride.ID),
+				State:  "0.0",
 			})
 		}
 	}

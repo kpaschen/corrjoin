@@ -63,7 +63,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 49,
+  "id": 4,
   "links": [],
   "panels": [
     {
@@ -764,6 +764,15 @@
               {
                 "id": "custom.width",
                 "value": 70
+              },
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Focus on this metric",
+                    "url": "/d/explore-strides/explore-strides?var-Stride=${Stride}﻿﻿&var-Subgraph=﻿﻿${Subgraph}﻿﻿&var-Timeseries=${__data.fields.rowid}"
+                  }
+                ]
               }
             ]
           },
@@ -842,7 +851,13 @@
           ],
           "show": false
         },
-        "showHeader": true
+        "showHeader": true,
+        "sortBy": [
+          {
+            "desc": false,
+            "displayName": "pearson"
+          }
+        ]
       },
       "pluginVersion": "11.5.2",
       "targets": [
@@ -875,7 +890,7 @@
           "options": {
             "delimiter": ",",
             "format": "kvp",
-            "source": "labelString"
+            "source": "labels"
           }
         }
       ],
@@ -1491,6 +1506,6 @@
   "timezone": "utc",
   "title": "Explore Strides",
   "uid": "explore-strides",
-  "version": 2,
+  "version": 1,
   "weekStart": ""
 }

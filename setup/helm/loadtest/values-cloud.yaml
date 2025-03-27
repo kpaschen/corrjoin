@@ -2,9 +2,13 @@ image:
   repository: "ghcr.io/kpaschen"
   image: "mmloadtest"
   version: "latest"
+  stressimage: "corrjoinstress"
+  stressversion: "latest"
 
 serviceAccount:
   name: mmloadtest-sa
 
 port: 80
 metricsPort: 8888
+
+enableStressPod: true

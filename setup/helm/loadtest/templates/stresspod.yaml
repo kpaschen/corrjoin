@@ -1,0 +1,27 @@
+{{- if .Values.enableStressPod -}}
+apiVersion: v1
+kind: Pod
+metadata:
+   name: stresspod
+   namespace: default
+   labels:
+      app: stress
+spec:
+   affinity:
+     podAffinity:
+       preferredDuringSchedulingIgnoredDuringExecution:
+       - weight: 100
+         podAffinityTerm:
+           labelSelector:
+             matchExpressions:
+             - key: app
+               operator: In
+               values:
+               - mattermost
+           topologyKey: kubernetes.io/hostname
+   containers:
+      - name: stress
+        image: {{ .Values.image.repository }}/{{ .Values.image.stressimage }}:{{ .Values.image.stressversion }}
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+{{- end -}}
+

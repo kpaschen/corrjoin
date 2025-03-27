@@ -231,6 +231,7 @@ func (c *CorrelationExplorer) scanResultFiles() error {
 					stride.Status = StrideError
 					break
 				}
+				log.Printf("stride %d is now ready for exploration\n", stride.ID)
 				stride.Status = StrideProcessed
 			} else {
 				continue
