@@ -1,0 +1,20 @@
+# If this fails to install, uncomment it and install it later.
+# It needs the PodMonitor crd to exist.
+{{- if not .Values.cni.useCeph -}}
+{{- if not .Values.cni.createPv -}}
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: localvolumes-monitor
+spec:
+  podMetricsEndpoints:
+    - honorLabels: true
+      interval: 15s
+      path: /metrics
+      targetPort: 8080
+      scheme: http
+  selector:
+     matchLabels:
+       k8s-app: local-volume-provisioner
+{{- end -}}
+{{- end -}}
