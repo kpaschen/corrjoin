@@ -1,11 +1,13 @@
-# If this fails to install, uncomment it and install it later.
-# It needs the PodMonitor crd to exist.
-{{- if not .Values.cni.useCeph -}}
-{{- if not .Values.cni.createPv -}}
+# This should monitor the local volumes provisioner but
+# it doesn't currently work, perhaps because the local volume
+# daemonset does not specify the ports explicitly?
 apiVersion: monitoring.coreos.com/v1
 kind: PodMonitor
 metadata:
   name: localvolumes-monitor
+  namespace: kube-system
+  labels:
+     app.kubernetes.io/instance: prometheus
 spec:
   podMetricsEndpoints:
     - honorLabels: true
@@ -16,5 +18,3 @@ spec:
   selector:
      matchLabels:
        k8s-app: local-volume-provisioner
-{{- end -}}
-{{- end -}}
