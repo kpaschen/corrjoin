@@ -64,7 +64,7 @@ func main() {
 	flag.BoolVar(&justExplore, "justExplore", false, "If true, launch only the explorer endpoint")
 	flag.BoolVar(&noExplore, "noExplore", false, "If true, do not launch the explorer endpoint")
 	flag.StringVar(&prometheusURL, "prometheusURL", "", "A URL for the prometheus service")
-	flag.IntVar(&strideMaxAgeSeconds, "strideMaxAgeSeconds", 7200, "The maximum time to keep stride data around for.")
+	flag.IntVar(&strideMaxAgeSeconds, "strideMaxAgeSeconds", 21600, "The maximum time to keep stride data around for.")
 	flag.IntVar(&maxRows, "maxRows", 0, "The maximum number of timeseries to process. 0 means no limit.")
 	flag.StringVar(&labeldrop, "labeldrop", "", "The labels to drop from timeseries, separated by |")
 

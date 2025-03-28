@@ -91,9 +91,9 @@ func TestGetTimeseriesById(t *testing.T) {
 		t.Errorf("expected error but got rowids %v", rowids)
 	}
 
-	sampleEntry, ok := stride.metricsCache[18395833292221308750]
+	sampleEntry, ok := stride.metricsCache[1969005827646001793]
 	if !ok {
-		t.Errorf("entry rowid 18395833292221308750 is missing")
+		t.Errorf("entry rowid 1969005827646001793 is missing")
 	}
 	fmt.Printf("sample entry: %+v\n", sampleEntry)
 }

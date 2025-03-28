@@ -43,6 +43,7 @@ spec:
             "-sampleInterval", {{ .Values.corrjoin.sampleInterval | quote }},
            "-prometheusURL", {{ .Values.prometheusURL }},
            "-maxRows", {{ .Values.corrjoin.maxRows | quote }},
+           "-strideMaxAgeSeconds", {{ .Values.corrjoin.strideMaxAgeSeconds | quote }},
            "-labeldrop", "prometheus|prometheus_replica|id|image",
            "-parquetMaxRowsPerRowGroup", "20000"]
         resources:
