@@ -550,7 +550,7 @@ func (c *CorrelationExplorer) GetMetricHistory(w http.ResponseWriter, r *http.Re
 					resp = append(resp, TimelineResponse{
 						Time:   st.StartTimeString,
 						Metric: fmt.Sprintf("fp-%d", m.Fingerprint),
-						State:  fmt.Sprintf("fp-%d", size),
+						State:  fmt.Sprintf("%d", size),
 					})
 				}
 			}
