@@ -69,8 +69,8 @@ func (p *ParquetExplorer) Initialize(filename string) error {
 		}
 	}
 
-	if p.idIndex < 0 || p.correlatedIndex < 0 || p.pearsonIndex < 0 {
-		return fmt.Errorf("bad schema: missing columns for id, correlated, or pearson")
+	if p.metricFingerprintIndex < 0 || p.correlatedIndex < 0 || p.pearsonIndex < 0 {
+		return fmt.Errorf("bad schema: missing columns for fingerprint, correlated, or pearson")
 	}
 
 	filepath := filepath.Join(p.filenameBase, filename)
@@ -138,8 +138,8 @@ func (p *ParquetExplorer) GetMetrics(cache *map[uint64]*Metric) error {
 					log.Printf("metric found for row id %d and metric fp %d: %v\n", m.RowId, m.Fingerprint, m)
 					log.Printf("expanding with fingerprint %d, name %s, and labels %v\n",
 						result.MetricFingerprint, result.Metric, result.Labels)
+					m.Fingerprint = result.MetricFingerprint
 				}
-				m.Fingerprint = result.MetricFingerprint
 				m.LabelSet["__name__"] = (model.LabelValue)(result.Metric)
 				// TODO: these are currently always on the same row as the metric name, not sure
 				// if that will stay that way.

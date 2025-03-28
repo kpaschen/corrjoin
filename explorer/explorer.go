@@ -25,7 +25,7 @@ type subgraphResponse struct {
 }
 
 type CorrelatedResponse struct {
-	Rowid       uint64                               `json:"rowid"`
+	Rowid       string                               `json:"rowid"`
 	Labels      map[model.LabelName]model.LabelValue `json:"labels"`
 	LabelString string                               `json:"labelString"`
 	Pearson     float32                              `json:"pearson"`
@@ -33,7 +33,7 @@ type CorrelatedResponse struct {
 
 type metricInfoResponse struct {
 	Stride      int                                  `json:"stride"`
-	Rowid       uint64                               `json:"rowid"`
+	Rowid       string                               `json:"rowid"`
 	Labels      map[model.LabelName]model.LabelValue `json:"labels"`
 	LabelString string                               `json:"labelString"`
 	Constant    bool                                 `json:"constant"`
@@ -46,7 +46,7 @@ type correlatedTimeseriesResponse struct {
 }
 
 type subgraphNodeResponse struct {
-	Id       uint64 `json:"id"`
+	Id       string `json:"id"`
 	Title    string `json:"title"`
 	SubTitle string `json:"subtitle,optional"`
 	MainStat string `json:"mainstat,optional"`
@@ -54,8 +54,8 @@ type subgraphNodeResponse struct {
 
 type subgraphEdgeResponse struct {
 	Id        int    `json:"id"`
-	Source    uint64 `json:"source"`
-	Target    uint64 `json:"target"`
+	Source    string `json:"source"`
+	Target    string `json:"target"`
 	Thickness int    `json:"thickness"`
 	Mainstat  string `json:"mainstat,optional"`
 }
@@ -68,7 +68,7 @@ type TimeseriesResponse struct {
 // This is what the timeline panel wants.
 type TimelineResponse struct {
 	Time   string `json:"time"` // This must be in YYYY-MM-DDTHH:MM:SSZ format
-	Metric uint64 `json:"metric"`
+	Metric string `json:"metric"`
 	State  string `json:"state"`
 }
 
@@ -165,7 +165,7 @@ func (c *CorrelationExplorer) GetSubgraphNodes(w http.ResponseWriter, r *http.Re
 				continue
 			}
 			r := subgraphNodeResponse{
-				Id:       row,
+				Id:       fmt.Sprintf("fp-%d", row),
 				Title:    string(metric.LabelSet["__name__"]),
 				SubTitle: metric.MetricString(),
 				MainStat: fmt.Sprintf("%d", row),
@@ -227,8 +227,8 @@ func (c *CorrelationExplorer) GetSubgraphEdges(w http.ResponseWriter, r *http.Re
 	for i, e := range edges {
 		resp[i] = subgraphEdgeResponse{
 			Id:       i,
-			Source:   e.Source,
-			Target:   e.Target,
+			Source:   fmt.Sprintf("fp-%d", e.Source),
+			Target:   fmt.Sprintf("fp-%d", e.Target),
 			Mainstat: fmt.Sprintf("%f", e.Pearson),
 		}
 	}
@@ -403,6 +403,7 @@ func (c *CorrelationExplorer) getMetrics(params url.Values, stride *Stride) ([]u
 	if stride == nil {
 		return nil, fmt.Errorf("stride cannot be nil")
 	}
+	log.Printf("getMetrics: params is %v\n", params)
 	metrics, err := c.getMetricsById(params, stride)
 	if err == nil && metrics != nil && len(metrics) > 0 {
 		ret := make([]uint64, len(metrics), len(metrics))
@@ -442,13 +443,16 @@ func (c *CorrelationExplorer) getMetricsById(params url.Values, stride *Stride) 
 	}
 	tsids, err := c.parseTsIdsFromGraphiteResult(strings.TrimSpace(metricId[0]))
 	if err != nil {
+		log.Printf("getMetricsById: failed to parse ts id: %v\n", err)
 		return nil, err
 	}
+	log.Printf("tsids: %v\n", tsids)
 	ret := make([]*explorerlib.Metric, len(tsids), len(tsids))
 	for i, tsid := range tsids {
-		metric, exists := stride.metricsCache[uint64(tsid)]
+		metric, exists := stride.metricsCache[tsid]
 		if !exists {
-			return nil, fmt.Errorf("no metric with row id %d", tsid)
+			log.Printf("getMetricsById: did not find a metric with id %d\n", tsid)
+			return nil, fmt.Errorf("no metric with id %d", tsid)
 		}
 		ret[i] = metric
 	}
@@ -526,7 +530,7 @@ func (c *CorrelationExplorer) GetMetricHistory(w http.ResponseWriter, r *http.Re
 			if m.Constant {
 				resp = append(resp, TimelineResponse{
 					Time:   st.StartTimeString,
-					Metric: m.Fingerprint,
+					Metric: fmt.Sprintf("fp-%d", m.Fingerprint),
 					State:  "-1",
 				})
 			} else {
@@ -538,15 +542,15 @@ func (c *CorrelationExplorer) GetMetricHistory(w http.ResponseWriter, r *http.Re
 					// Metric is not correlated with anything.
 					resp = append(resp, TimelineResponse{
 						Time:   st.StartTimeString,
-						Metric: m.Fingerprint,
+						Metric: fmt.Sprintf("fp-%d", m.Fingerprint),
 						State:  "0",
 					})
 				} else {
 					size := st.subgraphs.Sizes[graphId]
 					resp = append(resp, TimelineResponse{
 						Time:   st.StartTimeString,
-						Metric: m.Fingerprint,
-						State:  fmt.Sprintf("%d", size),
+						Metric: fmt.Sprintf("fp-%d", m.Fingerprint),
+						State:  fmt.Sprintf("fp-%d", size),
 					})
 				}
 			}
@@ -692,7 +696,7 @@ func (c *CorrelationExplorer) extendTimeline(resp []TimelineResponse,
 		rowidsFound[rowid] = true
 		resp = append(resp, TimelineResponse{
 			Time:   st.StartTimeString,
-			Metric: rowid,
+			Metric: fmt.Sprintf("fp-%d", rowid),
 			State:  fmt.Sprintf("%f", pearson),
 		})
 	}
@@ -702,7 +706,7 @@ func (c *CorrelationExplorer) extendTimeline(resp []TimelineResponse,
 		if !ok {
 			resp = append(resp, TimelineResponse{
 				Time:   st.StartTimeString,
-				Metric: rowid,
+				Metric: fmt.Sprintf("fp-%d", rowid),
 				State:  "0.0",
 			})
 		}
@@ -721,7 +725,7 @@ func (c *CorrelationExplorer) extendTimeline(resp []TimelineResponse,
 		for rowid, _ := range newRowIds {
 			resp = append(resp, TimelineResponse{
 				Time:   earlierStride.StartTimeString,
-				Metric: rowid,
+				Metric: fmt.Sprintf("fp-%d", rowid),
 				State:  "0.0",
 			})
 		}
@@ -834,7 +838,7 @@ func (c *CorrelationExplorer) GetMetricInfo(w http.ResponseWriter, r *http.Reque
 		}
 		resp = append(resp, metricInfoResponse{
 			Stride:      stride.ID,
-			Rowid:       rowid,
+			Rowid:       fmt.Sprintf("fp-%d", rowid),
 			Labels:      m.LabelSet,
 			LabelString: m.MetricString(),
 			Constant:    m.Constant,
@@ -906,7 +910,7 @@ func (c *CorrelationExplorer) GetCorrelatedSeries(w http.ResponseWriter, r *http
 			return
 		}
 		resp.Correlates = append(resp.Correlates, CorrelatedResponse{
-			Rowid:       otherRowId,
+			Rowid:       fmt.Sprintf("fp-%d", otherRowId),
 			Labels:      map[model.LabelName]model.LabelValue(otherMetric.LabelSet),
 			LabelString: otherMetric.MetricString(),
 			Pearson:     pearson,

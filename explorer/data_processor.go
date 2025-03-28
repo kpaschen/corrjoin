@@ -362,8 +362,8 @@ func (c *CorrelationExplorer) retrieveEdges(stride *Stride, graphId int, maxNode
 	reader := csv.NewReader(edgeFile)
 	reader.ReuseRecord = true
 	var results []explorerlib.Edge
-	// Read the header line.
-	header, err := reader.Read()
+	// Read the header line
+	_, err = reader.Read()
 	if err != nil {
 		if err == io.EOF {
 			log.Printf("got eof immediately on file edges_%d.csv\n", graphId)
@@ -372,7 +372,6 @@ func (c *CorrelationExplorer) retrieveEdges(stride *Stride, graphId int, maxNode
 		log.Printf("error reading edges file: %v\n", err)
 		return nil, err
 	}
-	log.Printf("read header: %v\n", header)
 	ctr := 0
 	for {
 		row, err := reader.Read()
@@ -384,11 +383,11 @@ func (c *CorrelationExplorer) retrieveEdges(stride *Stride, graphId int, maxNode
 			log.Printf("error reading edges file: %v\n", err)
 			return nil, err
 		}
-		source, err := strconv.ParseInt(row[0], 10, 64)
+		source, err := strconv.ParseUint(row[0], 10, 64)
 		if err != nil {
 			return nil, err
 		}
-		target, err := strconv.ParseInt(row[1], 10, 64)
+		target, err := strconv.ParseUint(row[1], 10, 64)
 		if err != nil {
 			return nil, err
 		}
@@ -562,20 +561,25 @@ func (c *CorrelationExplorer) getLatestStride() *Stride {
 	return c.strideCache[newestEntry]
 }
 
-func (c *CorrelationExplorer) parseTsIdsFromGraphiteResult(graphite string) ([]int, error) {
-	metricId, err := strconv.ParseInt(graphite, 10, 32)
+func (c *CorrelationExplorer) parseTsIdsFromGraphiteResult(graphite string) ([]uint64, error) {
+	metricId, err := strconv.ParseUint(graphite, 10, 64)
 	if err == nil {
-		return []int{int(metricId)}, nil
+		return []uint64{metricId}, nil
 	}
 	strippedGraphite := strings.Trim(graphite, "{}")
 	tsids := strings.Split(strippedGraphite, ",")
-	ret := make([]int, len(tsids), len(tsids))
+	ret := make([]uint64, len(tsids), len(tsids))
 	for i, tsid := range tsids {
-		metricId, err := strconv.ParseInt(tsid, 10, 32)
-		if err != nil {
-			return nil, err
+		var metricId uint64
+		res, err := fmt.Sscanf(tsid, "fp-%d", &metricId)
+		if err != nil || res == 0 {
+			metricId, err = strconv.ParseUint(tsid, 10, 64)
+			if err != nil {
+				return nil, err
+			}
 		}
-		ret[i] = int(metricId)
+		log.Printf("parsed %d out of %s\n", metricId, tsid)
+		ret[i] = metricId
 	}
 	return ret, nil
 }

@@ -40,7 +40,6 @@ func TestScanResultFiles(t *testing.T) {
 		if fpEntries != entries {
 			t.Errorf("cache count mismatch: %d in cache by rowid vs %d in cache by fp", entries, fpEntries)
 		}
-
 	}
 
 	if allStridesAreNil {
@@ -91,6 +90,7 @@ func TestGetTimeseriesById(t *testing.T) {
 	if err == nil {
 		t.Errorf("expected error but got rowids %v", rowids)
 	}
+
 	sampleEntry, ok := stride.metricsCache[18395833292221308750]
 	if !ok {
 		t.Errorf("entry rowid 18395833292221308750 is missing")
