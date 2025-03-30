@@ -520,6 +520,20 @@ func (c *CorrelationExplorer) addStrideCacheEntry(stride *Stride) {
 	}
 	if c.strideCache[oldestEntry] != nil {
 		log.Printf("evicting stride from time %v from cache\n", c.strideCache[oldestEntry].StartTime)
+		s := c.strideCache[oldestEntry]
+		fullPath := filepath.Join(c.FilenameBase, s.Filename)
+		log.Printf("try to remove %s\n", fullPath)
+		err := os.RemoveAll(fullPath)
+		if err != nil {
+			log.Printf("failed to remove %s: %v\n", fullPath, err)
+		}
+		fullPath = filepath.Join(c.FilenameBase, directoryNameForStride(*s))
+		log.Printf("try to remove %s\n", fullPath)
+		err = os.RemoveAll(fullPath)
+		if err != nil {
+			log.Printf("failed to remove %s: %v\n", fullPath, err)
+		}
+		s.Status = StrideDeleted
 		c.strideCache[oldestEntry] = nil
 	}
 	c.strideCache[oldestEntry] = stride
