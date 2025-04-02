@@ -18,4 +18,10 @@ func TestParseIds(t *testing.T) {
 	if ids[0] != 77 || ids[1] != 12 {
 		t.Errorf("expected 77,11 but got %v", ids)
 	}
+
+	ids, err = explorer.parseTsIdsFromGraphiteResult("9821293140777017000")
+
+	if err != nil {
+		t.Errorf("unexpected: %v", err)
+	}
 }

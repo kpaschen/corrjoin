@@ -1,10 +1,10 @@
 package explorer
 
 import (
-	"encoding/json"
+	"encoding/csv"
 	"fmt"
 	explorerlib "github.com/kpaschen/corrjoin/lib/explorer"
-	"io/ioutil"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -213,14 +213,7 @@ func (c *CorrelationExplorer) scanResultFiles() error {
 					}
 					break
 				}
-				stride.convertMetricsCache()
 				log.Printf("added stride %d with %d timeseries", stride.ID, len(stride.metricsCache))
-				err = c.materializeStrideData(stride)
-				if err != nil {
-					log.Printf("failed to materialize stride data: %v\n", err)
-					stride.Status = StrideError
-					break
-				}
 				stride.Status = StrideRead
 				break
 			}
@@ -237,6 +230,7 @@ func (c *CorrelationExplorer) scanResultFiles() error {
 					stride.Status = StrideError
 					break
 				}
+				log.Printf("stride %d is now ready for exploration\n", stride.ID)
 				stride.Status = StrideProcessed
 			} else {
 				continue
@@ -251,16 +245,6 @@ func (c *CorrelationExplorer) scanResultFiles() error {
 
 func directoryNameForStride(stride Stride) string {
 	return fmt.Sprintf("stride_%d_%d", stride.ID, stride.StartTime)
-}
-
-func (s *Stride) convertMetricsCache() {
-	for rowid, m := range s.metricsCacheByRowId {
-		if m.Fingerprint == 0 {
-			log.Printf("missing metrics fingerprint for row id %d, %v\n", rowid, *m)
-			continue
-		}
-		s.metricsCache[m.Fingerprint] = rowid
-	}
 }
 
 func parseStrideFromDirname(dirname string) (*Stride, error) {
@@ -293,28 +277,27 @@ func parseStrideFromFilename(filename string) (*Stride, error) {
 		return nil, err
 	}
 	return &Stride{
-		ID:                  strideCounter,
-		StartTime:           startT.UTC().Unix(),
-		StartTimeString:     startT.UTC().Format(explorerlib.FORMAT),
-		EndTime:             endT.UTC().Unix(),
-		EndTimeString:       endT.UTC().Format(explorerlib.FORMAT),
-		Status:              StrideExists,
-		Filename:            filename,
-		metricsCache:        make(map[uint64]int),
-		metricsCacheByRowId: make(map[int](*explorerlib.Metric)),
+		ID:              strideCounter,
+		StartTime:       startT.UTC().Unix(),
+		StartTimeString: startT.UTC().Format(explorerlib.FORMAT),
+		EndTime:         endT.UTC().Unix(),
+		EndTimeString:   endT.UTC().Format(explorerlib.FORMAT),
+		Status:          StrideExists,
+		Filename:        filename,
+		metricsCache:    make(map[uint64](*explorerlib.Metric)),
 	}, nil
 }
 
-func (c *CorrelationExplorer) retrieveCorrelatedTimeseries(stride *Stride, tsRowId int,
-	onlyConsider []int, maxResults int) (map[int]float32, error) {
+func (c *CorrelationExplorer) retrieveCorrelatedTimeseries(stride *Stride, tsRowId uint64,
+	onlyConsider []uint64, maxResults int) (map[uint64]float32, error) {
 
 	if stride == nil || stride.subgraphs == nil {
 		return nil, fmt.Errorf("stride has no subgraphs")
 	}
 
-	ret := make(map[int]float32)
+	ret := make(map[uint64]float32)
 
-	metric, exists := stride.metricsCacheByRowId[tsRowId]
+	metric, exists := stride.metricsCache[tsRowId]
 	if !exists {
 		return ret, fmt.Errorf("no metric with id %d", tsRowId)
 	}
@@ -328,18 +311,16 @@ func (c *CorrelationExplorer) retrieveCorrelatedTimeseries(stride *Stride, tsRow
 		log.Printf("no graph found for row id %d in stride %d\n", tsRowId, stride.ID)
 		return ret, nil // This timeseries is not correlated with anything.
 	}
-	edges, err := c.retrieveEdges(stride, graphId)
+	edges, err := c.retrieveEdges(stride, graphId, MAX_GRAPH_SIZE)
 	if err != nil {
+		log.Printf("failed to retrieve edges: %v\n", err)
 		return ret, err
 	}
-
-  log.Printf("obtained edges for row %d: %v\n", tsRowId, edges)
-  log.Printf("onlyconsider is %v\n", onlyConsider)
 
 	ctr := 0
 	for _, e := range edges {
 		if e.Pearson > 0 && (e.Source == tsRowId || e.Target == tsRowId) {
-			var otherRowId int
+			var otherRowId uint64
 			if e.Source == tsRowId {
 				otherRowId = e.Target
 			} else {
@@ -368,21 +349,65 @@ func (c *CorrelationExplorer) retrieveCorrelatedTimeseries(stride *Stride, tsRow
 	return ret, nil
 }
 
-func (c *CorrelationExplorer) retrieveEdges(stride *Stride, graphId int) ([]explorerlib.Edge, error) {
+func (c *CorrelationExplorer) retrieveEdges(stride *Stride, graphId int, maxNodes int) ([]explorerlib.Edge, error) {
 	dirname := directoryNameForStride(*stride)
 	fullDirname := fmt.Sprintf("%s/%s", c.FilenameBase, dirname)
-	edgeFile, err := os.Open(fmt.Sprintf("%s/edges_%d.json", fullDirname, graphId))
+	edgeFile, err := os.Open(fmt.Sprintf("%s/edges_%d.csv", fullDirname, graphId))
 	if err != nil {
 		return nil, fmt.Errorf("failed to open edges file for graph id %d and stride %d: %v",
 			graphId, stride.ID, err)
 	}
 	defer edgeFile.Close()
 
-	// TODO: read this piecewise for larger files?
-	edgeContents, _ := ioutil.ReadAll(edgeFile)
+	reader := csv.NewReader(edgeFile)
+	reader.ReuseRecord = true
 	var results []explorerlib.Edge
-	json.Unmarshal(edgeContents, &results)
-	return results, nil
+	// Read the header line
+	_, err = reader.Read()
+	if err != nil {
+		if err == io.EOF {
+			log.Printf("got eof immediately on file edges_%d.csv\n", graphId)
+			return results, nil
+		}
+		log.Printf("error reading edges file: %v\n", err)
+		return nil, err
+	}
+	ctr := 0
+	for {
+		row, err := reader.Read()
+		if err != nil {
+			if err == io.EOF {
+				log.Printf("reached end of file\n")
+				return results, nil
+			}
+			log.Printf("error reading edges file: %v\n", err)
+			return nil, err
+		}
+		source, err := strconv.ParseUint(row[0], 10, 64)
+		if err != nil {
+			return nil, err
+		}
+		target, err := strconv.ParseUint(row[1], 10, 64)
+		if err != nil {
+			return nil, err
+		}
+		pearson, err := strconv.ParseFloat(row[2], 32)
+		if err != nil {
+			return nil, err
+		}
+
+		results = append(results, explorerlib.Edge{
+			Source:  uint64(source),
+			Target:  uint64(target),
+			Pearson: float32(pearson),
+		})
+		ctr++
+		if maxNodes > 0 && ctr > maxNodes {
+			// Returning an empty edges list will make the graph render without edges.
+			log.Printf("not returning all edges since maxNodes %d was exceeded\n", maxNodes)
+			return []explorerlib.Edge{}, nil
+		}
+	}
 }
 
 func (c *CorrelationExplorer) extractEdges(stride *Stride) error {
@@ -402,8 +427,8 @@ func (c *CorrelationExplorer) extractEdges(stride *Stride) error {
 	dirname := directoryNameForStride(*stride)
 	fullDirname := fmt.Sprintf("%s/%s", c.FilenameBase, dirname)
 	edgeFiles := make(map[int]*os.File)
-	previousEdgeEntries := make(map[int]bool)
-	defer terminateEdgeFiles(edgeFiles)
+	edgeWriters := make(map[int]*csv.Writer)
+	defer terminateEdgeFiles(edgeWriters, edgeFiles)
 	edgeChan := make(chan []*explorerlib.Edge, 1)
 	go parquetExplorer.GetEdges(edgeChan)
 	for edges := range edgeChan {
@@ -415,43 +440,43 @@ func (c *CorrelationExplorer) extractEdges(stride *Stride) error {
 			if graphId == -1 {
 				return fmt.Errorf("missing graph id for for %d\n", e.Source)
 			}
+			size := subgraphs.Sizes[graphId]
+			if size < 2 {
+				continue
+			}
 			edgeFile, exists := edgeFiles[graphId]
 			if !exists {
-				edgeFile, err = os.OpenFile(fmt.Sprintf("%s/edges_%d.json", fullDirname, graphId),
+				edgeFile, err = os.OpenFile(fmt.Sprintf("%s/edges_%d.csv", fullDirname, graphId),
 					os.O_WRONLY|os.O_CREATE, 0640)
 				if err != nil {
 					return fmt.Errorf("failed to create edge file %d: %v", graphId, err)
 				}
+				edgeWriter := csv.NewWriter(edgeFile)
 				edgeFiles[graphId] = edgeFile
-				edgeFile.Write([]byte("["))
+				edgeWriters[graphId] = edgeWriter
+				err = edgeWriter.Write([]string{"ID", "Correlated", "Pearson"})
+				if err != nil {
+					return fmt.Errorf("failed to write header to edge csv file: %v\n", err)
+				}
 			}
-			_, exists = previousEdgeEntries[graphId]
-			if exists {
-				edgeFile.Write([]byte(","))
-			} else {
-				previousEdgeEntries[graphId] = true
-			}
-			edgeSerialized, err := json.Marshal(e)
+			err = edgeWriters[graphId].Write([]string{fmt.Sprintf("%d", e.Source), fmt.Sprintf("%d", e.Target), fmt.Sprintf("%f", e.Pearson)})
 			if err != nil {
-				return err
-			}
-			_, err = edgeFile.Write(edgeSerialized)
-			if err != nil {
-				return fmt.Errorf("failed to write %T to edge file: %v", edgeSerialized, err)
+				return fmt.Errorf("failed to write %v to edge file: %v", e, err)
 			}
 		}
 	}
 	return nil
 }
 
-func terminateEdgeFiles(files map[int]*os.File) {
-	for _, f := range files {
-		if f == nil {
+func terminateEdgeFiles(writers map[int]*csv.Writer, files map[int]*os.File) {
+	for _, w := range writers {
+		if w == nil {
 			continue
 		}
-		_, err := f.Write([]byte("]"))
-		if err != nil {
-			log.Printf("failed to write closing ] to file %s: %v\n", f.Name(), err)
+		w.Flush()
+	}
+	for _, f := range files {
+		if f == nil {
 			continue
 		}
 		f.Close()
@@ -471,21 +496,6 @@ func (c *CorrelationExplorer) readAndCacheSubgraphs(parquetExplorer *explorerlib
 	return nil
 }
 
-func (c *CorrelationExplorer) materializeStrideData(stride *Stride) error {
-	dirname := directoryNameForStride(*stride)
-	subgraphsSerialized, err := json.Marshal(*(stride.subgraphs))
-	if err != nil {
-		return err
-	}
-	file, err := os.Create(fmt.Sprintf("%s/%s/subgraphs.json", c.FilenameBase, dirname))
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-	_, err = file.Write(subgraphsSerialized)
-	return err
-}
-
 func (c *CorrelationExplorer) addStrideCacheEntry(stride *Stride) {
 	oldestTime := stride.StartTime
 	oldestEntry := -1
@@ -495,8 +505,8 @@ func (c *CorrelationExplorer) addStrideCacheEntry(stride *Stride) {
 			return
 		}
 		if s.Status == StrideDeleted {
-      log.Printf("removing deleted stride for time %v from cache\n", s.StartTime)
-      s = nil
+			log.Printf("removing deleted stride for time %v from cache\n", s.StartTime)
+			s = nil
 			c.strideCache[i] = stride
 			return
 		}
@@ -508,10 +518,24 @@ func (c *CorrelationExplorer) addStrideCacheEntry(stride *Stride) {
 	if oldestEntry == -1 {
 		log.Printf("no entry found for stride %d with start time %v\n", stride.ID, stride.StartTime)
 	}
-  if c.strideCache[oldestEntry] != nil {
-     log.Printf("evicting stride from time %v from cache\n", c.strideCache[oldestEntry].StartTime)
-     c.strideCache[oldestEntry] = nil
-  }
+	if c.strideCache[oldestEntry] != nil {
+		log.Printf("evicting stride from time %v from cache\n", c.strideCache[oldestEntry].StartTime)
+		s := c.strideCache[oldestEntry]
+		fullPath := filepath.Join(c.FilenameBase, s.Filename)
+		log.Printf("try to remove %s\n", fullPath)
+		err := os.RemoveAll(fullPath)
+		if err != nil {
+			log.Printf("failed to remove %s: %v\n", fullPath, err)
+		}
+		fullPath = filepath.Join(c.FilenameBase, directoryNameForStride(*s))
+		log.Printf("try to remove %s\n", fullPath)
+		err = os.RemoveAll(fullPath)
+		if err != nil {
+			log.Printf("failed to remove %s: %v\n", fullPath, err)
+		}
+		s.Status = StrideDeleted
+		c.strideCache[oldestEntry] = nil
+	}
 	c.strideCache[oldestEntry] = stride
 }
 
@@ -523,7 +547,7 @@ func (c *CorrelationExplorer) readResultFile(filename string, stride *Stride) er
 	}
 	defer parquetExplorer.Delete()
 	log.Printf("reading metrics from %s\n", filename)
-	err = parquetExplorer.GetMetrics(&stride.metricsCacheByRowId)
+	err = parquetExplorer.GetMetrics(&stride.metricsCache)
 	if err != nil {
 		return err
 	}
@@ -551,20 +575,25 @@ func (c *CorrelationExplorer) getLatestStride() *Stride {
 	return c.strideCache[newestEntry]
 }
 
-func (c *CorrelationExplorer) parseTsIdsFromGraphiteResult(graphite string) ([]int, error) {
-	metricId, err := strconv.ParseInt(graphite, 10, 32)
+func (c *CorrelationExplorer) parseTsIdsFromGraphiteResult(graphite string) ([]uint64, error) {
+	metricId, err := strconv.ParseUint(graphite, 10, 64)
 	if err == nil {
-		return []int{int(metricId)}, nil
+		return []uint64{metricId}, nil
 	}
 	strippedGraphite := strings.Trim(graphite, "{}")
 	tsids := strings.Split(strippedGraphite, ",")
-	ret := make([]int, len(tsids), len(tsids))
+	ret := make([]uint64, len(tsids), len(tsids))
 	for i, tsid := range tsids {
-		metricId, err := strconv.ParseInt(tsid, 10, 32)
-		if err != nil {
-			return nil, err
+		var metricId uint64
+		res, err := fmt.Sscanf(tsid, "fp-%d", &metricId)
+		if err != nil || res == 0 {
+			metricId, err = strconv.ParseUint(tsid, 10, 64)
+			if err != nil {
+				return nil, err
+			}
 		}
-		ret[i] = int(metricId)
+		log.Printf("parsed %d out of %s\n", metricId, tsid)
+		ret[i] = metricId
 	}
 	return ret, nil
 }

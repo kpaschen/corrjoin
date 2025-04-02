@@ -39,6 +39,7 @@ func main() {
 	var sampleInterval int
 	var resultsDirectory string
 	var justExplore bool
+	var noExplore bool
 	var prometheusURL string
 	var strideMaxAgeSeconds int
 	var maxRows int
@@ -61,8 +62,9 @@ func main() {
 	flag.IntVar(&parquetMaxRowsPerRowGroup, "parquetMaxRowsPerRowGroup", 100000, "Number of rows per row group in Parquet. Small numbers reduce memory usage but cost more disk space; large numbers cost more memory but improve compression.")
 	flag.StringVar(&resultsDirectory, "resultsDirectory", "/tmp/corrjoinResults", "The directory with the result files.")
 	flag.BoolVar(&justExplore, "justExplore", false, "If true, launch only the explorer endpoint")
+	flag.BoolVar(&noExplore, "noExplore", false, "If true, do not launch the explorer endpoint")
 	flag.StringVar(&prometheusURL, "prometheusURL", "", "A URL for the prometheus service")
-	flag.IntVar(&strideMaxAgeSeconds, "strideMaxAgeSeconds", 86400, "The maximum time to keep stride data around for.")
+	flag.IntVar(&strideMaxAgeSeconds, "strideMaxAgeSeconds", 21600, "The maximum time to keep stride data around for.")
 	flag.IntVar(&maxRows, "maxRows", 0, "The maximum number of timeseries to process. 0 means no limit.")
 	flag.StringVar(&labeldrop, "labeldrop", "", "The labels to drop from timeseries, separated by |")
 
@@ -89,24 +91,30 @@ func main() {
 	}
 	corrjoinConfig = corrjoinConfig.ComputeSettingsFields()
 
-	expl := &explorer.CorrelationExplorer{
-		FilenameBase: resultsDirectory,
-	}
-	err := expl.Initialize(prometheusURL, strideMaxAgeSeconds, strings.Split(labeldrop, "|"))
-	if err != nil {
-		log.Printf("failed to initialize explorer: %v\n", err)
-	}
+	var expl *explorer.CorrelationExplorer
+	var explorerRouter *mux.Router
 
-	explorerRouter := mux.NewRouter().StrictSlash(true)
-	explorerRouter.HandleFunc("/getStrides", expl.GetStrides).Methods("GET")
-	explorerRouter.HandleFunc("/getSubgraphs", expl.GetSubgraphs).Methods("GET")
-	explorerRouter.HandleFunc("/getSubgraphNodes", expl.GetSubgraphNodes).Methods("GET")
-	explorerRouter.HandleFunc("/getSubgraphEdges", expl.GetSubgraphEdges).Methods("GET")
-	explorerRouter.HandleFunc("/getCorrelatedSeries", expl.GetCorrelatedSeries).Methods("GET")
-	explorerRouter.HandleFunc("/getTimeseries", expl.GetTimeseries).Methods("GET")
-	explorerRouter.HandleFunc("/getTimeline", expl.GetTimeline).Methods("GET")
-	explorerRouter.HandleFunc("/getMetricInfo", expl.GetMetricInfo).Methods("GET")
-	explorerRouter.HandleFunc("/dumpMetricCache", expl.DumpMetricCache).Methods("GET")
+	if !noExplore {
+		expl = &explorer.CorrelationExplorer{
+			FilenameBase: resultsDirectory,
+		}
+		err := expl.Initialize(prometheusURL, strideMaxAgeSeconds, strings.Split(labeldrop, "|"))
+		if err != nil {
+			log.Printf("failed to initialize explorer: %v\n", err)
+		}
+
+		explorerRouter = mux.NewRouter().StrictSlash(true)
+		explorerRouter.HandleFunc("/getStrides", expl.GetStrides).Methods("GET")
+		explorerRouter.HandleFunc("/getSubgraphs", expl.GetSubgraphs).Methods("GET")
+		explorerRouter.HandleFunc("/getSubgraphNodes", expl.GetSubgraphNodes).Methods("GET")
+		explorerRouter.HandleFunc("/getSubgraphEdges", expl.GetSubgraphEdges).Methods("GET")
+		explorerRouter.HandleFunc("/getCorrelatedSeries", expl.GetCorrelatedSeries).Methods("GET")
+		explorerRouter.HandleFunc("/getTimeseries", expl.GetTimeseries).Methods("GET")
+		explorerRouter.HandleFunc("/getTimeline", expl.GetTimeline).Methods("GET")
+		explorerRouter.HandleFunc("/getMetricInfo", expl.GetMetricInfo).Methods("GET")
+		explorerRouter.HandleFunc("/dumpMetricCache", expl.DumpMetricCache).Methods("GET")
+		explorerRouter.HandleFunc("/getMetricHistory", expl.GetMetricHistory).Methods("GET")
+	}
 
 	http.Handle("/metrics", promhttp.Handler())
 	go http.ListenAndServe(cfg.metricsAddress, nil)
@@ -135,19 +143,23 @@ func main() {
 		}()
 	}
 
-	explorerServer := &http.Server{
-		Addr:    cfg.explorerAddress,
-		Handler: explorerRouter,
-	}
+	var explorerServer *http.Server
 
-	go func() {
-		log.Printf("explorer service listening on port %s\n", cfg.explorerAddress)
-		if err := explorerServer.ListenAndServe(); err != nil {
-			if err != http.ErrServerClosed {
-				log.Fatal(err)
-			}
+	if !noExplore {
+		explorerServer := &http.Server{
+			Addr:    cfg.explorerAddress,
+			Handler: explorerRouter,
 		}
-	}()
+
+		go func() {
+			log.Printf("explorer service listening on port %s\n", cfg.explorerAddress)
+			if err := explorerServer.ListenAndServe(); err != nil {
+				if err != http.ErrServerClosed {
+					log.Fatal(err)
+				}
+			}
+		}()
+	}
 
 	<-stop
 	log.Println("correlation service shutting down")
@@ -160,8 +172,10 @@ func main() {
 			log.Fatal(err)
 		}
 	}
-	// This is best effort, there is nothing really to do.
-	if err := explorerServer.Shutdown(ctx); err != nil {
-		log.Fatal(err)
+	if !noExplore {
+		// This is best effort, there is nothing really to do.
+		if err := explorerServer.Shutdown(ctx); err != nil {
+			log.Fatal(err)
+		}
 	}
 }

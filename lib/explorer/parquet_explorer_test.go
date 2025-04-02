@@ -32,7 +32,7 @@ func TestComputePrometheusGraphURL(t *testing.T) {
 
 func TestGetSubgraphs(t *testing.T) {
 	explorer := NewParquetExplorer("./testdata")
-	err := explorer.Initialize("correlations_4_20250227153854-20250227155533.pq")
+	err := explorer.Initialize("correlations_4_20250328112900-20250328120219.pq")
 	if err != nil {
 		t.Fatalf("failed to read parquet file: %v", err)
 	}

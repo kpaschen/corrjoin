@@ -11,8 +11,8 @@ spec:
   - name: loadtest-rules
     rules:
     - expr: |-
-        rate(container_cpu_seconds_total{namespace="mattermost"}[1m])
-      record: 'container_cpu_seconds_total:rate1m'
+        rate(container_cpu_usage_seconds_total{namespace="mattermost"}[1m])
+      record: 'container_cpu_usage_seconds:rate1m'
     - expr: |-
         histogram_quantile(0.95, sum by(le) (rate(loadtest_http_request_time_bucket[1m])))
       record: 'loadtest_latency:quantile95'
@@ -23,5 +23,7 @@ spec:
         sum by (namespace, pod, container) (rate(loadtest_http_errors_total[1m]))
            /  on (namespace, pod, container) (rate(loadtest_http_request_time_count[1m]))
       record: 'container:loadtest_errors:rate1m'
-
+    - expr: |-
+        rate(loadtest_http_requests_total[1m])
+      record: 'loadtest_http_requests:rate1m'
 

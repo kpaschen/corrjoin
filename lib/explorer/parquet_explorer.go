@@ -17,6 +17,7 @@ import (
 type ParquetExplorer struct {
 	filenameBase           string
 	file                   *parquet.File
+	pqfile                 *os.File
 	idIndex                int
 	correlatedIndex        int
 	pearsonIndex           int
@@ -68,19 +69,20 @@ func (p *ParquetExplorer) Initialize(filename string) error {
 		}
 	}
 
-	if p.idIndex < 0 || p.correlatedIndex < 0 || p.pearsonIndex < 0 {
-		return fmt.Errorf("bad schema: missing columns for id, correlated, or pearson")
+	if p.metricFingerprintIndex < 0 || p.correlatedIndex < 0 || p.pearsonIndex < 0 {
+		return fmt.Errorf("bad schema: missing columns for fingerprint, correlated, or pearson")
 	}
 
 	filepath := filepath.Join(p.filenameBase, filename)
 
-	pqfile, err := os.Open(filepath)
+	var err error
+	p.pqfile, err = os.Open(filepath)
 	if err != nil {
 		log.Printf("failed to open ts parquet file %s: %v\n", filename, err)
 		return err
 	}
-	stat, _ := pqfile.Stat()
-	p.file, err = parquet.OpenFile(pqfile, stat.Size())
+	stat, _ := p.pqfile.Stat()
+	p.file, err = parquet.OpenFile(p.pqfile, stat.Size())
 	if err != nil {
 		log.Printf("Parquet: failed to open ts parquet file %s: %v\n", filename, err)
 		return err
@@ -89,8 +91,12 @@ func (p *ParquetExplorer) Initialize(filename string) error {
 }
 
 func (p *ParquetExplorer) Delete() error {
+	var err error
+	if p.pqfile != nil {
+		err = p.pqfile.Close()
+	}
 	p.file = nil
-	return nil
+	return err
 }
 
 // Reduced schema type for reading just metrics information from parquet.
@@ -102,7 +108,7 @@ type metricRow struct {
 	Constant          bool              `parquet:"constant,optional"`
 }
 
-func (p *ParquetExplorer) GetMetrics(cache *map[int]*Metric) error {
+func (p *ParquetExplorer) GetMetrics(cache *map[uint64]*Metric) error {
 	reader := parquet.NewGenericReader[metricRow](p.file)
 	defer reader.Close()
 	for done := false; !done; {
@@ -119,23 +125,21 @@ func (p *ParquetExplorer) GetMetrics(cache *map[int]*Metric) error {
 			if i >= numRead {
 				break
 			}
-			// The MetricFingerprint gets written on the rows that have the metrics
-			// metadata, but not on the rows with the constant bit.
 			if result.Metric != "" {
-				m, exists := (*cache)[result.ID]
+				m, exists := (*cache)[result.MetricFingerprint]
 				if !exists {
 					m = &Metric{
 						RowId:       result.ID,
 						Fingerprint: result.MetricFingerprint,
 						LabelSet:    (model.LabelSet)(make(map[model.LabelName]model.LabelValue)),
 					}
-					(*cache)[result.ID] = m
+					(*cache)[result.MetricFingerprint] = m
 				} else {
 					log.Printf("metric found for row id %d and metric fp %d: %v\n", m.RowId, m.Fingerprint, m)
 					log.Printf("expanding with fingerprint %d, name %s, and labels %v\n",
 						result.MetricFingerprint, result.Metric, result.Labels)
+					m.Fingerprint = result.MetricFingerprint
 				}
-				m.Fingerprint = result.MetricFingerprint
 				m.LabelSet["__name__"] = (model.LabelValue)(result.Metric)
 				// TODO: these are currently always on the same row as the metric name, not sure
 				// if that will stay that way.
@@ -146,14 +150,15 @@ func (p *ParquetExplorer) GetMetrics(cache *map[int]*Metric) error {
 				}
 			}
 			if result.Constant {
-				m, exists := (*cache)[result.ID]
+				m, exists := (*cache)[result.MetricFingerprint]
 				if !exists {
 					m = &Metric{
-						RowId:    result.ID,
-						Constant: true,
-						LabelSet: make(map[model.LabelName]model.LabelValue),
+						Fingerprint: result.MetricFingerprint,
+						RowId:       result.ID,
+						Constant:    true,
+						LabelSet:    make(map[model.LabelName]model.LabelValue),
 					}
-					(*cache)[result.ID] = m
+					(*cache)[result.MetricFingerprint] = m
 				} else {
 					m.Constant = true
 				}
@@ -163,7 +168,7 @@ func (p *ParquetExplorer) GetMetrics(cache *map[int]*Metric) error {
 	return nil
 }
 
-func (s *SubgraphMemberships) addPair(row1 int, row2 int) {
+func (s *SubgraphMemberships) addPair(row1 uint64, row2 uint64) {
 	c1, have1 := s.Rows[row1]
 	c2, have2 := s.Rows[row2]
 
@@ -215,7 +220,7 @@ func (s *SubgraphMemberships) addPair(row1 int, row2 int) {
 	}
 }
 
-func (s *SubgraphMemberships) GetGraphId(rowId int) int {
+func (s *SubgraphMemberships) GetGraphId(rowId uint64) int {
 	if s.Rows == nil {
 		return -1
 	}
@@ -231,7 +236,7 @@ func (p *ParquetExplorer) GetSubgraphs() (*SubgraphMemberships, error) {
 	reader := parquet.NewGenericReader[reporter.Timeseries](p.file)
 	defer reader.Close()
 	subgraphs := &SubgraphMemberships{
-		Rows:           make(map[int]int),
+		Rows:           make(map[uint64]int),
 		Sizes:          make(map[int]int),
 		nextSubgraphId: 0,
 	}
@@ -255,7 +260,7 @@ func (p *ParquetExplorer) GetSubgraphs() (*SubgraphMemberships, error) {
 			if !(result.Pearson > 0.0) {
 				continue
 			}
-			subgraphs.addPair(result.ID, result.Correlated)
+			subgraphs.addPair(result.MetricFingerprint, result.Correlated)
 		}
 	}
 	return subgraphs, nil
@@ -289,11 +294,11 @@ func (p *ParquetExplorer) GetEdges(edgeChan chan<- []*Edge) error {
 			if !(result.Pearson > 0.0) {
 				continue
 			}
-			if result.ID >= result.Correlated {
+			if result.MetricFingerprint >= result.Correlated {
 				continue
 			}
 			edgeBuf = append(edgeBuf, &Edge{
-				Source:  result.ID,
+				Source:  result.MetricFingerprint,
 				Target:  result.Correlated,
 				Pearson: result.Pearson,
 			})
@@ -303,14 +308,13 @@ func (p *ParquetExplorer) GetEdges(edgeChan chan<- []*Edge) error {
 	return nil
 }
 
-// TODO: parse into Metric
-func (p *ParquetExplorer) LookupMetric(timeSeriesId int) (map[string]string, error) {
+func (p *ParquetExplorer) LookupMetric(timeSeriesId uint64) (map[string]string, error) {
 	if p.file == nil {
 		return nil, fmt.Errorf("parquet explorer has no parquet file")
 	}
 	ret := make(map[string]string)
 	for _, rg := range p.file.RowGroups() {
-		idchunk := rg.ColumnChunks()[p.idIndex]
+		idchunk := rg.ColumnChunks()[p.metricFingerprintIndex]
 		ididx, _ := idchunk.ColumnIndex()
 		found := parquet.Find(ididx, parquet.ValueOf(timeSeriesId),
 			parquet.CompareNullsLast(idchunk.Type().Compare))
@@ -338,7 +342,7 @@ func (p *ParquetExplorer) LookupMetric(timeSeriesId int) (map[string]string, err
 				if i >= numRead {
 					break
 				}
-				if result.ID != timeSeriesId {
+				if result.MetricFingerprint != timeSeriesId {
 					continue
 				}
 				if result.Metric != "" {

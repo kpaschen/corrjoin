@@ -1,0 +1,72 @@
+@startuml
+
+!theme plain
+hide empty methods
+
+!procedure $schema($name, $slug)
+package "$name" as $slug <<Rectangle>>
+!endprocedure
+
+!procedure $table($name, $slug)
+entity "<b>$name</b>" as $slug << (T, Orange) table >>
+!endprocedure
+
+!procedure $view($name, $slug)
+entity "<b>$name</b>" as $slug << (V, Aquamarine) view >>
+!endprocedure
+
+!procedure $pk($name)
+<color:#GoldenRod><&key></color> <b>$name</b>
+!endprocedure
+
+!procedure $fk($name)
+<color:#Silver><&key></color> $name
+!endprocedure
+
+!procedure $column($name)
+{field} <color:#White><&media-record></color> $name
+!endprocedure
+
+
+title "Publications Schema"
+
+
+$schema("CorrelationResults", "id_corrschema") {
+
+  $table("Metric", "id_metric") {
+    $pk("Fingerprint"): UINT64
+    $column("Name"): String
+    $column("LabelValues"): MAP[String]String
+  }
+
+  $table("TimeWindow", "id_window") {
+    $pk("ID"): INTEGER
+    $column("StartTime"): UINT64 (UnixSeconds UTC)
+    $column("EndTime"): UINT64 (UnixSeconds UTC)
+  }
+
+  $table("MetricStatus", "id_metric_status") {
+    $fk("MetricFP"): UINT64
+    $fk("TimeWindowId"): INTEGER
+    $column("Constant"): BOOL
+  }
+}
+
+id_corrschema.id_metric_status::MetricFP  ||--o{ id_corrschema.id_metric::MetricFP : FK_METRIC
+id_corrschema.id_metric_status::TimeWindowId  ||--o{ id_corrschema.id_window::ID : FK_TIME_WINDOW
+id_timeseries_data.id_timeseries_values::MetricFP  ||--o{ id_corrschema.id_metric::MetricFP : FK_METRIC
+
+
+$schema("TimeseriesData", "id_timeseries_data") {
+  $table("TimeseriesValues", "id_timeseries_values") {
+    $pk("MetricFP"): UINT64
+    $column("time"): UINT64 (UnixSeconds UTC)
+    $column("value"): FLOAT
+  }
+
+}
+
+
+
+
+@enduml

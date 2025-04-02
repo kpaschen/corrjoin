@@ -1,10 +1,14 @@
 image:
   repository: "localhost:5001"
   image: "mmloadtest"
+  stressimage: "corrjoinstress"
   version: "latest"
+  stressversion: "latest"
 
 serviceAccount:
   name: mmloadtest-sa
 
 port: 80
 metricsPort: 8888
+
+enableStressPod: false

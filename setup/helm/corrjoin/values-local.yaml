@@ -23,7 +23,8 @@ corrjoin:
    windowSize: 100
    stride: 50
    sampleInterval: 20
-   correlationThreshold: 99
+   correlationThreshold: 90
+   strideMaxAgeSeconds: 10000
    maxRows: 0
 
 receiverNodeSelector:

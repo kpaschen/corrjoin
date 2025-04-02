@@ -10,12 +10,12 @@ flavor=${FLAVOR:-local}
 # This needs to match the image.registry setting in your values-${flavor}.yaml files.
 imageregistry=${IMAGEREGISTRY:-localhost:5001}
 
-# Set BUILDTESTHOME to a nonempty value if you want to build the custom apache
+# Set BUILDLOCAL to a nonempty value if you want to build the custom apache
 # and load test images. If you do this, they will be pushed to $imageregistry.
 
 # Building the mattermost loadtesting tool involves checking it out from git.
 # LTHOME is the parent directory of where you want to check out the loadtesting code.
-# You only need this if you also set BUILDTESTHOME.
+# You only need this if you also set BUILDLOCAL.
 LTHOME=${LTHOME:-/home/developer/code}
 
 repo_exists=$(helm repo list -o json | yq '.[] | select(.name == "mattermost") .url')
@@ -25,14 +25,14 @@ fi
 helm repo update
 
 # Install postgres so mattermost can use it
-kubectl get namespace -o name postgres
+kubectl get namespace -o name postgres 2>/dev/null
 if [ $? -ne 0 ]; then 
    kubectl create ns postgres
 fi
 
 # The postgres chart also contains the mattermost db secret, so make sure
 # that namespace also exists.
-kubectl get namespace -o name mattermost
+kubectl get namespace -o name mattermost 2>/dev/null
 if [ $? -ne 0 ]; then 
    kubectl create ns mattermost
 fi
@@ -42,7 +42,7 @@ helm upgrade --install postgres . -f values-${flavor}.yaml
 )
 
 # Install mattermost
-kubectl get namespace -o name mattermost-operator
+kubectl get namespace -o name mattermost-operator 2>/dev/null
 if [ $? -ne 0 ]; then 
    kubectl create ns mattermost-operator
 fi
@@ -50,7 +50,7 @@ helm upgrade --install mattermost-operator mattermost/mattermost-operator -n mat
 
 kubectl apply -f mattermost-installation.yaml
 
-if [ ! -z ${BUILDPACKAGES} ]; then
+if [ ! -z ${BUILDLOCAL} ]; then
 echo "building custom apache image"
 (
 cd apache
@@ -61,7 +61,7 @@ fi
 
 # Set up apache in kubernetes.
 # This is so we can attach an apache exporter to it for monitoring.
-kubectl get namespace -o name apache
+kubectl get namespace -o name apache 2>/dev/null
 if [ $? -ne 0 ]; then 
    kubectl create ns apache
 fi
@@ -75,10 +75,11 @@ helm upgrade --install apache . -f values-${flavor}.yaml
 # First, we need to create an admin user for mattermost.
 mmpod=$(kubectl -n mattermost get pods -o=name | grep mm-corrjoin)
 
+# These can fail if the account already exists, that is not a problem.
 kubectl -n mattermost exec $mmpod -c mattermost -- /mattermost/bin/mmctl --local user create --email=nobody@nephometrics.com --username=mmadmin --password=mmadmin123
 kubectl -n mattermost exec $mmpod -c mattermost -- /mattermost/bin/mmctl --local roles system-admin mmadmin
 
-if [ ! -z "${BUILDPACKAGES}" ]; then
+if [ ! -z "${BUILDLOCAL}" ]; then
 echo "building custom apache mattermost load test image"
 mkdir -p $LTHOME
 (
@@ -98,9 +99,14 @@ cd ${LTHOME}/mattermost-load-test-ng
 docker build -f Dockerfile-lt -t ${imageregistry}/mmloadtest:latest .
 docker push ${imageregistry}/mmloadtest:latest
 )
+(
+cd loadtest
+docker build -f Dockerfile-stress -t ${imageregistry}/corrjoinstress:latest .
+docker push ${imageregistry}/corrjoinstress:latest
+)
 fi
 
-kubectl get namespace -o name mattermost-lt
+kubectl get namespace -o name mattermost-lt 2> /dev/null
 if [ $? -ne 0 ]; then 
    kubectl create ns mattermost-lt
 fi

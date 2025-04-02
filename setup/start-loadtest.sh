@@ -20,6 +20,6 @@ done
 
 curl -d "{\"LoadTestConfig\": $(cat loadtest/config.json)}" http://localhost:4000/loadagent/create\?id\=lt0
 curl -X POST http://localhost:4000/loadagent/lt0/run
-curl -X POST http://localhost:4000/loadagent/lt0/addusers?amount=10
+curl -X POST http://localhost:4000/loadagent/lt0/addusers?amount=200
 
 echo "Loadtest is running. stop-loadtest.sh will stop it."

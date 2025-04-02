@@ -40,13 +40,8 @@ type Stride struct {
 	Filename        string
 	subgraphs       *explorerlib.SubgraphMemberships
 
-	// Maps metric fingerprints to rowids
-	metricsCache map[uint64](int)
-	// Maps rowids to metric structs.
-	// The metrics cache is on the stride because
-	// 1. rowids can change after a restart
-	// 2. the metric struct also records whether a metric was constant
-	metricsCacheByRowId map[int](*explorerlib.Metric)
+	// Maps metric fingerprints to Metrics.
+	metricsCache map[uint64](*explorerlib.Metric)
 }
 
 type PromQueryResponse struct {

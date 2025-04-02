@@ -1,0 +1,20 @@
+# This should monitor the local volumes provisioner but
+# it doesn't currently work, perhaps because the local volume
+# daemonset does not specify the ports explicitly?
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: localvolumes-monitor
+  namespace: kube-system
+  labels:
+     app.kubernetes.io/instance: prometheus
+spec:
+  podMetricsEndpoints:
+    - honorLabels: true
+      interval: 15s
+      path: /metrics
+      targetPort: 8080
+      scheme: http
+  selector:
+     matchLabels:
+       k8s-app: local-volume-provisioner

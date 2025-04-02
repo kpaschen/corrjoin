@@ -338,8 +338,8 @@ func (w *TimeseriesWindow) fullPearson() error {
 			}
 		}
 	}
-
-	return nil
+	err := w.comparer.StopStride(w.StrideCounter)
+	return err
 }
 
 func (w *TimeseriesWindow) pAAOnly() error {
@@ -368,7 +368,8 @@ func (w *TimeseriesWindow) pAAOnly() error {
 
 		}
 	}
-	return nil
+	err := w.comparer.StopStride(w.StrideCounter)
+	return err
 }
 
 func (w *TimeseriesWindow) processBuffer() error {
