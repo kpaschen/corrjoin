@@ -1,5 +1,5 @@
 // Package main has a command-line tool for evaluating the system in batch mode.
-// If you are looking for the code that runs in Kubernetes, look in the redeiver package.
+// If you are looking for the code that runs in Kubernetes, look in the frontend package.
 package main
 
 import (
