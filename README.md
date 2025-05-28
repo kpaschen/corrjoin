@@ -1,3 +1,5 @@
+# Note: this repository has been moved to https://codeberg.org/kpaschen/corrjoin
+
 # Correlating Prometheus timeseries
 
 ## What does this do?
