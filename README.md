@@ -22,7 +22,7 @@ for that, it was just easy.
 
 The explorer scans the directory with the Parquet files. When it finds a Parquet file that it
 hasn't read yet, it reads it and extracts some information from it. It stores this information
-in the file system as .json files. This is just a caching mechanism because the Parquet files
+in the file system as .csv files. This is just a caching mechanism because the Parquet files
 can be quite large.
 
 The explorer provides a REST API endpoint that serves json data and I use it as a backend
@@ -77,12 +77,6 @@ hand, large row groups need more memory, so it's a balance. That's why there is 
 For the systems I have experimented with (30-60k timeseries, correlation threshold 0.90-0.99, row group size 20k),
 the parquet files are 0.5-1.2GB in size. If you write one every half hour, you're using 1-2GB of disk space per hour. I usually keep only the latest 10 parquet files around, so 30GB of disk space should be enough.
 
-### Watch out for OOMKills
-
-In some Kubernetes installations, the receiver/explorer process gets Oomkilled. So far, this appears to be related to the cached bytes in
-the cgroup not being reclaimed. I am debugging this; for now, the system works fine in a Kind cluster. If you have insights, please
-share them.
-
 ### Creating more interesting time series
 
 With the above setup, your cluster will be mostly quiet, so you'll have a lot of constant time series.
@@ -96,6 +90,10 @@ I then run a loadtesting tool published by the Mattermost team.
 All the details are in the setup script in `setup/install-loadtestenv.sh`.
 You should probably take a look at the script before running it, since it wants a few parameters to be configured
 via environment variables.
+
+If you want more interesting data, there is a `stresstest` pod in the loadtest helm chart. This is not enabled by default.
+If you turn it on, it will run on the same node as the mattermost service (via pod affinity) and create some cpu load and
+i/o operations there. You can turn the stress up or down by modifying the parameters in the pod template.
 
 ## Getting value out of the data
 
